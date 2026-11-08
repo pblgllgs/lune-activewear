@@ -14,6 +14,8 @@ export interface Product {
   care?: string;
   shipping?: string;
   sizes: string[];
+  /** Unidades disponibles por talla. Si falta una talla, se considera sin límite. */
+  stockBySize?: Record<string, number>;
   colors: ProductColor[];
   images: string[];
   featured?: boolean;

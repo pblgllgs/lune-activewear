@@ -146,7 +146,8 @@ export function CartDrawer() {
                           <button
                             type="button"
                             onClick={() => setQty(item.key, item.qty + 1)}
-                            className="flex h-8 w-8 items-center justify-center transition hover:bg-secondary"
+                            disabled={typeof item.stock === "number" && item.qty >= item.stock}
+                            className="flex h-8 w-8 items-center justify-center transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40"
                             aria-label="Sumar unidad"
                           >
                             <Plus className="h-3 w-3" />

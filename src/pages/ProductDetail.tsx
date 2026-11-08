@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { getProduct, getProducts } from "@/lib/catalog";
 import { categoryLabel } from "@/lib/categories";
+import { firstAvailableSize, isSizeSoldOut, isSoldOut, sizeStock } from "@/lib/stock";
 import { discountPercent, formatCLP } from "@/lib/utils";
 import { whatsappLink } from "@/lib/constants";
 import { useCart } from "@/context/CartContext";
@@ -41,7 +42,7 @@ export default function ProductDetail() {
     getProduct(id)
       .then((found) => {
         setProduct(found);
-        setSize(found?.sizes[0] ?? "Único");
+        setSize(found ? firstAvailableSize(found) : "Único");
         setColor(found?.colors[0]?.name ?? "Único");
       })
       .finally(() => setLoading(false));
@@ -77,11 +78,17 @@ export default function ProductDetail() {
   const sameCategory = related.filter((p) => p.category === product.category).slice(0, 4);
   const suggestions = sameCategory.length > 0 ? sameCategory : related.slice(0, 4);
   const currentImage = images[index] ?? images[0];
+  const soldOut = isSoldOut(product);
+  const currentStock = sizeStock(product, size);
 
   const prev = () => setIndex((i) => (i - 1 + images.length) % images.length);
   const next = () => setIndex((i) => (i + 1) % images.length);
 
   const handleAdd = () => {
+    if (currentStock === 0) {
+      toast.error("Esa talla está agotada.");
+      return;
+    }
     addItem({
       productId: product.id,
       name: product.name,
@@ -90,6 +97,7 @@ export default function ProductDetail() {
       size,
       color,
       qty,
+      stock: currentStock ?? undefined,
     });
     toast.success(`${product.name} se agregó al carrito.`);
     openCart();
@@ -134,6 +142,7 @@ export default function ProductDetail() {
             <div className="absolute left-4 top-4 flex flex-col gap-1.5">
               {product.isNew && <Badge variant="accent">Nuevo</Badge>}
               {discount > 0 && <Badge>-{discount}%</Badge>}
+              {soldOut && <Badge variant="secondary">Agotado</Badge>}
             </div>
 
             {images.length > 1 && (
@@ -243,21 +252,39 @@ export default function ProductDetail() {
               </Link>
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
-              {product.sizes.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setSize(s)}
-                  className={`min-w-11 rounded-md border px-3 py-2 text-xs transition ${
-                    size === s
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-input hover:border-primary"
-                  }`}
-                >
-                  {s}
-                </button>
-              ))}
+              {product.sizes.map((s) => {
+                const out = isSizeSoldOut(product, s);
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => {
+                      setSize(s);
+                      setQty(1);
+                    }}
+                    disabled={out}
+                    title={out ? "Talla agotada" : undefined}
+                    className={`min-w-11 rounded-md border px-3 py-2 text-xs transition ${
+                      out
+                        ? "cursor-not-allowed border-input text-muted-foreground/50 line-through"
+                        : size === s
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-input hover:border-primary"
+                    }`}
+                  >
+                    {s}
+                  </button>
+                );
+              })}
             </div>
+            {currentStock === 0 && (
+              <p className="mt-2 text-xs text-destructive">Esta talla está agotada.</p>
+            )}
+            {currentStock !== null && currentStock > 0 && currentStock <= 5 && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Quedan {currentStock} unidad{currentStock === 1 ? "" : "es"} en talla {size}.
+              </p>
+            )}
           </div>
 
           {/* Cantidad + agregar */}
@@ -275,14 +302,21 @@ export default function ProductDetail() {
               <button
                 type="button"
                 onClick={() => setQty((q) => q + 1)}
-                className="flex h-full w-10 items-center justify-center transition hover:bg-secondary"
+                disabled={currentStock !== null && qty >= currentStock}
+                className="flex h-full w-10 items-center justify-center transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40"
                 aria-label="Sumar unidad"
               >
                 <Plus className="h-3.5 w-3.5" />
               </button>
             </div>
-            <Button size="lg" className="flex-1" onClick={handleAdd}>
-              <ShoppingBag className="h-4 w-4" /> Agregar al carrito
+            <Button
+              size="lg"
+              className="flex-1"
+              onClick={handleAdd}
+              disabled={currentStock === 0}
+            >
+              <ShoppingBag className="h-4 w-4" />
+              {currentStock === 0 ? "Talla agotada" : "Agregar al carrito"}
             </Button>
           </div>
 

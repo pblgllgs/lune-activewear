@@ -29,6 +29,7 @@ import {
 import { auth, db, isFirebaseConfigured } from "@/lib/firebase";
 import { deleteFromR2, isUploadConfigured, slugify, uploadToR2 } from "@/lib/upload";
 import { normalizeProduct, seedDemoProducts } from "@/lib/catalog";
+import { totalStock } from "@/lib/stock";
 import { CATEGORIES, categoryLabel } from "@/lib/categories";
 import { formatCLP } from "@/lib/utils";
 import type { Product, ProductColor } from "@/types/product";
@@ -205,6 +206,12 @@ function ProductForm({ editing }: { editing: Product | null }) {
   const [sizes, setSizes] = useState<string[]>(
     editing?.sizes?.length ? editing.sizes : ["S", "M", "L"]
   );
+  const [stockBySize, setStockBySize] = useState<Record<string, number>>(() => {
+    const initialSizes = editing?.sizes?.length ? editing.sizes : ["S", "M", "L"];
+    return Object.fromEntries(
+      initialSizes.map((size) => [size, editing?.stockBySize?.[size] ?? 5])
+    );
+  });
   const [colors, setColors] = useState<ProductColor[]>(
     editing?.colors?.length ? editing.colors : [{ name: "Chocolate", hex: "#49372D" }]
   );
@@ -219,10 +226,20 @@ function ProductForm({ editing }: { editing: Product | null }) {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => setForm({ ...form, [key]: e.target.value });
 
-  const toggleSize = (size: string) =>
+  const toggleSize = (size: string) => {
     setSizes((current) =>
       current.includes(size) ? current.filter((s) => s !== size) : [...current, size]
     );
+    setStockBySize((current) =>
+      current[size] === undefined ? { ...current, [size]: 5 } : current
+    );
+  };
+
+  const setStock = (size: string, value: string) =>
+    setStockBySize((current) => ({
+      ...current,
+      [size]: Math.max(0, Math.floor(Number(value) || 0)),
+    }));
 
   const updateColor = (index: number, patch: Partial<ProductColor>) =>
     setColors((current) => current.map((c, i) => (i === index ? { ...c, ...patch } : c)));
@@ -305,6 +322,9 @@ function ProductForm({ editing }: { editing: Product | null }) {
         care: form.care,
         shipping: form.shipping,
         sizes,
+        stockBySize: Object.fromEntries(
+          sizes.map((size) => [size, Math.max(0, Math.floor(stockBySize[size] ?? 0))])
+        ),
         colors: colors.filter((c) => c.name.trim()),
         images: urls,
         featured: form.featured,
@@ -332,6 +352,7 @@ function ProductForm({ editing }: { editing: Product | null }) {
         setImages([]);
         setColors([{ name: "Chocolate", hex: "#49372D" }]);
         setSizes(["S", "M", "L"]);
+        setStockBySize({ S: 5, M: 5, L: 5 });
         setForm({
           name: "",
           category: CATEGORIES[0].id,
@@ -430,9 +451,14 @@ function ProductForm({ editing }: { editing: Product | null }) {
             </div>
           </div>
 
-          {/* Tallas */}
+          {/* Tallas y stock */}
           <div>
-            <Label className="text-base">Tallas disponibles *</Label>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Label className="text-base">Tallas disponibles *</Label>
+              <span className="text-[11px] text-muted-foreground">
+                Cantidad por talla · 0 = agotada
+              </span>
+            </div>
             <div className="mt-3 flex flex-wrap gap-2">
               {SIZE_OPTIONS.map((size) => (
                 <button
@@ -449,6 +475,24 @@ function ProductForm({ editing }: { editing: Product | null }) {
                 </button>
               ))}
             </div>
+
+            {sizes.length > 0 && (
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                {SIZE_OPTIONS.filter((size) => sizes.includes(size)).map((size) => (
+                  <div key={size} className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Talla {size}</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={stockBySize[size] ?? 0}
+                      onChange={(e) => setStock(size, e.target.value)}
+                      aria-label={`Cantidad disponible talla ${size}`}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Colores */}
@@ -641,6 +685,7 @@ export default function Admin() {
     return {
       count: products.length,
       featured: products.filter((p) => p.featured).length,
+      stock: products.reduce((sum, product) => sum + totalStock(product), 0),
       value,
     };
   }, [products]);
@@ -761,11 +806,17 @@ export default function Admin() {
 
         {tab === "dashboard" && (
           <>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Card>
                 <CardHeader>
                   <CardTitle className="text-3xl">{stats.count}</CardTitle>
                   <CardDescription>Productos publicados</CardDescription>
+                </CardHeader>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-3xl">{stats.stock}</CardTitle>
+                  <CardDescription>Unidades en stock</CardDescription>
                 </CardHeader>
               </Card>
               <Card>
@@ -866,6 +917,14 @@ export default function Admin() {
                         <p className="mt-1 truncate text-xs text-muted-foreground">
                           {categoryLabel(product.category)} · {formatCLP(product.price)} ·{" "}
                           {product.sizes.join(" / ") || "sin tallas"} · {product.images.length} imágenes
+                        </p>
+                        <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                          Stock:{" "}
+                          {product.sizes.length > 0
+                            ? product.sizes
+                                .map((size) => `${size} ${product.stockBySize?.[size] ?? "—"}`)
+                                .join(" · ")
+                            : "sin tallas"}
                         </p>
                       </div>
                       <div className="flex shrink-0 gap-1">

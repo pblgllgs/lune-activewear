@@ -12,7 +12,7 @@ const SIZES = ["XS", "S", "M", "L", "XL"];
  * (o si la lectura falla). Al conectar Firestore, el panel admin reemplaza
  * estos productos por los reales.
  */
-export const DEMO_PRODUCTS: Product[] = [
+const DEMO_BASE: Product[] = [
   {
     id: "demo-calza-flare",
     name: "Calza Flare",
@@ -205,6 +205,21 @@ export const DEMO_PRODUCTS: Product[] = [
   },
 ];
 
+/** El catálogo de ejemplo parte con 5 unidades por talla. */
+export const DEMO_PRODUCTS: Product[] = DEMO_BASE.map((product) => ({
+  ...product,
+  stockBySize: Object.fromEntries(product.sizes.map((size) => [size, 5])),
+}));
+
+function normalizeStock(value: unknown): Record<string, number> | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const entries = Object.entries(value as Record<string, unknown>)
+    .map(([size, qty]) => [size, Number(qty)] as const)
+    .filter(([, qty]) => Number.isFinite(qty))
+    .map(([size, qty]) => [size, Math.max(0, Math.floor(qty))] as const);
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
 export function normalizeProduct(id: string, data: Record<string, unknown>): Product {
   return {
     id,
@@ -217,6 +232,7 @@ export function normalizeProduct(id: string, data: Record<string, unknown>): Pro
     care: data.care ? String(data.care) : undefined,
     shipping: data.shipping ? String(data.shipping) : undefined,
     sizes: Array.isArray(data.sizes) ? (data.sizes as string[]) : [],
+    stockBySize: normalizeStock(data.stockBySize),
     colors: Array.isArray(data.colors) ? (data.colors as Product["colors"]) : [],
     images: Array.isArray(data.images) ? (data.images as string[]) : [],
     featured: Boolean(data.featured),

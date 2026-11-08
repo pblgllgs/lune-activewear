@@ -2,12 +2,14 @@ import { Link } from "react-router-dom";
 import { ArrowUpRight } from "lucide-react";
 import type { Product } from "@/types/product";
 import { categoryLabel } from "@/lib/categories";
+import { isSoldOut } from "@/lib/stock";
 import { discountPercent, formatCLP } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { ImageWithFallback } from "@/components/shop/ImageWithFallback";
 
 export function ProductCard({ product }: { product: Product }) {
   const discount = discountPercent(product.price, product.compareAtPrice);
+  const soldOut = isSoldOut(product);
 
   return (
     <Link to={`/producto/${product.id}`} className="group block">
@@ -21,6 +23,7 @@ export function ProductCard({ product }: { product: Product }) {
         <div className="absolute left-3 top-3 flex flex-col items-start gap-1.5">
           {product.isNew && <Badge variant="accent">Nuevo</Badge>}
           {discount > 0 && <Badge>-{discount}%</Badge>}
+          {soldOut && <Badge variant="secondary">Agotado</Badge>}
         </div>
 
         <span className="absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center rounded-full bg-background/90 text-primary opacity-0 shadow-sm backdrop-blur transition group-hover:opacity-100">

@@ -17,6 +17,8 @@ export interface CartItem {
   size: string;
   color: string;
   qty: number;
+  /** Unidades disponibles al agregar (para no superar el stock desde el carrito). */
+  stock?: number;
 }
 
 interface CartContextValue {
@@ -70,9 +72,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems((current) => {
       const existing = current.find((i) => i.key === key);
       if (existing) {
-        return current.map((i) => (i.key === key ? { ...i, qty: i.qty + qty } : i));
+        const max = typeof existing.stock === "number" ? existing.stock : Number.POSITIVE_INFINITY;
+        return current.map((i) =>
+          i.key === key ? { ...i, qty: Math.min(max, i.qty + qty) } : i
+        );
       }
-      return [...current, { ...item, key, qty }];
+      const max = typeof item.stock === "number" ? item.stock : Number.POSITIVE_INFINITY;
+      return [...current, { ...item, key, qty: Math.min(max, qty) }];
     });
   }, []);
 
@@ -83,7 +89,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const setQty = useCallback((key: string, qty: number) => {
     setItems((current) =>
       current
-        .map((i) => (i.key === key ? { ...i, qty: Math.max(0, qty) } : i))
+        .map((i) => {
+          if (i.key !== key) return i;
+          const max = typeof i.stock === "number" ? i.stock : Number.POSITIVE_INFINITY;
+          return { ...i, qty: Math.min(max, Math.max(0, qty)) };
+        })
         .filter((i) => i.qty > 0)
     );
   }, []);
