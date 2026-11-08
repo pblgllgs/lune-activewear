@@ -4,7 +4,7 @@ import { ArrowRight, ArrowUpRight, RefreshCw, ShieldCheck, Sparkles, Truck } fro
 import { Button } from "@/components/ui/button";
 import { ProductCard } from "@/components/shop/ProductCard";
 import { SectionHeading } from "@/components/shop/SectionHeading";
-import { ImageWithFallback } from "@/components/shop/ImageWithFallback";
+import { HeroCarousel } from "@/components/shop/HeroCarousel";
 import { ContactSection } from "@/components/contact/ContactSection";
 import { FaqSection, FAQS } from "@/components/shop/FaqSection";
 import { CATEGORIES } from "@/lib/categories";
@@ -73,10 +73,10 @@ export default function Home() {
         <div className="grid overflow-hidden rounded-2xl bg-secondary md:grid-cols-2">
           <div className="order-2 flex flex-col justify-center px-7 py-12 md:order-1 md:px-12 md:py-16 lg:px-16">
             <p className="text-[10px] uppercase tracking-brand text-muted-foreground md:text-[11px]">
-              The first collection
+              La primera colección
             </p>
             <h1 className="mt-4 font-display text-4xl font-medium leading-[1.05] tracking-tight md:text-5xl lg:text-6xl">
-              Move with
+              Muévete con
               <br />
               Luné.
             </h1>
@@ -100,16 +100,15 @@ export default function Home() {
           </div>
 
           <div className="relative order-1 min-h-[340px] md:order-2 md:min-h-[560px]">
-            <ImageWithFallback
-              src={content.heroImage}
+            <HeroCarousel
+              images={content.heroImages}
               alt="Modelo con ropa deportiva LUNÉ"
-              priority
-              className="absolute inset-0 h-full w-full object-cover"
+              className="absolute inset-0"
             />
-            <span className="absolute left-4 top-4 rounded-full bg-background/85 px-3 py-1.5 text-[10px] uppercase tracking-wider2 backdrop-blur">
+            <span className="pointer-events-none absolute left-4 top-4 rounded-full bg-background/85 px-3 py-1.5 text-[10px] uppercase tracking-wider2 backdrop-blur">
               Nueva colección
             </span>
-            <span className="absolute bottom-4 right-4 text-[9px] uppercase tracking-brand text-primary-foreground/90 drop-shadow">
+            <span className="pointer-events-none absolute right-4 top-4 rounded-full bg-background/85 px-3 py-1.5 text-[10px] uppercase tracking-brand backdrop-blur">
               LUNÉ · Chillán, Chile
             </span>
           </div>

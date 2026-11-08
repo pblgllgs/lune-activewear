@@ -261,7 +261,8 @@ for (const product of products) {
 console.log(`[seo-pages] ${count} páginas estáticas generadas en ${dist}`);
 
 // Reglas explícitas para servir las páginas con meta propio. Las rutas no
-// listadas (productos nuevos) caen al catch-all y las resuelve React.
+// listadas (productos nuevos, 404) las resuelve el fallback SPA de Pages:
+// sin un 404.html propio, Pages sirve el index.html raíz en rutas sin asset.
 const redirects = [
   "/tienda /tienda/index.html 200",
   "/nosotros /nosotros/index.html 200",
@@ -269,7 +270,6 @@ const redirects = [
   ...products
     .filter((product) => product.name)
     .map((product) => `/producto/${product.id} /producto/${product.id}/index.html 200`),
-  "/* /index.html 200",
 ].join("\n");
 
 await writeFile(path.join(dist, "_redirects"), `${redirects}\n`, "utf8");

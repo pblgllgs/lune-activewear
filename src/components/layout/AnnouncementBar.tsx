@@ -2,7 +2,7 @@ import { CreditCard, MapPin, Truck } from "lucide-react";
 
 const items = [
   { icon: Truck, text: "Envío gratis en compras sobre $50.000" },
-  { icon: CreditCard, text: "3 cuotas sin interés con tarjetas de crédito" },
+  { icon: CreditCard, text: "Efectivo y transferencias" },
   { icon: MapPin, text: "Retiro gratis en Chillán" },
 ];
 

@@ -30,3 +30,6 @@ worker/node_modules/
 
 # Generado en prebuild
 public/sitemap.xml
+
+# Fotos fuente del carrusel (se suben a R2; no se versionan)
+carousel/
