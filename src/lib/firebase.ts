@@ -1,5 +1,4 @@
 import { initializeApp, type FirebaseApp } from "firebase/app";
-import { getAnalytics, isSupported } from "firebase/analytics";
 import { getAuth, type Auth } from "firebase/auth";
 import { initializeFirestore, type Firestore } from "firebase/firestore";
 
@@ -21,16 +20,12 @@ export const isFirebaseConfigured = Boolean(
   firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.appId
 );
 
-const app: FirebaseApp | null = isFirebaseConfigured ? initializeApp(firebaseConfig) : null;
+export const app: FirebaseApp | null = isFirebaseConfigured ? initializeApp(firebaseConfig) : null;
 
 export const auth: Auth | null = app ? getAuth(app) : null;
 export const db: Firestore | null = app
   ? initializeFirestore(app, { ignoreUndefinedProperties: true })
   : null;
 
-// Analytics es opcional y no bloquea el arranque de la app.
-if (app && firebaseConfig.measurementId && typeof window !== "undefined") {
-  void isSupported().then((supported) => {
-    if (supported && app) getAnalytics(app);
-  });
-}
+// Analytics (Google Analytics 4) NO se inicializa aquí: se carga solo cuando la
+// clienta acepta las cookies analíticas. Ver `src/lib/analytics.ts`.

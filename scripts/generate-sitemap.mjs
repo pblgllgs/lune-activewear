@@ -17,6 +17,7 @@ const staticUrls = [
     priority: "0.8",
   })),
   { loc: "/nosotros", changefreq: "monthly", priority: "0.6" },
+  { loc: "/privacidad", changefreq: "monthly", priority: "0.3" },
 ];
 
 const products = await fetchProducts();

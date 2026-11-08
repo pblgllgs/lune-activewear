@@ -200,6 +200,24 @@ const aboutMeta = {
   },
 };
 
+const privacyMeta = {
+  title: "Política de datos y privacidad | LUNÉ Activewear",
+  description:
+    "Qué datos personales recogemos, para qué los usamos, cuánto tiempo los conservamos y cómo ejercer tus derechos conforme a la Ley 21.719. Incluye el detalle de cookies de la tienda.",
+  canonical: `${SITE_URL}/privacidad`,
+  heading: "Política de datos y privacidad",
+  jsonLd: {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    name: "Política de datos y privacidad — LUNÉ Activewear",
+    description:
+      "Política de tratamiento de datos personales y aviso de cookies de LUNÉ Activewear conforme a la Ley 21.719.",
+    url: `${SITE_URL}/privacidad`,
+    inLanguage: "es-CL",
+    isPartOf: { "@type": "WebSite", name: SITE_NAME, url: SITE_URL },
+  },
+};
+
 const adminMeta = {
   title: "Administración | LUNÉ Activewear",
   description: "Panel privado de administración de LUNÉ Activewear.",
@@ -211,6 +229,8 @@ const adminMeta = {
 await writePage("/tienda", applyMeta(template, shopMeta));
 count += 1;
 await writePage("/nosotros", applyMeta(template, aboutMeta));
+count += 1;
+await writePage("/privacidad", applyMeta(template, privacyMeta));
 count += 1;
 await writePage("/admin", applyMeta(template, adminMeta));
 count += 1;
@@ -266,6 +286,7 @@ console.log(`[seo-pages] ${count} páginas estáticas generadas en ${dist}`);
 const redirects = [
   "/tienda /tienda/index.html 200",
   "/nosotros /nosotros/index.html 200",
+  "/privacidad /privacidad/index.html 200",
   "/admin /admin/index.html 200",
   ...products
     .filter((product) => product.name)

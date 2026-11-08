@@ -9,6 +9,7 @@ import {
   whatsappLink,
 } from "@/lib/constants";
 import { CATEGORIES } from "@/lib/categories";
+import { openCookiePreferences } from "@/lib/consent";
 
 function InstagramIcon({ className }: { className?: string }) {
   return (
@@ -34,6 +35,7 @@ const helpLinks = [
   { label: "Guía de tallas", to: "/#preguntas" },
   { label: "Nosotros", to: "/nosotros" },
   { label: "Contacto", to: "/#contacto" },
+  { label: "Política de datos", to: "/privacidad" },
 ];
 
 export function Footer() {
@@ -119,6 +121,15 @@ export function Footer() {
                   </Link>
                 </li>
               ))}
+              <li>
+                <button
+                  type="button"
+                  onClick={openCookiePreferences}
+                  className="text-left transition hover:text-primary-foreground"
+                >
+                  Preferencias de cookies
+                </button>
+              </li>
             </ul>
           </div>
 

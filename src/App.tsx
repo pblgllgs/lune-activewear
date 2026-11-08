@@ -7,6 +7,7 @@ import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { CartDrawer } from "@/components/layout/CartDrawer";
+import { CookieBanner } from "@/components/layout/CookieBanner";
 import { WhatsAppFloat } from "@/components/layout/WhatsAppFloat";
 import { useSeo } from "@/lib/seo";
 import Home from "@/pages/Home";
@@ -14,6 +15,7 @@ import Home from "@/pages/Home";
 const Shop = lazy(() => import("@/pages/Shop"));
 const ProductDetail = lazy(() => import("@/pages/ProductDetail"));
 const Favorites = lazy(() => import("@/pages/Favorites"));
+const Privacy = lazy(() => import("@/pages/Privacy"));
 const About = lazy(() => import("@/pages/About"));
 const Admin = lazy(() => import("@/pages/Admin"));
 
@@ -79,6 +81,7 @@ function App() {
                   <Route path="/tienda" element={<Shop />} />
                   <Route path="/producto/:id" element={<ProductDetail />} />
                   <Route path="/favoritos" element={<Favorites />} />
+                  <Route path="/privacidad" element={<Privacy />} />
                   <Route path="/nosotros" element={<About />} />
                   <Route path="/admin" element={<Admin />} />
                   <Route path="*" element={<NotFound />} />
@@ -87,6 +90,7 @@ function App() {
             </main>
             <Footer />
             <CartDrawer />
+            <CookieBanner />
             <WhatsAppFloat />
           </div>
         </WishlistProvider>
