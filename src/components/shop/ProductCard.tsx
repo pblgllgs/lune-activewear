@@ -28,21 +28,19 @@ export function ProductCard({ product }: { product: Product }) {
         </span>
       </div>
 
-      <div className="mt-3 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[10px] uppercase tracking-wider2 text-muted-foreground">
-            {categoryLabel(product.category)}
+      <div className="mt-3">
+        <p className="text-[10px] uppercase tracking-wider2 text-muted-foreground">
+          {categoryLabel(product.category)}
+        </p>
+        <div className="mt-0.5 flex items-baseline justify-between gap-3">
+          <h3 className="truncate font-display text-base font-medium">{product.name}</h3>
+          <p className="shrink-0 text-sm font-medium">{formatCLP(product.price)}</p>
+        </div>
+        {discount > 0 && product.compareAtPrice && (
+          <p className="mt-0.5 text-xs text-muted-foreground line-through">
+            {formatCLP(product.compareAtPrice)}
           </p>
-          <h3 className="mt-0.5 truncate font-display text-base font-medium">{product.name}</h3>
-        </div>
-        <div className="shrink-0 text-right">
-          <p className="text-sm font-medium">{formatCLP(product.price)}</p>
-          {discount > 0 && product.compareAtPrice && (
-            <p className="text-xs text-muted-foreground line-through">
-              {formatCLP(product.compareAtPrice)}
-            </p>
-          )}
-        </div>
+        )}
       </div>
     </Link>
   );

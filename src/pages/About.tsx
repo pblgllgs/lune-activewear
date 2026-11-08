@@ -4,9 +4,9 @@ import { Button } from "@/components/ui/button";
 import { ImageWithFallback } from "@/components/shop/ImageWithFallback";
 
 const IMAGE_ONE =
-  "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=1000&q=80";
+  "https://images.pexels.com/photos/3822906/pexels-photo-3822906.jpeg?auto=compress&cs=tinysrgb&w=1000";
 const IMAGE_TWO =
-  "https://images.unsplash.com/photo-1552674605-db6ffd4facb5?auto=format&fit=crop&w=1000&q=80";
+  "https://images.pexels.com/photos/4498157/pexels-photo-4498157.jpeg?auto=compress&cs=tinysrgb&w=1000";
 
 const values = [
   {

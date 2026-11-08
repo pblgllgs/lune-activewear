@@ -11,7 +11,7 @@ import { getProducts } from "@/lib/catalog";
 import type { Product } from "@/types/product";
 
 const HERO_IMAGE =
-  "https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=1400&q=80";
+  "https://images.pexels.com/photos/3823086/pexels-photo-3823086.jpeg?auto=compress&cs=tinysrgb&w=1400";
 
 const benefits = [
   {
@@ -119,7 +119,7 @@ export default function Home() {
               <Link
                 key={cat.id}
                 to={`/tienda?categoria=${cat.id}`}
-                className={`group relative flex aspect-[4/5] flex-col justify-between overflow-hidden rounded-xl p-5 transition md:p-6 ${cat.tint}`}
+                className={`group relative flex aspect-[4/5] flex-col justify-between overflow-hidden rounded-xl p-5 transition md:aspect-square md:p-6 ${cat.tint}`}
               >
                 <div>
                   <h3 className="font-display text-xl font-medium uppercase tracking-[0.18em] md:text-2xl">

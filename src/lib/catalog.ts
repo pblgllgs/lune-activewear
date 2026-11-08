@@ -1,9 +1,9 @@
-import { collection, doc, getDoc, getDocs } from "firebase/firestore";
+import { addDoc, collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { Product } from "@/types/product";
 
-const img = (id: string, w = 1000) =>
-  `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${w}&q=80`;
+const img = (id: number, w = 1000) =>
+  `https://images.pexels.com/photos/${id}/pexels-photo-${id}.jpeg?auto=compress&cs=tinysrgb&w=${w}`;
 
 const SIZES = ["XS", "S", "M", "L", "XL"];
 
@@ -29,7 +29,7 @@ export const DEMO_PRODUCTS: Product[] = [
       { name: "Chocolate", hex: "#49372D" },
       { name: "Negro", hex: "#1C1A19" },
     ],
-    images: [img("photo-1506629082955-511b1aa562c8"), img("photo-1544367567-0f2fcb009e0b")],
+    images: [img(3822906), img(3823039)],
     featured: true,
     isNew: true,
     createdAt: "2026-01-02T10:00:00.000Z",
@@ -49,7 +49,7 @@ export const DEMO_PRODUCTS: Product[] = [
       { name: "Rosa empolvado", hex: "#EADDE0" },
       { name: "Taupe", hex: "#B9A99C" },
     ],
-    images: [img("photo-1518611012118-696072aa579a"), img("photo-1552674605-db6ffd4facb5")],
+    images: [img(3768916), img(4498157)],
     featured: true,
     createdAt: "2026-01-04T10:00:00.000Z",
   },
@@ -68,7 +68,7 @@ export const DEMO_PRODUCTS: Product[] = [
       { name: "Rosa empolvado", hex: "#EADDE0" },
       { name: "Chocolate", hex: "#49372D" },
     ],
-    images: [img("photo-1571019613454-1cb2f99b2d8b"), img("photo-1594381898411-846e7d193883")],
+    images: [img(4498157), img(3822906)],
     featured: true,
     isNew: true,
     createdAt: "2026-01-06T10:00:00.000Z",
@@ -88,7 +88,7 @@ export const DEMO_PRODUCTS: Product[] = [
       { name: "Marfil", hex: "#FFFFFF" },
       { name: "Chocolate", hex: "#49372D" },
     ],
-    images: [img("photo-1556906781-9a412961c28c"), img("photo-1518310383802-640c2de311b2")],
+    images: [img(4498157), img(4498151)],
     createdAt: "2026-01-08T10:00:00.000Z",
   },
   {
@@ -107,7 +107,7 @@ export const DEMO_PRODUCTS: Product[] = [
       { name: "Negro", hex: "#1C1A19" },
       { name: "Chocolate", hex: "#49372D" },
     ],
-    images: [img("photo-1538805060514-97d9cc17730c"), img("photo-1483721310020-03333e577078")],
+    images: [img(3823039), img(3823086)],
     featured: true,
     createdAt: "2026-01-10T10:00:00.000Z",
   },
@@ -126,7 +126,7 @@ export const DEMO_PRODUCTS: Product[] = [
       { name: "Taupe", hex: "#B9A99C" },
       { name: "Crema", hex: "#EEE7DF" },
     ],
-    images: [img("photo-1548690312-e3b507d8c110"), img("photo-1517836357463-d25dfeac3438")],
+    images: [img(866027), img(3764014)],
     createdAt: "2026-01-12T10:00:00.000Z",
   },
   {
@@ -144,7 +144,7 @@ export const DEMO_PRODUCTS: Product[] = [
       { name: "Crema", hex: "#EEE7DF" },
       { name: "Blanco", hex: "#FFFFFF" },
     ],
-    images: [img("photo-1523381210434-271e8be1f52b"), img("photo-1503342217505-b0a15ec3261c")],
+    images: [img(6456301), img(6456299)],
     createdAt: "2026-01-14T10:00:00.000Z",
   },
   {
@@ -162,7 +162,7 @@ export const DEMO_PRODUCTS: Product[] = [
       { name: "Chocolate", hex: "#49372D" },
       { name: "Taupe", hex: "#B9A99C" },
     ],
-    images: [img("photo-1593079831268-3381b0db4a77"), img("photo-1483985988355-763728e1935b")],
+    images: [img(6456299), img(6456301)],
     featured: true,
     createdAt: "2026-01-16T10:00:00.000Z",
   },
@@ -181,7 +181,7 @@ export const DEMO_PRODUCTS: Product[] = [
       { name: "Chocolate", hex: "#49372D" },
       { name: "Negro", hex: "#1C1A19" },
     ],
-    images: [img("photo-1544367567-0f2fcb009e0b"), img("photo-1518310383802-640c2de311b2")],
+    images: [img(3823039), img(3822906)],
     createdAt: "2026-01-18T10:00:00.000Z",
   },
   {
@@ -199,7 +199,7 @@ export const DEMO_PRODUCTS: Product[] = [
       { name: "Blanco", hex: "#FFFFFF" },
       { name: "Rosa empolvado", hex: "#EADDE0" },
     ],
-    images: [img("photo-1518611012118-696072aa579a"), img("photo-1594381898411-846e7d193883")],
+    images: [img(3768916), img(4498157)],
     isNew: true,
     createdAt: "2026-01-20T10:00:00.000Z",
   },
@@ -230,6 +230,8 @@ export async function getProducts(): Promise<Product[]> {
   if (!db) return DEMO_PRODUCTS;
   try {
     const snap = await getDocs(collection(db, "products"));
+    // Mientras el catálogo real esté vacío se mantiene la vitrina de ejemplo.
+    if (snap.empty) return DEMO_PRODUCTS;
     return snap.docs
       .map((d) => normalizeProduct(d.id, d.data()))
       .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
@@ -250,4 +252,23 @@ export async function getProduct(id: string): Promise<Product | null> {
     console.warn("No se pudo leer el producto desde Firestore.", error);
     return null;
   }
+}
+
+/**
+ * Copia el catálogo de demostración a Firestore para que el administrador
+ * pueda editarlo desde el panel. Devuelve cuántos productos se importaron.
+ */
+export async function seedDemoProducts(): Promise<number> {
+  if (!db) throw new Error("Firebase no está configurado.");
+
+  for (const product of DEMO_PRODUCTS) {
+    const data: Record<string, unknown> = { ...product };
+    delete data.id;
+    await addDoc(collection(db, "products"), {
+      ...data,
+      createdAt: data.createdAt ?? new Date().toISOString(),
+    });
+  }
+
+  return DEMO_PRODUCTS.length;
 }

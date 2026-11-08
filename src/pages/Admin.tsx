@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { auth, db, isFirebaseConfigured } from "@/lib/firebase";
 import { deleteFromR2, isUploadConfigured, slugify, uploadToR2 } from "@/lib/upload";
-import { normalizeProduct } from "@/lib/catalog";
+import { normalizeProduct, seedDemoProducts } from "@/lib/catalog";
 import { CATEGORIES, categoryLabel } from "@/lib/categories";
 import { formatCLP } from "@/lib/utils";
 import type { Product, ProductColor } from "@/types/product";
@@ -611,6 +611,7 @@ export default function Admin() {
   const [tab, setTab] = useState<Tab>("dashboard");
   const [products, setProducts] = useState<Product[]>([]);
   const [editing, setEditing] = useState<Product | null>(null);
+  const [seeding, setSeeding] = useState(false);
 
   useEffect(() => {
     const currentAuth = auth;
@@ -660,8 +661,7 @@ export default function Admin() {
     toast.success(product.featured ? "Quitado de destacados." : "Marcado como destacado.");
   };
 
-  const remove = async (product: Product) => {
-    if (!db) return;
+  const remove = async (product: Product) => {    if (!db) return;
     const result = await Swal.fire({
       title: "¿Eliminar producto?",
       text: `Se eliminará "${product.name}" junto con sus imágenes de R2. Esta acción no se puede deshacer.`,
@@ -685,6 +685,30 @@ export default function Admin() {
       toast.success("Producto eliminado.");
     } catch {
       toast.error("No se pudo eliminar el producto.");
+    }
+  };
+
+  const importDemo = async () => {
+    if (!db) return;
+    const result = await Swal.fire({
+      title: "¿Importar catálogo de ejemplo?",
+      text: "Se crearán los productos de demostración en Firestore para que puedas editarlos, cambiarles las fotos y ajustar precios.",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Sí, importar",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#49372D",
+    });
+    if (!result.isConfirmed) return;
+
+    setSeeding(true);
+    try {
+      const total = await seedDemoProducts();
+      toast.success(`${total} productos importados al catálogo.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo importar el catálogo.");
+    } finally {
+      setSeeding(false);
     }
   };
 
@@ -757,6 +781,27 @@ export default function Admin() {
                 </CardHeader>
               </Card>
             </div>
+
+            {products.length === 0 && (
+              <Card className="border-primary/25 bg-secondary/40">
+                <CardHeader>
+                  <CardTitle className="text-lg">Tu catálogo está vacío</CardTitle>
+                  <CardDescription>
+                    Importa el catálogo de ejemplo para tener una base editable, o crea tu primer
+                    producto desde cero.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-wrap gap-3">
+                  <Button onClick={importDemo} disabled={seeding}>
+                    <UploadCloud className="h-4 w-4" />
+                    {seeding ? "Importando…" : "Importar catálogo de ejemplo"}
+                  </Button>
+                  <Button variant="outline" onClick={() => setTab("nuevo")}>
+                    <Plus className="h-4 w-4" /> Crear producto
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
 
             <Card>
               <CardHeader>

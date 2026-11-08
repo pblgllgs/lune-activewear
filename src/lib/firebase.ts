@@ -1,4 +1,5 @@
 import { initializeApp, type FirebaseApp } from "firebase/app";
+import { getAnalytics, isSupported } from "firebase/analytics";
 import { getAuth, type Auth } from "firebase/auth";
 import { initializeFirestore, type Firestore } from "firebase/firestore";
 
@@ -9,6 +10,7 @@ const firebaseConfig = {
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
 /**
@@ -25,3 +27,10 @@ export const auth: Auth | null = app ? getAuth(app) : null;
 export const db: Firestore | null = app
   ? initializeFirestore(app, { ignoreUndefinedProperties: true })
   : null;
+
+// Analytics es opcional y no bloquea el arranque de la app.
+if (app && firebaseConfig.measurementId && typeof window !== "undefined") {
+  void isSupported().then((supported) => {
+    if (supported && app) getAnalytics(app);
+  });
+}
