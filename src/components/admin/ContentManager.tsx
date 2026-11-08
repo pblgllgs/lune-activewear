@@ -123,9 +123,6 @@ function HeroImageList({
 }) {
   const addInputRef = useRef<HTMLInputElement>(null);
 
-  const updateAt = (index: number, draft: DraftImage) =>
-    onChange(items.map((item, i) => (i === index ? draft : item)));
-
   const removeAt = (index: number) => {
     const target = items[index];
     if (target?.file) URL.revokeObjectURL(target.url);
@@ -212,14 +209,6 @@ function HeroImageList({
                 </span>
               )}
             </div>
-
-            <Input
-              value={item.file ? "" : item.url}
-              onChange={(e) => updateAt(index, { url: e.target.value })}
-              placeholder={item.file ? "Archivo pendiente de subir" : "https://..."}
-              disabled={Boolean(item.file)}
-              className="text-xs"
-            />
           </div>
         ))}
       </div>
@@ -245,14 +234,6 @@ function HeroImageList({
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant="secondary" size="sm" onClick={() => addInputRef.current?.click()}>
           <Plus className="h-3.5 w-3.5" /> Agregar imágenes
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => onChange([...items, { url: "" }])}
-        >
-          <ImagePlus className="h-3.5 w-3.5" /> Agregar por URL
         </Button>
       </div>
     </div>
