@@ -613,12 +613,13 @@ export default function Admin() {
   const [editing, setEditing] = useState<Product | null>(null);
 
   useEffect(() => {
-    if (!auth) return;
-    return onAuthStateChanged(auth, (user) => {
+    const currentAuth = auth;
+    if (!currentAuth) return;
+    return onAuthStateChanged(currentAuth, (user) => {
       const allowed = Boolean(user?.email && ADMIN_EMAILS.includes(user.email));
       setIsAdmin(allowed);
       if (user?.email && !ADMIN_EMAILS.includes(user.email)) {
-        void signOut(auth);
+        void signOut(currentAuth);
       }
     });
   }, []);
@@ -650,6 +651,8 @@ export default function Admin() {
   }
 
   if (!isAdmin) return <LoginForm firebaseAuth={auth} />;
+
+  const firebaseAuth = auth;
 
   const toggleFeatured = async (product: Product) => {
     if (!db) return;
@@ -691,7 +694,7 @@ export default function Admin() {
         <div className="flex flex-col gap-1 rounded-xl border bg-card p-3 md:sticky md:top-24">
           <div className="mb-2 flex items-center justify-between px-2">
             <span className="text-[10px] uppercase tracking-brand text-muted-foreground">Panel</span>
-            <Button variant="ghost" size="icon" onClick={() => signOut(auth)} title="Cerrar sesión">
+            <Button variant="ghost" size="icon" onClick={() => signOut(firebaseAuth)} title="Cerrar sesión">
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
@@ -727,8 +730,8 @@ export default function Admin() {
             <p className="text-[10px] uppercase tracking-brand text-muted-foreground">Administración</p>
             <h1 className="mt-1 font-display text-3xl font-medium tracking-tight">Catálogo</h1>
           </div>
-          {auth.currentUser?.email && (
-            <p className="text-xs text-muted-foreground">{auth.currentUser.email}</p>
+          {firebaseAuth.currentUser?.email && (
+            <p className="text-xs text-muted-foreground">{firebaseAuth.currentUser.email}</p>
           )}
         </div>
 

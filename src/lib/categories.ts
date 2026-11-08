@@ -1,5 +1,3 @@
-import type { Product } from "@/types/product";
-
 export interface CategoryInfo {
   id: string;
   label: string;

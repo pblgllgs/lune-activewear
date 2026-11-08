@@ -67,7 +67,7 @@ export function Navbar() {
             className="hidden h-10 w-10 items-center justify-center rounded-md transition hover:bg-secondary sm:inline-flex"
             aria-label="Buscar productos"
           >
-            <Search className="h-4.5 w-4.5" />
+            <Search className="h-5 w-5" />
           </Link>
           <button
             type="button"
@@ -75,7 +75,7 @@ export function Navbar() {
             className="relative inline-flex h-10 w-10 items-center justify-center rounded-md transition hover:bg-secondary"
             aria-label={`Abrir carrito (${count} productos)`}
           >
-            <ShoppingBag className="h-4.5 w-4.5" />
+            <ShoppingBag className="h-5 w-5" />
             {count > 0 && (
               <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-semibold text-primary-foreground">
                 {count}
