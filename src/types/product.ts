@@ -3,6 +3,17 @@ export interface ProductColor {
   hex: string;
 }
 
+/** Fila de la guía de tallas: rango de medidas del cuerpo en cm. */
+export interface SizeGuideRow {
+  size: string;
+  bustMin: number;
+  bustMax: number;
+  waistMin: number;
+  waistMax: number;
+  hipMin: number;
+  hipMax: number;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -14,6 +25,8 @@ export interface Product {
   care?: string;
   shipping?: string;
   sizes: string[];
+  /** Medidas de la guía de tallas. Si falta, se usan los valores por defecto. */
+  sizeGuide?: SizeGuideRow[];
   /** Unidades disponibles por talla. Si falta una talla, se considera sin límite. */
   stockBySize?: Record<string, number>;
   colors: ProductColor[];

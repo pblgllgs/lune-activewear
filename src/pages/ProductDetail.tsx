@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { getProduct, getProducts } from "@/lib/catalog";
 import { categoryLabel } from "@/lib/categories";
+import { resolveSizeGuide } from "@/lib/size-guide";
 import { firstAvailableSize, isSizeSoldOut, isSoldOut, sizeStock } from "@/lib/stock";
 import { discountPercent, formatCLP } from "@/lib/utils";
 import { whatsappLink } from "@/lib/constants";
@@ -22,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ImageWithFallback } from "@/components/shop/ImageWithFallback";
 import { ProductCard } from "@/components/shop/ProductCard";
+import { SizeGuide } from "@/components/shop/SizeGuide";
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
@@ -276,9 +278,7 @@ export default function ProductDetail() {
           <div className="mt-6">
             <div className="flex items-center justify-between">
               <p className="text-[10px] uppercase tracking-wider2">Talla</p>
-              <Link to="/#contacto" className="text-[10px] uppercase tracking-wider2 underline underline-offset-4">
-                Guía de tallas
-              </Link>
+              <SizeGuide sizes={product.sizes} rows={resolveSizeGuide(product)} />
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
               {product.sizes.map((s) => {

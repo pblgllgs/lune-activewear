@@ -1,5 +1,6 @@
 import { addDoc, collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { normalizeSizeGuide } from "@/lib/size-guide";
 import type { Product } from "@/types/product";
 
 const img = (id: number, w = 1000) =>
@@ -232,6 +233,7 @@ export function normalizeProduct(id: string, data: Record<string, unknown>): Pro
     care: data.care ? String(data.care) : undefined,
     shipping: data.shipping ? String(data.shipping) : undefined,
     sizes: Array.isArray(data.sizes) ? (data.sizes as string[]) : [],
+    sizeGuide: normalizeSizeGuide(data.sizeGuide),
     stockBySize: normalizeStock(data.stockBySize),
     colors: Array.isArray(data.colors) ? (data.colors as Product["colors"]) : [],
     images: Array.isArray(data.images) ? (data.images as string[]) : [],

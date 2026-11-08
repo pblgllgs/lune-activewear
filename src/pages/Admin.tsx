@@ -21,6 +21,7 @@ import {
   Package,
   Pencil,
   Plus,
+  RotateCcw,
   Star,
   Trash2,
   UploadCloud,
@@ -30,11 +31,12 @@ import { auth, db, isFirebaseConfigured } from "@/lib/firebase";
 import { ContentManager } from "@/components/admin/ContentManager";
 import { deleteFromR2, isUploadConfigured, slugify, uploadToR2 } from "@/lib/upload";
 import { normalizeProduct, seedDemoProducts } from "@/lib/catalog";
+import { defaultSizeGuide, resolveSizeGuide } from "@/lib/size-guide";
 import { totalStock } from "@/lib/stock";
 import { CATEGORIES, categoryLabel } from "@/lib/categories";
 import { formatCLP } from "@/lib/utils";
 import { useSeo } from "@/lib/seo";
-import type { Product, ProductColor } from "@/types/product";
+import type { Product, ProductColor, SizeGuideRow } from "@/types/product";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -57,6 +59,13 @@ const ADMIN_EMAILS = ((import.meta.env.VITE_ADMIN_EMAILS as string) || "")
   .filter(Boolean);
 
 const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL", "Único"];
+
+/** Columnas editables de la guía de tallas: cada medida es un rango desde/hasta. */
+const SIZE_GUIDE_FIELDS = [
+  { label: "Busto", min: "bustMin", max: "bustMax" },
+  { label: "Cintura", min: "waistMin", max: "waistMax" },
+  { label: "Cadera", min: "hipMin", max: "hipMax" },
+] as const;
 
 /* ------------------------------ Sin configurar ------------------------------ */
 
@@ -220,6 +229,9 @@ function ProductForm({ editing }: { editing: Product | null }) {
   const [images, setImages] = useState<DraftImage[]>(
     editing ? editing.images.map((url) => ({ id: url, url })) : []
   );
+  const [sizeGuide, setSizeGuide] = useState<SizeGuideRow[]>(() =>
+    editing ? resolveSizeGuide(editing) : defaultSizeGuide()
+  );
   const [urlInput, setUrlInput] = useState("");
   const [status, setStatus] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -242,6 +254,19 @@ function ProductForm({ editing }: { editing: Product | null }) {
       ...current,
       [size]: Math.max(0, Math.floor(Number(value) || 0)),
     }));
+
+  const updateSizeGuide = (
+    size: string,
+    key: keyof Omit<SizeGuideRow, "size">,
+    value: string
+  ) =>
+    setSizeGuide((current) =>
+      current.map((row) =>
+        row.size === size
+          ? { ...row, [key]: Math.max(0, Math.floor(Number(value) || 0)) }
+          : row
+      )
+    );
 
   const updateColor = (index: number, patch: Partial<ProductColor>) =>
     setColors((current) => current.map((c, i) => (i === index ? { ...c, ...patch } : c)));
@@ -327,6 +352,15 @@ function ProductForm({ editing }: { editing: Product | null }) {
         stockBySize: Object.fromEntries(
           sizes.map((size) => [size, Math.max(0, Math.floor(stockBySize[size] ?? 0))])
         ),
+        sizeGuide: sizeGuide.map((row) => ({
+          size: row.size,
+          bustMin: Math.max(0, Math.floor(row.bustMin || 0)),
+          bustMax: Math.max(0, Math.floor(row.bustMax || 0)),
+          waistMin: Math.max(0, Math.floor(row.waistMin || 0)),
+          waistMax: Math.max(0, Math.floor(row.waistMax || 0)),
+          hipMin: Math.max(0, Math.floor(row.hipMin || 0)),
+          hipMax: Math.max(0, Math.floor(row.hipMax || 0)),
+        })),
         colors: colors.filter((c) => c.name.trim()),
         images: urls,
         featured: form.featured,
@@ -355,6 +389,7 @@ function ProductForm({ editing }: { editing: Product | null }) {
         setColors([{ name: "Chocolate", hex: "#49372D" }]);
         setSizes(["S", "M", "L"]);
         setStockBySize({ S: 5, M: 5, L: 5 });
+        setSizeGuide(defaultSizeGuide());
         setForm({
           name: "",
           category: CATEGORIES[0].id,
@@ -495,6 +530,79 @@ function ProductForm({ editing }: { editing: Product | null }) {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Guía de tallas */}
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Label className="text-base">Guía de tallas</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setSizeGuide(defaultSizeGuide())}
+              >
+                <RotateCcw className="h-3.5 w-3.5" /> Restaurar valores
+              </Button>
+            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Medidas del cuerpo en cm. Se muestran en la ficha del producto; las tallas
+              disponibles se destacan automáticamente. Si un producto no tiene valores propios,
+              se usan estos por defecto.
+            </p>
+
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full min-w-[620px] border-collapse text-left text-sm">
+                <thead>
+                  <tr className="border-b text-[10px] uppercase tracking-wider2 text-muted-foreground">
+                    <th className="py-2 pr-3 font-medium">Talla</th>
+                    <th className="py-2 pr-3 font-medium">Busto (cm)</th>
+                    <th className="py-2 pr-3 font-medium">Cintura (cm)</th>
+                    <th className="py-2 font-medium">Cadera (cm)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sizeGuide.map((row) => (
+                    <tr key={row.size} className="border-b border-primary/5 last:border-0">
+                      <td className="py-1.5 pr-3 font-medium">{row.size}</td>
+                      {SIZE_GUIDE_FIELDS.map((field) => (
+                        <td key={field.label} className="py-1.5 pr-3 last:pr-0">
+                          <div className="flex items-center gap-1.5">
+                            <Input
+                              type="number"
+                              inputMode="numeric"
+                              min={0}
+                              step={1}
+                              value={row[field.min]}
+                              onChange={(e) =>
+                                updateSizeGuide(row.size, field.min, e.target.value)
+                              }
+                              aria-label={`${field.label} desde, talla ${row.size}`}
+                              className="h-9 w-[4.5rem] px-2 text-center"
+                              placeholder="80"
+                            />
+                            <span className="text-muted-foreground">–</span>
+                            <Input
+                              type="number"
+                              inputMode="numeric"
+                              min={0}
+                              step={1}
+                              value={row[field.max]}
+                              onChange={(e) =>
+                                updateSizeGuide(row.size, field.max, e.target.value)
+                              }
+                              aria-label={`${field.label} hasta, talla ${row.size}`}
+                              className="h-9 w-[4.5rem] px-2 text-center"
+                              placeholder="84"
+                            />
+                          </div>
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* Colores */}
