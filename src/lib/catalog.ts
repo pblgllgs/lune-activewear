@@ -239,9 +239,16 @@ export function normalizeProduct(id: string, data: Record<string, unknown>): Pro
     images: Array.isArray(data.images) ? (data.images as string[]) : [],
     featured: Boolean(data.featured),
     isNew: Boolean(data.isNew),
+    // Sin el campo se considera publicado (catálogo anterior a los borradores).
+    published: data.published === undefined ? true : Boolean(data.published),
     createdAt: data.createdAt ? String(data.createdAt) : undefined,
     updatedAt: data.updatedAt ? String(data.updatedAt) : undefined,
   };
+}
+
+/** Un producto sin el campo `published` se considera publicado. */
+export function isPublished(product: Product): boolean {
+  return product.published !== false;
 }
 
 export async function getProducts(): Promise<Product[]> {
@@ -252,6 +259,7 @@ export async function getProducts(): Promise<Product[]> {
     if (snap.empty) return DEMO_PRODUCTS;
     return snap.docs
       .map((d) => normalizeProduct(d.id, d.data()))
+      .filter(isPublished)
       .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
   } catch (error) {
     console.warn("No se pudo leer Firestore, se usa el catálogo de demostración.", error);
@@ -265,7 +273,10 @@ export async function getProduct(id: string): Promise<Product | null> {
   if (!db) return null;
   try {
     const snap = await getDoc(doc(db, "products", id));
-    return snap.exists() ? normalizeProduct(snap.id, snap.data()) : null;
+    if (!snap.exists()) return null;
+    const product = normalizeProduct(snap.id, snap.data());
+    // Los borradores solo existen en el panel admin.
+    return isPublished(product) ? product : null;
   } catch (error) {
     console.warn("No se pudo leer el producto desde Firestore.", error);
     return null;

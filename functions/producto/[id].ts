@@ -52,7 +52,9 @@ export async function onRequest(context: Context): Promise<Response> {
     const product = await fetchProduct(id, env);
     const template = await getTemplate(context);
 
-    if (!product || !product.name) {
+    // Los borradores (published: false) se tratan igual que un producto inexistente:
+    // no deben indexarse ni ser visibles sin pasar por el panel admin.
+    if (!product || !product.name || product.published === false) {
       return new Response(injectNotFoundMeta(template, base), {
         status: 404,
         headers: {

@@ -5,6 +5,7 @@
 import { readFile } from "node:fs/promises";
 import { onRequest as productoHandler } from "../functions/producto/[id].ts";
 import { onRequest as sitemapHandler } from "../functions/sitemap.xml.ts";
+import { normalizeDoc } from "../functions/_lib/seo.ts";
 
 const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url), "utf8");
 const sitemapXml = await readFile(new URL("../dist/sitemap.xml", import.meta.url), "utf8");
@@ -103,6 +104,23 @@ function meta(html, kind, key) {
   check("404: canonical tienda", html.includes('href="https://lune-activewear.pages.dev/tienda"'));
   check("404: title propio", /<title>Producto no encontrado \| LUNÉ Activewear<\/title>/.test(html));
   check("404: noscript 404", /<h1>Producto no encontrado<\/h1>/.test(html));
+}
+
+/* ---------------------------------------------------- borrador (no publicado) */
+{
+  const draft = normalizeDoc("borrador-test", {
+    name: { stringValue: "Borrador" },
+    category: { stringValue: "calzas" },
+    price: { integerValue: "10000" },
+    published: { booleanValue: false },
+  });
+  check("borrador: published=false normalizado", draft.published === false);
+  const pub = normalizeDoc("publicado-test", {
+    name: { stringValue: "Publicado" },
+    category: { stringValue: "calzas" },
+    price: { integerValue: "10000" },
+  });
+  check("sin campo published: se considera publicado", pub.published === true);
 }
 
 /* ------------------------------------------------- ID con formato inválido */

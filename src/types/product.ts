@@ -33,6 +33,12 @@ export interface Product {
   images: string[];
   featured?: boolean;
   isNew?: boolean;
+  /**
+   * Si es `false` el producto es un borrador: no aparece en la tienda, ni en la
+   * búsqueda, ni en el sitemap, y su ficha responde 404. Solo lo ve el admin.
+   * Ausente o `true` = publicado (compatibilidad con el catálogo existente).
+   */
+  published?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }

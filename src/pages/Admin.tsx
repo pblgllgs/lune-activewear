@@ -22,6 +22,7 @@ import Swal from "sweetalert2";
 import {
   AlertCircle,
   Eye,
+  EyeOff,
   ImagePlus,
   LayoutDashboard,
   Link2,
@@ -221,6 +222,7 @@ function ProductForm({ editing }: { editing: Product | null }) {
       editing?.shipping ?? "Despacho a todo Chile en 2 a 5 días hábiles. Retiro gratis en Chillán.",
     featured: editing?.featured ?? false,
     isNew: editing?.isNew ?? false,
+    published: editing?.published ?? true,
   }));
 
   const [sizes, setSizes] = useState<string[]>(
@@ -244,6 +246,7 @@ function ProductForm({ editing }: { editing: Product | null }) {
   const [urlInput, setUrlInput] = useState("");
   const [status, setStatus] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
+  const publishIntentRef = useRef<boolean>(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const set = (key: keyof typeof form) => (
@@ -375,6 +378,7 @@ function ProductForm({ editing }: { editing: Product | null }) {
         images: urls,
         featured: form.featured,
         isNew: form.isNew,
+        published: publishIntentRef.current,
         updatedAt: new Date().toISOString(),
       };
 
@@ -421,6 +425,7 @@ function ProductForm({ editing }: { editing: Product | null }) {
           shipping: "Despacho a todo Chile en 2 a 5 días hábiles. Retiro gratis en Chillán.",
           featured: false,
           isNew: false,
+          published: true,
         });
       }
       setStatus("");
@@ -455,6 +460,7 @@ function ProductForm({ editing }: { editing: Product | null }) {
       images: images.map((image) => image.url),
       featured: form.featured,
       isNew: form.isNew,
+      published: publishIntentRef.current,
     };
   }, [
     editing,
@@ -808,12 +814,40 @@ function ProductForm({ editing }: { editing: Product | null }) {
               />
               Marcar como nuevo
             </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={form.published}
+                onChange={(e) => setForm({ ...form, published: e.target.checked })}
+                className="h-4 w-4 rounded border-input accent-primary"
+              />
+              Publicado (visible en la tienda)
+            </label>
           </div>
 
-          <Button type="submit" className="w-full">
-            <UploadCloud className="h-4 w-4" />
-            {editing ? "Guardar cambios" : "Publicar producto"}
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              type="submit"
+              variant="outline"
+              className="flex-1"
+              onClick={() => {
+                publishIntentRef.current = false;
+              }}
+            >
+              <EyeOff className="h-4 w-4" />
+              Guardar como borrador
+            </Button>
+            <Button
+              type="submit"
+              className="flex-1"
+              onClick={() => {
+                publishIntentRef.current = true;
+              }}
+            >
+              <UploadCloud className="h-4 w-4" />
+              {editing ? "Guardar y publicar" : "Publicar producto"}
+            </Button>
+          </div>
           {status && <p className="text-center text-sm text-muted-foreground">{status}</p>}
         </form>
       </CardContent>
@@ -1089,7 +1123,7 @@ export default function Admin() {
             ) : (
               <div className="space-y-3">
                 {products.map((product) => (
-                  <Card key={product.id}>
+                  <Card key={product.id} className={product.published === false ? "opacity-70" : ""}>
                     <CardContent className="flex items-center gap-3 p-3 sm:gap-4 sm:p-4">
                       <div className="h-16 w-14 shrink-0 overflow-hidden rounded-md border bg-secondary">
                         {product.images[0] ? (
@@ -1103,6 +1137,11 @@ export default function Admin() {
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="truncate font-display font-medium">{product.name}</p>
+                          {product.published === false && (
+                            <Badge variant="outline">
+                              <EyeOff className="h-3 w-3" /> Borrador
+                            </Badge>
+                          )}
                           {product.featured && (
                             <Badge variant="secondary">
                               <Star className="h-3 w-3" /> Destacado

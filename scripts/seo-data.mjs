@@ -36,6 +36,7 @@ export const FALLBACK_PRODUCTS = [
   colors: [],
   images: [],
   soldOut: false,
+  published: true,
   lastmod: "",
 }));
 
@@ -56,7 +57,7 @@ export async function fetchProducts() {
     const data = await response.json();
     const docs = Array.isArray(data.documents) ? data.documents : [];
 
-    const products = docs
+    const all = docs
       .map((doc) => {
         const id = String(doc.name ?? "").split("/").pop() ?? "";
         const fields = doc.fields ?? {};
@@ -81,13 +82,17 @@ export async function fetchProducts() {
           colors: arr(fields.colors).map((value) => str(value?.mapValue?.fields?.name)),
           images: arr(fields.images).map((value) => str(value)),
           soldOut,
+          // Sin el campo se considera publicado. Los borradores no entran al
+          // sitemap ni tienen página estática.
+          published: fields.published ? fields.published.booleanValue === true : true,
           lastmod: str(fields.updatedAt || fields.createdAt).slice(0, 10),
         };
       })
       .filter((product) => product.id && product.name.trim().toLowerCase() !== "test");
 
-    if (products.length === 0) throw new Error("catálogo vacío");
-    return products;
+    if (all.length === 0) throw new Error("catálogo vacío");
+    // Los borradores no se publican ni entran al sitemap.
+    return all.filter((product) => product.published !== false);
   } catch (error) {
     console.warn(
       `[seo] No se pudo leer Firestore (${error.message}). Se usan los slugs conocidos.`

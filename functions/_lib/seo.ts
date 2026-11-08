@@ -26,6 +26,8 @@ export interface ProductMeta {
   colors: string[];
   images: string[];
   soldOut: boolean;
+  /** `false` = borrador: no se sirve ni entra al sitemap. */
+  published: boolean;
   lastmod: string;
 }
 
@@ -72,7 +74,8 @@ const arr = (field: unknown): unknown[] =>
 const map = (field: unknown): Record<string, unknown> =>
   (field as { mapValue?: { fields?: Record<string, unknown> } })?.mapValue?.fields ?? {};
 
-function normalizeDoc(id: string, fields: Record<string, unknown>): ProductMeta {
+/** Convierte un documento de Firestore (REST) en los datos que usa el edge. */
+export function normalizeDoc(id: string, fields: Record<string, unknown>): ProductMeta {
   const sizes = arr(fields.sizes).map((value) => str(value));
   const stock = map(fields.stockBySize);
   const soldOut =
@@ -81,6 +84,7 @@ function normalizeDoc(id: string, fields: Record<string, unknown>): ProductMeta 
       const entry = stock[size];
       return entry ? num(entry) === 0 : false;
     });
+  const publishedField = fields.published as { booleanValue?: boolean } | undefined;
 
   return {
     id,
@@ -93,6 +97,8 @@ function normalizeDoc(id: string, fields: Record<string, unknown>): ProductMeta 
     colors: arr(fields.colors).map((color) => str(map(color).name)),
     images: arr(fields.images).map((image) => str(image)),
     soldOut,
+    // Sin el campo se considera publicado (catálogo anterior a los borradores).
+    published: publishedField ? publishedField.booleanValue === true : true,
     lastmod: (str(fields.updatedAt) || str(fields.createdAt)).slice(0, 10),
   };
 }
@@ -155,7 +161,10 @@ export async function fetchProducts(env: EdgeEnv): Promise<ProductMeta[]> {
       const id = String(doc.name ?? "").split("/").pop() ?? "";
       return normalizeDoc(id, doc.fields ?? {});
     })
-    .filter((product) => product.id && product.name.trim().toLowerCase() !== "test");
+    .filter(
+      (product) =>
+        product.id && product.name.trim().toLowerCase() !== "test" && product.published !== false
+    );
 
   remember(key, products);
   return products;
