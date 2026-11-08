@@ -29,6 +29,17 @@ export function isSoldOut(product: Product): boolean {
   return product.sizes.every((size) => sizeStock(product, size) === 0);
 }
 
+/** Umbral de stock bajo para mostrar "Últimas unidades". */
+export const LOW_STOCK_THRESHOLD = 5;
+/** Desde este stock hacia abajo se usa el aviso de "Últimas N unidades". */
+export const LAST_UNITS_THRESHOLD = 3;
+
+/** Quedan pocas unidades en total (sin contar tallas sin información). */
+export function isLowStock(product: Product): boolean {
+  const total = totalStock(product);
+  return total > 0 && total <= LOW_STOCK_THRESHOLD;
+}
+
 /** Primera talla con stock (o la primera de la lista si todas están agotadas). */
 export function firstAvailableSize(product: Product): string {
   return product.sizes.find((size) => sizeStock(product, size) !== 0) ?? product.sizes[0] ?? "Único";

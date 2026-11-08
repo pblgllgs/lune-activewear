@@ -4,7 +4,7 @@ import { ArrowUpRight, Heart } from "lucide-react";
 import type { MouseEvent } from "react";
 import type { Product } from "@/types/product";
 import { categoryLabel } from "@/lib/categories";
-import { isSoldOut } from "@/lib/stock";
+import { isLowStock, isSoldOut } from "@/lib/stock";
 import { discountPercent, formatCLP } from "@/lib/utils";
 import { useWishlist } from "@/context/WishlistContext";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ import { ImageWithFallback } from "@/components/shop/ImageWithFallback";
 export function ProductCard({ product }: { product: Product }) {
   const discount = discountPercent(product.price, product.compareAtPrice);
   const soldOut = isSoldOut(product);
+  const lowStock = !soldOut && isLowStock(product);
   const { has, toggle } = useWishlist();
   const favorite = has(product.id);
 
@@ -37,6 +38,7 @@ export function ProductCard({ product }: { product: Product }) {
             {product.isNew && <Badge variant="accent">Nuevo</Badge>}
             {discount > 0 && <Badge>-{discount}%</Badge>}
             {soldOut && <Badge variant="secondary">Agotado</Badge>}
+            {lowStock && <Badge variant="outline">Últimas unidades</Badge>}
           </div>
 
           <span className="absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center rounded-full bg-background/90 text-primary opacity-0 shadow-sm backdrop-blur transition group-hover:opacity-100">

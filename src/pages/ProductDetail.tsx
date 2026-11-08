@@ -18,6 +18,8 @@ import {
   firstAvailableSize,
   isSizeSoldOut,
   isSoldOut,
+  LAST_UNITS_THRESHOLD,
+  LOW_STOCK_THRESHOLD,
   sizeStock,
 } from "@/lib/stock";
 import { discountPercent, formatCLP } from "@/lib/utils";
@@ -333,6 +335,18 @@ export default function ProductDetail() {
             </div>
             {currentStock === 0 && (
               <p className="mt-2 text-xs text-destructive">Esta talla está agotada.</p>
+            )}
+            {currentStock !== null && currentStock > 0 && currentStock <= LOW_STOCK_THRESHOLD && (
+              <p
+                className={`mt-2 text-xs ${
+                  currentStock <= LAST_UNITS_THRESHOLD
+                    ? "font-medium text-primary"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {currentStock <= LAST_UNITS_THRESHOLD ? "Últimas" : "Quedan"} {currentStock} unidad
+                {currentStock === 1 ? "" : "es"} en talla {size}.
+              </p>
             )}
           </div>
 
