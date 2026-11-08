@@ -40,8 +40,9 @@ informativo hasta conectar Firebase.
 | Script | Descripción |
 |---|---|
 | `npm run dev` | Servidor de desarrollo |
-| `npm run build` | Build de producción (`tsc -b && vite build`) |
-| `npm run preview` | Previsualiza el build |
+| `npm run build` | Build de producción (`prebuild` sitemap → `tsc -b && vite build` → `postbuild` páginas SEO) |
+| `npm run preview` | Previsualiza el build (no aplica `_redirects`) |
+| `npm run sitemap` | Regenera `public/sitemap.xml` desde Firestore |
 | `npm run lint` | oxlint |
 
 ## Estructura
@@ -49,14 +50,17 @@ informativo hasta conectar Firebase.
 ```
 src/
   components/
+    admin/       ContentManager (hero e imágenes de Nosotros)
     contact/     ContactSection (formulario → WhatsApp)
     layout/      AnnouncementBar, Navbar, Footer, CartDrawer, WhatsAppFloat
-    shop/        ProductCard, ImageWithFallback, SectionHeading
+    shop/        ProductCard, ImageWithFallback, SectionHeading, FaqSection
     ui/          Componentes shadcn/ui
   context/       CartContext (carrito persistido en localStorage)
-  lib/           firebase, catalog (datos demo + Firestore), upload (R2), utils, constants
+  lib/           firebase, catalog (datos demo + Firestore), stock, site-content,
+                 seo (metadatos + JSON-LD), upload (R2), utils, constants
   pages/         Home, Shop, ProductDetail, About, Admin
   types/         Product, ProductColor
+scripts/         sitemap y páginas estáticas de SEO (pre/post build)
 worker/          Cloudflare Worker para R2 (upload/serve/delete)
 ```
 
@@ -64,17 +68,33 @@ worker/          Cloudflare Worker para R2 (upload/serve/delete)
 
 - Colección Firestore: `products`.
 - Cada documento: `name`, `category`, `price`, `compareAtPrice?`, `description`,
-  `composition?`, `care?`, `shipping?`, `sizes[]`, `colors[{name,hex}]`, `images[]`,
-  `featured`, `isNew`, `createdAt`, `updatedAt`.
-- Las imágenes se guardan en R2 bajo `products/<slug>/`.
+  `composition?`, `care?`, `shipping?`, `sizes[]`, `stockBySize{}`, `colors[{name,hex}]`,
+  `images[]`, `featured`, `isNew`, `createdAt`, `updatedAt`.
+- `stockBySize`: unidades por talla; una talla ausente o `null` se considera sin límite,
+  `0` significa agotada.
+- Documento `settings/site`: `heroImage`, `aboutImageOne`, `aboutImageTwo`, editable desde
+  Admin → Contenido.
+- Las imágenes se guardan en R2 bajo `products/<slug>/` y `site/`.
+
+## SEO
+
+- `src/lib/seo.ts` (`useSeo`) actualiza título, descripción, canonical, Open Graph, Twitter
+  y JSON-LD en cada ruta.
+- `prebuild` genera `public/sitemap.xml` desde Firestore.
+- `postbuild` genera HTML estático con metadatos propios para `/tienda`, `/nosotros`,
+  `/admin` y cada producto, más las reglas de `_redirects`.
+- `VITE_SITE_URL` define canonical, Open Graph y sitemap. La URL actual
+  (`https://lune-activewear.pages.dev`) es provisoria: al comprar el dominio definitivo
+  basta cambiarla y redesplegar.
 
 ## Pendientes de personalización
 
-- Reemplazar `WHATSAPP_NUMBER`, `EMAIL`, `INSTAGRAM` y `LOCATION` en `src/lib/constants.ts`.
+- Confirmar `INSTAGRAM` en `src/lib/constants.ts` (WhatsApp y correo ya son reales).
 - Reemplazar las imágenes de demostración por fotos reales de las prendas.
 - Ajustar precios, tallas y descripciones en el panel admin.
 
 ## Despliegue
 
-Cloudflare Pages: build `npm run build`, output `dist`. El archivo `public/_redirects`
-resuelve el routing de la SPA.
+Cloudflare Pages: build `npm run build`, output `dist`. `public/_redirects` se regenera en
+el `postbuild` con las rutas estáticas de SEO y el catch-all de la SPA; `public/_headers`
+aplica `noindex` a `/admin`.
