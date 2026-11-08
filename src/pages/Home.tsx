@@ -8,10 +8,8 @@ import { ImageWithFallback } from "@/components/shop/ImageWithFallback";
 import { ContactSection } from "@/components/contact/ContactSection";
 import { CATEGORIES } from "@/lib/categories";
 import { getProducts } from "@/lib/catalog";
+import { DEFAULT_SITE_CONTENT, getSiteContent } from "@/lib/site-content";
 import type { Product } from "@/types/product";
-
-const HERO_IMAGE =
-  "https://images.pexels.com/photos/3823086/pexels-photo-3823086.jpeg?auto=compress&cs=tinysrgb&w=1400";
 
 const benefits = [
   {
@@ -39,9 +37,11 @@ const benefits = [
 export default function Home() {
   const { hash } = useLocation();
   const [products, setProducts] = useState<Product[]>([]);
+  const [content, setContent] = useState(DEFAULT_SITE_CONTENT);
 
   useEffect(() => {
     getProducts().then(setProducts);
+    getSiteContent().then(setContent);
   }, []);
 
   useEffect(() => {
@@ -91,7 +91,7 @@ export default function Home() {
 
           <div className="relative order-1 min-h-[340px] md:order-2 md:min-h-[560px]">
             <ImageWithFallback
-              src={HERO_IMAGE}
+              src={content.heroImage}
               alt="Modelo con ropa deportiva LUNÉ"
               className="absolute inset-0 h-full w-full object-cover"
             />

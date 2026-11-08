@@ -27,6 +27,7 @@ import {
   X,
 } from "lucide-react";
 import { auth, db, isFirebaseConfigured } from "@/lib/firebase";
+import { ContentManager } from "@/components/admin/ContentManager";
 import { deleteFromR2, isUploadConfigured, slugify, uploadToR2 } from "@/lib/upload";
 import { normalizeProduct, seedDemoProducts } from "@/lib/catalog";
 import { totalStock } from "@/lib/stock";
@@ -47,7 +48,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-type Tab = "dashboard" | "nuevo" | "productos";
+type Tab = "dashboard" | "nuevo" | "productos" | "contenido";
 
 const ADMIN_EMAILS = ((import.meta.env.VITE_ADMIN_EMAILS as string) || "")
   .split(",")
@@ -648,6 +649,7 @@ const MENU: { tab: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { tab: "dashboard", label: "Resumen", icon: LayoutDashboard },
   { tab: "nuevo", label: "Nuevo producto", icon: Plus },
   { tab: "productos", label: "Productos", icon: Package },
+  { tab: "contenido", label: "Contenido", icon: ImagePlus },
 ];
 
 export default function Admin() {
@@ -797,7 +799,9 @@ export default function Admin() {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-[10px] uppercase tracking-brand text-muted-foreground">Administración</p>
-            <h1 className="mt-1 font-display text-3xl font-medium tracking-tight">Catálogo</h1>
+            <h1 className="mt-1 font-display text-3xl font-medium tracking-tight">
+              {tab === "contenido" ? "Contenido del sitio" : "Catálogo"}
+            </h1>
           </div>
           {firebaseAuth.currentUser?.email && (
             <p className="text-xs text-muted-foreground">{firebaseAuth.currentUser.email}</p>
@@ -967,6 +971,8 @@ export default function Admin() {
             )}
           </>
         )}
+
+        {tab === "contenido" && <ContentManager />}
       </main>
     </div>
   );

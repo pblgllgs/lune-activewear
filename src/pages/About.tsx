@@ -1,12 +1,9 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Heart, Sparkles, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ImageWithFallback } from "@/components/shop/ImageWithFallback";
-
-const IMAGE_ONE =
-  "https://images.pexels.com/photos/3822906/pexels-photo-3822906.jpeg?auto=compress&cs=tinysrgb&w=1000";
-const IMAGE_TWO =
-  "https://images.pexels.com/photos/4498157/pexels-photo-4498157.jpeg?auto=compress&cs=tinysrgb&w=1000";
+import { DEFAULT_SITE_CONTENT, getSiteContent } from "@/lib/site-content";
 
 const values = [
   {
@@ -27,6 +24,12 @@ const values = [
 ];
 
 export default function About() {
+  const [content, setContent] = useState(DEFAULT_SITE_CONTENT);
+
+  useEffect(() => {
+    getSiteContent().then(setContent);
+  }, []);
+
   return (
     <div>
       <section className="container py-12 md:py-20">
@@ -48,7 +51,7 @@ export default function About() {
         <div className="mt-12 grid gap-3 md:grid-cols-[1.2fr_1fr] md:gap-4">
           <div className="aspect-[4/5] overflow-hidden rounded-xl bg-secondary md:aspect-[5/6]">
             <ImageWithFallback
-              src={IMAGE_ONE}
+              src={content.aboutImageOne}
               alt="Mujer entrenando con ropa deportiva"
               className="h-full w-full object-cover"
             />
@@ -56,7 +59,7 @@ export default function About() {
           <div className="grid gap-3 md:gap-4">
             <div className="aspect-[4/3] overflow-hidden rounded-xl bg-secondary">
               <ImageWithFallback
-                src={IMAGE_TWO}
+                src={content.aboutImageTwo}
                 alt="Detalle de ropa deportiva femenina"
                 className="h-full w-full object-cover"
               />
