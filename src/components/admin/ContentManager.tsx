@@ -70,6 +70,22 @@ function toHeroDrafts(content: SiteContent): DraftSlide[] {
   return slides.map((slide) => ({ ...slide }));
 }
 
+/**
+ * Al elegir una foto, detecta su orientación para partir con un ajuste que no
+ * la recorte: verticales → `contain`; horizontales → `cover` (si no, quedarían
+ * como una franja pequeña). El admin puede cambiarlo después.
+ */
+async function fileToSlide(file: File): Promise<DraftSlide> {
+  const url = URL.createObjectURL(file);
+  const fit = await new Promise<HeroSlideFit>((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img.naturalWidth >= img.naturalHeight ? "cover" : "contain");
+    img.onerror = () => resolve("contain");
+    img.src = url;
+  });
+  return { url, file, fit, position: "center" };
+}
+
 function ImageSlot({
   label,
   hint,
@@ -278,18 +294,9 @@ function HeroImageList({
         className="hidden"
         onChange={(e) => {
           const files = Array.from(e.target.files ?? []);
-          if (files.length) {
-            onChange([
-              ...items,
-              ...files.map((file) => ({
-                url: URL.createObjectURL(file),
-                file,
-                fit: "contain" as const,
-                position: "center" as const,
-              })),
-            ]);
-          }
           e.target.value = "";
+          if (!files.length) return;
+          Promise.all(files.map(fileToSlide)).then((drafts) => onChange([...items, ...drafts]));
         }}
       />
 
