@@ -32,8 +32,9 @@ const cors = (request: Request, allowedOrigin: string) => {
 
   const matches = allowed.some((value) => {
     if (value === "*" || value === origin) return true;
-    if (value.startsWith("*.")) {
-      return origin.endsWith(value.slice(1));
+    if (value.includes("*")) {
+      const [prefix, suffix] = value.split("*");
+      return origin.startsWith(prefix) && origin.endsWith(suffix);
     }
     return false;
   });
@@ -58,7 +59,7 @@ const CONTENT_TYPES: Record<string, string> = {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    const headers = cors(env.ALLOWED_ORIGIN || "*");
+    const headers = cors(request, env.ALLOWED_ORIGIN || "*");
 
     if (request.method === "OPTIONS") return new Response(null, { headers });
 
