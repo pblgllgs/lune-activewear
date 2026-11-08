@@ -68,10 +68,13 @@ worker/          Cloudflare Worker para R2 (upload/serve/delete)
 
 - Colección Firestore: `products`.
 - Cada documento: `name`, `category`, `price`, `compareAtPrice?`, `description`,
-  `composition?`, `care?`, `shipping?`, `sizes[]`, `stockBySize{}`, `colors[{name,hex}]`,
-  `images[]`, `featured`, `isNew`, `createdAt`, `updatedAt`.
+  `composition?`, `care?`, `shipping?`, `sizes[]`, `stockBySize{}`, `sizeGuide[]`,
+  `colors[{name,hex}]`, `images[]`, `featured`, `isNew`, `createdAt`, `updatedAt`.
 - `stockBySize`: unidades por talla; una talla ausente o `null` se considera sin límite,
   `0` significa agotada.
+- `sizeGuide`: filas `{ size, bustMin, bustMax, waistMin, waistMax, hipMin, hipMax }` con
+  medidas del cuerpo en cm. Si el producto no las define, se usan las de
+  `DEFAULT_SIZE_GUIDE` (`src/lib/size-guide.ts`). Se edita por producto en Admin.
 - Documento `settings/site`: `heroSlides[{url, fit, position}]` (carrusel del inicio),
   `heroImage`/`heroImages` (compatibilidad), `aboutImageOne`, `aboutImageTwo`; editable
   desde Admin → Contenido. `fit` es `contain` (foto completa) o `cover` (rellena y recorta)
