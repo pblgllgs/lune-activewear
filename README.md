@@ -76,6 +76,9 @@ worker/          Cloudflare Worker para R2 (upload/serve/delete)
   `heroImage`/`heroImages` (compatibilidad), `aboutImageOne`, `aboutImageTwo`; editable
   desde Admin → Contenido. `fit` es `contain` (foto completa) o `cover` (rellena y recorta)
   y `position` (`center`/`top`/`bottom`) elige el encuadre.
+- En Admin → Contenido las imágenes se agregan solo subiéndolas (sin campos de URL). Al
+  subir una foto se detecta su orientación: vertical → `contain`, horizontal → `cover`;
+  el ajuste y el encuadre se pueden cambiar por slide.
 - Las imágenes se guardan en R2 bajo `products/<slug>/` y `site/`.
 
 ## SEO
