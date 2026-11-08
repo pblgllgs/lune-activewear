@@ -5,11 +5,20 @@
  * Convención de claves en R2:
  *   products/<slug-producto>/<timestamp>-<nombre>
  */
-const WORKER_URL = import.meta.env.VITE_R2_WORKER_URL as string | undefined;
-const UPLOAD_TOKEN = import.meta.env.VITE_UPLOAD_TOKEN as string | undefined;
+// Se leen dentro de cada función: Vite reemplaza estos valores en tiempo de
+// arranque/build, pero así el error indica exactamente qué variable falta.
+const workerUrl = () => import.meta.env.VITE_R2_WORKER_URL as string | undefined;
+const uploadToken = () => import.meta.env.VITE_UPLOAD_TOKEN as string | undefined;
 
 export function isUploadConfigured() {
-  return Boolean(WORKER_URL && UPLOAD_TOKEN);
+  return Boolean(workerUrl() && uploadToken());
+}
+
+export function missingUploadConfig(): string[] {
+  const missing: string[] = [];
+  if (!workerUrl()) missing.push("VITE_R2_WORKER_URL");
+  if (!uploadToken()) missing.push("VITE_UPLOAD_TOKEN");
+  return missing;
 }
 
 export function slugify(input: string): string {
@@ -23,29 +32,33 @@ export function slugify(input: string): string {
 }
 
 export async function uploadToR2(file: File, folder: string): Promise<string> {
-  if (!WORKER_URL || !UPLOAD_TOKEN) {
-    throw new Error("Falta configurar VITE_R2_WORKER_URL y VITE_UPLOAD_TOKEN.");
+  const base = workerUrl();
+  const token = uploadToken();
+  if (!base || !token) {
+    throw new Error(`Falta configurar ${missingUploadConfig().join(" y ")}.`);
   }
 
   const key = `${folder}/${Date.now()}-${file.name.replace(/\s+/g, "-")}`;
 
   const res = await fetch(
-    `${WORKER_URL}/upload?key=${encodeURIComponent(key)}&token=${encodeURIComponent(UPLOAD_TOKEN)}&contentType=${encodeURIComponent(file.type)}`,
+    `${base}/upload?key=${encodeURIComponent(key)}&token=${encodeURIComponent(token)}&contentType=${encodeURIComponent(file.type)}`,
     { method: "PUT", body: file }
   );
   if (!res.ok) throw new Error("Error al subir el archivo a R2");
 
-  return `${WORKER_URL}/file/${key}`;
+  return `${base}/file/${key}`;
 }
 
 /** Elimina un archivo de R2 a partir de su URL pública (/file/<key>). */
 export async function deleteFromR2(url: string): Promise<void> {
+  const base = workerUrl();
+  const token = uploadToken();
   const idx = url.indexOf("/file/");
-  if (idx === -1 || !WORKER_URL || !UPLOAD_TOKEN) return;
+  if (idx === -1 || !base || !token) return;
   const key = url.slice(idx + "/file/".length);
 
   const res = await fetch(
-    `${WORKER_URL}/delete?key=${encodeURIComponent(key)}&token=${encodeURIComponent(UPLOAD_TOKEN)}`,
+    `${base}/delete?key=${encodeURIComponent(key)}&token=${encodeURIComponent(token)}`,
     { method: "DELETE" }
   );
   if (!res.ok) throw new Error("Error al eliminar el archivo de R2");

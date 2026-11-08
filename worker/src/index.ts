@@ -18,11 +18,33 @@ export interface Env {
   UPLOAD_TOKEN: string;
 }
 
-const cors = (origin: string) => ({
-  "Access-Control-Allow-Origin": origin,
-  "Access-Control-Allow-Methods": "GET, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-});
+/**
+ * ALLOWED_ORIGIN acepta una lista separada por comas y comodines de subdominio
+ * (ej. "https://*.lune-activewear.pages.dev" para previews de Pages).
+ * Se devuelve el origen exacto de la petición cuando coincide.
+ */
+const cors = (request: Request, allowedOrigin: string) => {
+  const origin = request.headers.get("Origin") ?? "";
+  const allowed = (allowedOrigin || "*")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  const matches = allowed.some((value) => {
+    if (value === "*" || value === origin) return true;
+    if (value.startsWith("*.")) {
+      return origin.endsWith(value.slice(1));
+    }
+    return false;
+  });
+
+  return {
+    "Access-Control-Allow-Origin": matches ? origin || "*" : allowed[0] ?? "*",
+    "Access-Control-Allow-Methods": "GET, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    Vary: "Origin",
+  };
+};
 
 const CONTENT_TYPES: Record<string, string> = {
   pdf: "application/pdf",

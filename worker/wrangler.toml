@@ -5,7 +5,8 @@ compatibility_date = "2025-08-01"
 # npx wrangler secret put UPLOAD_TOKEN
 
 [vars]
-ALLOWED_ORIGIN = "http://localhost:5173"
+# Lista separada por comas; admite comodines de subdominio para previews de Pages.
+ALLOWED_ORIGIN = "http://localhost:5173,https://lune-activewear.pages.dev,https://*.lune-activewear.pages.dev"
 
 [[r2_buckets]]
 binding = "LUNE_BUCKET"
