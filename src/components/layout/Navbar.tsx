@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Menu, Search, ShoppingBag, X } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { CATEGORIES } from "@/lib/categories";
+import { SearchDialog } from "@/components/shop/SearchDialog";
 
 const links = [
   { label: "Inicio", to: "/" },
@@ -26,15 +27,18 @@ function Wordmark() {
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const { count, openCart } = useCart();
   const location = useLocation();
 
   useEffect(() => {
     setOpen(false);
+    setSearchOpen(false);
   }, [location.pathname, location.hash]);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border/70 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+    <>
+      <header className="sticky top-0 z-50 border-b border-border/70 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <div className="container grid h-20 grid-cols-[1fr_auto_1fr] items-center">
         {/* Navegación escritorio / hamburguesa móvil */}
         <nav className="hidden items-center gap-7 md:flex">
@@ -62,13 +66,15 @@ export function Navbar() {
         <Wordmark />
 
         <div className="flex items-center justify-end gap-1">
-          <Link
-            to="/tienda"
-            className="hidden h-10 w-10 items-center justify-center rounded-md transition hover:bg-secondary sm:inline-flex"
+          <button
+            type="button"
+            onClick={() => setSearchOpen(true)}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-md transition hover:bg-secondary"
             aria-label="Buscar productos"
+            aria-haspopup="dialog"
           >
             <Search className="h-5 w-5" />
-          </Link>
+          </button>
           <button
             type="button"
             onClick={openCart}
@@ -125,6 +131,9 @@ export function Navbar() {
           </div>
         </div>
       )}
-    </header>
+      </header>
+
+      <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
+    </>
   );
 }

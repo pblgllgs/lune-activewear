@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ArrowUpDown } from "lucide-react";
+import { ArrowUpDown, X } from "lucide-react";
 import { getProducts } from "@/lib/catalog";
 import { CATEGORIES, categoryInfo } from "@/lib/categories";
 import { isSizeSoldOut } from "@/lib/stock";
+import { matchesQuery } from "@/lib/search";
 import { collectionPageJsonLd, useSeo } from "@/lib/seo";
 import { ProductCard } from "@/components/shop/ProductCard";
 import { PRICE_RANGES, ShopFilters } from "@/components/shop/ShopFilters";
@@ -27,17 +28,23 @@ export default function Shop() {
   const selectedSizes = (searchParams.get("tallas") ?? "").split(",").filter(Boolean);
   const selectedColors = (searchParams.get("colores") ?? "").split(",").filter(Boolean);
   const priceRange = searchParams.get("precio") ?? "";
+  const searchQuery = searchParams.get("buscar") ?? "";
   const activeFilterCount =
     selectedSizes.length + selectedColors.length + (priceRange ? 1 : 0);
 
   useSeo({
-    title: category
-      ? `${category.label} — Tienda | LUNÉ Activewear`
-      : "Tienda — Calzas, petos, shorts y poleras | LUNÉ Activewear",
-    description: category
-      ? `${category.blurb} Descubre nuestra colección de ${category.label.toLowerCase()} LUNÉ Activewear, diseñada en Chillán, Chile, con envíos a todo el país.`
-      : "Explora calzas, petos, shorts y poleras LUNÉ Activewear. Ropa deportiva femenina diseñada en Chillán, Chile, con envíos a todo el país y compra por WhatsApp.",
-    path: category ? `/tienda?categoria=${category.id}` : "/tienda",
+    title: searchQuery
+      ? `Búsqueda: “${searchQuery}” — Tienda | LUNÉ Activewear`
+      : category
+        ? `${category.label} — Tienda | LUNÉ Activewear`
+        : "Tienda — Calzas, petos, shorts y poleras | LUNÉ Activewear",
+    description: searchQuery
+      ? `Resultados de búsqueda para “${searchQuery}” en LUNÉ Activewear.`
+      : category
+        ? `${category.blurb} Descubre nuestra colección de ${category.label.toLowerCase()} LUNÉ Activewear, diseñada en Chillán, Chile, con envíos a todo el país.`
+        : "Explora calzas, petos, shorts y poleras LUNÉ Activewear. Ropa deportiva femenina diseñada en Chillán, Chile, con envíos a todo el país y compra por WhatsApp.",
+    path: searchQuery ? "/tienda" : category ? `/tienda?categoria=${category.id}` : "/tienda",
+    noindex: Boolean(searchQuery),
     jsonLd: collectionPageJsonLd({
       name: category ? `${category.label} — LUNÉ Activewear` : "Tienda LUNÉ Activewear",
       description: category
@@ -78,6 +85,10 @@ export default function Shop() {
       list = list.filter((product) => product.price >= range.min && product.price <= range.max);
     }
 
+    if (searchQuery.trim()) {
+      list = list.filter((product) => matchesQuery(product, searchQuery));
+    }
+
     switch (sort) {
       case "price-asc":
         return list.sort((a, b) => a.price - b.price);
@@ -90,7 +101,7 @@ export default function Shop() {
           (a, b) => Number(Boolean(b.featured)) - Number(Boolean(a.featured))
         );
     }
-  }, [products, activeCategory, selectedSizes, selectedColors, priceRange, sort]);
+  }, [products, activeCategory, selectedSizes, selectedColors, priceRange, searchQuery, sort]);
 
   /** Actualiza un parámetro de la URL sin perder los demás filtros. */
   const setParam = (key: string, value: string | null) => {
@@ -196,6 +207,23 @@ export default function Shop() {
         />
 
         <div>
+          {searchQuery && (
+            <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-secondary px-4 py-3 lg:mt-0">
+              <p className="text-xs text-muted-foreground">
+                Resultados para{" "}
+                <span className="font-medium text-foreground">“{searchQuery}”</span>
+              </p>
+              <button
+                type="button"
+                onClick={() => setParam("buscar", null)}
+                className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider2 text-muted-foreground underline underline-offset-4 transition hover:text-foreground"
+              >
+                <X className="h-3 w-3" />
+                Limpiar búsqueda
+              </button>
+            </div>
+          )}
+
           {loading ? (
             <div className="mt-8 grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-3 lg:mt-0 lg:grid-cols-3 xl:grid-cols-4">
               {Array.from({ length: 8 }).map((_, i) => (
@@ -208,7 +236,23 @@ export default function Shop() {
             </div>
           ) : filtered.length === 0 ? (
             <div className="mt-10 flex flex-col items-center gap-4 text-center lg:mt-0">
-              {activeFilterCount > 0 ? (
+              {searchQuery ? (
+                <>
+                  <p className="font-display text-2xl">
+                    No encontramos prendas para “{searchQuery}”.
+                  </p>
+                  <p className="max-w-sm text-sm text-muted-foreground">
+                    Revisa la ortografía o prueba con otra palabra.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setParam("buscar", null)}
+                    className="rounded-md bg-primary px-5 py-2.5 text-[11px] uppercase tracking-wider2 text-primary-foreground"
+                  >
+                    Limpiar búsqueda
+                  </button>
+                </>
+              ) : activeFilterCount > 0 ? (
                 <>
                   <p className="font-display text-2xl">No encontramos prendas con esos filtros.</p>
                   <p className="max-w-sm text-sm text-muted-foreground">
