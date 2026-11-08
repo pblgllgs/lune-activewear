@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
+  Bell,
   ChevronLeft,
   ChevronRight,
   Heart,
@@ -120,6 +121,7 @@ export default function ProductDetail() {
   const currentImage = images[index] ?? images[0];
   const soldOut = isSoldOut(product);
   const currentStock = sizeStock(product, size);
+  const soldOutSizes = product.sizes.filter((s) => isSizeSoldOut(product, s));
   const favorite = isFavorite(product.id);
 
   const prev = () => setIndex((i) => (i - 1 + images.length) % images.length);
@@ -160,6 +162,18 @@ export default function ProductDetail() {
     toggleFavorite(product.id);
     toast.success(favorite ? "Quitado de favoritos." : "Guardado en favoritos.");
   };
+
+  const notifyLink = (soldOutSize: string) =>
+    whatsappLink(
+      [
+        "Hola Luné! Quiero que me avisen cuando vuelva a estar disponible:",
+        product.name,
+        `Talla: ${soldOutSize}`,
+        `Color: ${color}`,
+        "",
+        "Mi nombre:",
+      ].join("\n")
+    );
 
   return (
     <div className="container py-8 md:py-12">
@@ -347,6 +361,28 @@ export default function ProductDetail() {
                 {currentStock <= LAST_UNITS_THRESHOLD ? "Últimas" : "Quedan"} {currentStock} unidad
                 {currentStock === 1 ? "" : "es"} en talla {size}.
               </p>
+            )}
+
+            {soldOutSizes.length > 0 && (
+              <div className="mt-4 rounded-lg border border-dashed border-primary/20 p-3">
+                <p className="text-[10px] uppercase tracking-wider2 text-muted-foreground">
+                  ¿Tu talla está agotada?
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {soldOutSizes.map((soldOutSize) => (
+                    <a
+                      key={soldOutSize}
+                      href={notifyLink(soldOutSize)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-whatsapp/40 px-3 py-1.5 text-[10px] uppercase tracking-wider2 text-whatsapp transition hover:border-whatsapp hover:bg-whatsapp hover:text-whatsapp-foreground"
+                    >
+                      <Bell className="h-3 w-3" />
+                      Avísame talla {soldOutSize}
+                    </a>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
 
