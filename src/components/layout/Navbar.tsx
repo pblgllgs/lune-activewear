@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, Search, ShoppingBag, X } from "lucide-react";
+import { Menu, Heart, Search, ShoppingBag, X } from "lucide-react";
 import { useCart } from "@/context/CartContext";
+import { useWishlist } from "@/context/WishlistContext";
 import { CATEGORIES } from "@/lib/categories";
 import { SearchDialog } from "@/components/shop/SearchDialog";
 
@@ -29,6 +30,7 @@ export function Navbar() {
   const [open, setOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const { count, openCart } = useCart();
+  const { count: wishlistCount } = useWishlist();
   const location = useLocation();
 
   useEffect(() => {
@@ -75,6 +77,18 @@ export function Navbar() {
           >
             <Search className="h-5 w-5" />
           </button>
+          <Link
+            to="/favoritos"
+            className="relative inline-flex h-10 w-10 items-center justify-center rounded-md transition hover:bg-secondary"
+            aria-label={`Ver favoritos (${wishlistCount})`}
+          >
+            <Heart className="h-5 w-5" />
+            {wishlistCount > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[9px] font-semibold text-accent-foreground">
+                {wishlistCount}
+              </span>
+            )}
+          </Link>
           <button
             type="button"
             onClick={openCart}

@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import {
   ChevronLeft,
   ChevronRight,
+  Heart,
   Minus,
   Plus,
   RefreshCw,
@@ -13,11 +14,17 @@ import {
 import { getProduct, getProducts } from "@/lib/catalog";
 import { categoryLabel } from "@/lib/categories";
 import { resolveSizeGuide } from "@/lib/size-guide";
-import { firstAvailableSize, isSizeSoldOut, isSoldOut, sizeStock } from "@/lib/stock";
+import {
+  firstAvailableSize,
+  isSizeSoldOut,
+  isSoldOut,
+  sizeStock,
+} from "@/lib/stock";
 import { discountPercent, formatCLP } from "@/lib/utils";
 import { whatsappLink } from "@/lib/constants";
 import { breadcrumbJsonLd, productJsonLd, truncate, useSeo } from "@/lib/seo";
 import { useCart } from "@/context/CartContext";
+import { useWishlist } from "@/context/WishlistContext";
 import type { Product } from "@/types/product";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +35,7 @@ import { SizeGuide } from "@/components/shop/SizeGuide";
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const { addItem, openCart } = useCart();
+  const { has: isFavorite, toggle: toggleFavorite } = useWishlist();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [related, setRelated] = useState<Product[]>([]);
@@ -110,6 +118,7 @@ export default function ProductDetail() {
   const currentImage = images[index] ?? images[0];
   const soldOut = isSoldOut(product);
   const currentStock = sizeStock(product, size);
+  const favorite = isFavorite(product.id);
 
   const prev = () => setIndex((i) => (i - 1 + images.length) % images.length);
   const next = () => setIndex((i) => (i + 1) % images.length);
@@ -143,6 +152,11 @@ export default function ProductDetail() {
       `Precio: ${formatCLP(product.price * qty)}`,
     ].join("\n");
     window.open(whatsappLink(text), "_blank", "noopener,noreferrer");
+  };
+
+  const handleFavorite = () => {
+    toggleFavorite(product.id);
+    toast.success(favorite ? "Quitado de favoritos." : "Guardado en favoritos.");
   };
 
   return (
@@ -225,9 +239,20 @@ export default function ProductDetail() {
           <p className="text-[10px] uppercase tracking-brand text-muted-foreground">
             {categoryLabel(product.category)}
           </p>
-          <h1 className="mt-2 font-display text-3xl font-medium tracking-tight md:text-4xl">
-            {product.name}
-          </h1>
+          <div className="mt-2 flex items-start justify-between gap-4">
+            <h1 className="font-display text-3xl font-medium tracking-tight md:text-4xl">
+              {product.name}
+            </h1>
+            <button
+              type="button"
+              onClick={handleFavorite}
+              aria-pressed={favorite}
+              aria-label={favorite ? "Quitar de favoritos" : "Guardar en favoritos"}
+              className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-primary/15 transition hover:bg-secondary"
+            >
+              <Heart className={`h-4 w-4 ${favorite ? "fill-primary text-primary" : ""}`} />
+            </button>
+          </div>
 
           <div className="mt-4 flex items-center gap-3">
             <span className="font-display text-2xl">{formatCLP(product.price)}</span>
@@ -308,11 +333,6 @@ export default function ProductDetail() {
             </div>
             {currentStock === 0 && (
               <p className="mt-2 text-xs text-destructive">Esta talla está agotada.</p>
-            )}
-            {currentStock !== null && currentStock > 0 && currentStock <= 5 && (
-              <p className="mt-2 text-xs text-muted-foreground">
-                Quedan {currentStock} unidad{currentStock === 1 ? "" : "es"} en talla {size}.
-              </p>
             )}
           </div>
 

@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Link, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 import { CartProvider } from "@/context/CartContext";
+import { WishlistProvider } from "@/context/WishlistContext";
 import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
@@ -12,6 +13,7 @@ import Home from "@/pages/Home";
 
 const Shop = lazy(() => import("@/pages/Shop"));
 const ProductDetail = lazy(() => import("@/pages/ProductDetail"));
+const Favorites = lazy(() => import("@/pages/Favorites"));
 const About = lazy(() => import("@/pages/About"));
 const Admin = lazy(() => import("@/pages/Admin"));
 
@@ -64,27 +66,30 @@ function App() {
   return (
     <BrowserRouter>
       <CartProvider>
-        <ScrollToTop />
-        <Toaster richColors position="top-right" />
-        <div className="flex min-h-screen flex-col bg-background">
-          <AnnouncementBar />
-          <Navbar />
-          <main className="flex-1">
-            <Suspense fallback={<RouteFallback />}>
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/tienda" element={<Shop />} />
-                <Route path="/producto/:id" element={<ProductDetail />} />
-                <Route path="/nosotros" element={<About />} />
-                <Route path="/admin" element={<Admin />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
-          </main>
-          <Footer />
-          <CartDrawer />
-          <WhatsAppFloat />
-        </div>
+        <WishlistProvider>
+          <ScrollToTop />
+          <Toaster richColors position="top-right" />
+          <div className="flex min-h-screen flex-col bg-background">
+            <AnnouncementBar />
+            <Navbar />
+            <main className="flex-1">
+              <Suspense fallback={<RouteFallback />}>
+                <Routes>
+                  <Route path="/" element={<Home />} />
+                  <Route path="/tienda" element={<Shop />} />
+                  <Route path="/producto/:id" element={<ProductDetail />} />
+                  <Route path="/favoritos" element={<Favorites />} />
+                  <Route path="/nosotros" element={<About />} />
+                  <Route path="/admin" element={<Admin />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Suspense>
+            </main>
+            <Footer />
+            <CartDrawer />
+            <WhatsAppFloat />
+          </div>
+        </WishlistProvider>
       </CartProvider>
     </BrowserRouter>
   );
