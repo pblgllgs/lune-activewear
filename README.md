@@ -53,12 +53,13 @@ src/
     admin/       ContentManager (hero e imágenes de Nosotros)
     contact/     ContactSection (formulario → WhatsApp)
     layout/      AnnouncementBar, Navbar, Footer, CartDrawer, WhatsAppFloat
-    shop/        ProductCard, ImageWithFallback, SectionHeading, FaqSection
+    shop/        ProductCard, ShopFilters, SearchDialog, SizeGuide, ImageWithFallback,
+                 SectionHeading, FaqSection
     ui/          Componentes shadcn/ui
-  context/       CartContext (carrito persistido en localStorage)
-  lib/           firebase, catalog (datos demo + Firestore), stock, site-content,
-                 seo (metadatos + JSON-LD), upload (R2), utils, constants
-  pages/         Home, Shop, ProductDetail, About, Admin
+  context/       CartContext (carrito) y WishlistContext (favoritos), ambos en localStorage
+  lib/           firebase, catalog (datos demo + Firestore), stock, size-guide, search,
+                 site-content, seo (metadatos + JSON-LD), upload (R2), utils, constants
+  pages/         Home, Shop, ProductDetail, Favorites, About, Admin
   types/         Product, ProductColor
 scripts/         sitemap y páginas estáticas de SEO (pre/post build)
 worker/          Cloudflare Worker para R2 (upload/serve/delete)
@@ -106,3 +107,7 @@ worker/          Cloudflare Worker para R2 (upload/serve/delete)
 Cloudflare Pages: build `npm run build`, output `dist`. `public/_redirects` se regenera en
 el `postbuild` con las rutas estáticas de SEO y el catch-all de la SPA; `public/_headers`
 aplica `noindex` a `/admin`.
+
+El proyecto de Pages está conectado al repositorio de GitHub: **cada `git push` a `master`
+compila y publica solo**. No hace falta ejecutar `npx wrangler pages deploy` (genera
+despliegues duplicados).
