@@ -2,24 +2,33 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { ImageWithFallback } from "@/components/shop/ImageWithFallback";
 import { cn } from "@/lib/utils";
+import type { HeroSlide } from "@/lib/site-content";
 
 interface HeroCarouselProps {
-  images: string[];
+  slides: HeroSlide[];
   alt: string;
   /** Milisegundos entre imágenes. `0` desactiva el avance automático. */
   interval?: number;
   className?: string;
 }
 
+const fitClass = (fit: HeroSlide["fit"]) => (fit === "contain" ? "object-contain" : "object-cover");
+
+const positionClass = (position: HeroSlide["position"]) => {
+  if (position === "top") return "object-top";
+  if (position === "bottom") return "object-bottom";
+  return "object-center";
+};
+
 /**
  * Carrusel del hero: desplazamiento horizontal con autoplay, flechas, puntos,
  * swipe táctil y navegación con teclado. Se pausa al pasar el mouse o enfocar y
  * respeta `prefers-reduced-motion`.
  */
-export function HeroCarousel({ images, alt, interval = 5500, className }: HeroCarouselProps) {
-  const slides = images.filter((src) => Boolean(src));
-  const count = slides.length;
-  const key = slides.join("|");
+export function HeroCarousel({ slides, alt, interval = 5500, className }: HeroCarouselProps) {
+  const items = slides.filter((slide) => Boolean(slide.url));
+  const count = items.length;
+  const key = items.map((slide) => `${slide.url}|${slide.fit}|${slide.position}`).join("|");
 
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -60,7 +69,7 @@ export function HeroCarousel({ images, alt, interval = 5500, className }: HeroCa
   // transición no muestre un hueco (la primera entra como LCP con prioridad).
   useEffect(() => {
     if (count < 2) return;
-    const sources = key.split("|").slice(1);
+    const sources = items.slice(1).map((slide) => slide.url);
     const id = window.setTimeout(() => {
       sources.forEach((src) => {
         const img = new Image();
@@ -68,7 +77,7 @@ export function HeroCarousel({ images, alt, interval = 5500, className }: HeroCa
       });
     }, 1200);
     return () => window.clearTimeout(id);
-  }, [count, key]);
+  }, [count, key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (count === 0) {
     return <div className={cn("h-full w-full bg-secondary", className)} aria-hidden />;
@@ -115,17 +124,21 @@ export function HeroCarousel({ images, alt, interval = 5500, className }: HeroCa
         )}
         style={{ transform: `translateX(-${index * 100}%)` }}
       >
-        {slides.map((src, i) => (
+        {items.map((slide, i) => (
           <div
-            key={`${src}-${i}`}
+            key={`${slide.url}-${i}`}
             className="relative h-full w-full shrink-0"
             aria-hidden={i !== index}
           >
             <ImageWithFallback
-              src={src}
+              src={slide.url}
               alt={alt}
               priority={i === 0}
-              className="h-full w-full object-cover"
+              className={cn(
+                "h-full w-full",
+                fitClass(slide.fit),
+                positionClass(slide.position)
+              )}
             />
           </div>
         ))}
@@ -151,9 +164,9 @@ export function HeroCarousel({ images, alt, interval = 5500, className }: HeroCa
           </button>
 
           <div className="absolute bottom-4 left-4 flex items-center gap-1.5 rounded-full bg-background/75 px-2.5 py-1.5 shadow-sm backdrop-blur">
-            {slides.map((src, i) => (
+            {items.map((slide, i) => (
               <button
-                key={`dot-${src}-${i}`}
+                key={`dot-${slide.url}-${i}`}
                 type="button"
                 onClick={() => goTo(i)}
                 aria-label={`Ir a la imagen ${i + 1} de ${count}`}

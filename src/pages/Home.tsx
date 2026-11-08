@@ -101,7 +101,7 @@ export default function Home() {
 
           <div className="relative order-1 min-h-[340px] md:order-2 md:min-h-[560px]">
             <HeroCarousel
-              images={content.heroImages}
+              slides={content.heroSlides}
               alt="Modelo con ropa deportiva LUNÉ"
               className="absolute inset-0"
             />

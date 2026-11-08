@@ -1,11 +1,24 @@
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
+export type HeroSlideFit = "cover" | "contain";
+export type HeroSlidePosition = "center" | "top" | "bottom";
+
+export interface HeroSlide {
+  url: string;
+  /** `contain` muestra la foto completa; `cover` rellena el panel y puede recortar. */
+  fit: HeroSlideFit;
+  /** Punto de la foto que se mantiene visible cuando `fit` es `cover`. */
+  position: HeroSlidePosition;
+}
+
 export interface SiteContent {
   /** Primera imagen del hero. Se mantiene por compatibilidad con el contenido antiguo. */
   heroImage: string;
-  /** Imágenes del carrusel del hero, en orden. */
+  /** URLs de las slides, en orden. Derivado de `heroSlides`. */
   heroImages: string[];
+  /** Slides del carrusel con su ajuste de visualización. */
+  heroSlides: HeroSlide[];
   aboutImageOne: string;
   aboutImageTwo: string;
   updatedAt?: string;
@@ -32,9 +45,17 @@ export const DEFAULT_HERO_IMAGES: string[] = HERO_FALLBACKS.map((fallback, index
   r2OrFallback(`site/hero-${index + 1}.jpg`, fallback)
 );
 
+/** Las fotos de la colección se muestran completas por defecto. */
+export const DEFAULT_HERO_SLIDES: HeroSlide[] = DEFAULT_HERO_IMAGES.map((url) => ({
+  url,
+  fit: "contain",
+  position: "center",
+}));
+
 export const DEFAULT_SITE_CONTENT: SiteContent = {
   heroImage: DEFAULT_HERO_IMAGES[0],
   heroImages: DEFAULT_HERO_IMAGES,
+  heroSlides: DEFAULT_HERO_SLIDES,
   aboutImageOne: r2OrFallback(
     "site/about-1.jpg",
     "https://images.pexels.com/photos/3822906/pexels-photo-3822906.jpeg?auto=compress&cs=tinysrgb&w=1000"
@@ -55,6 +76,27 @@ const imageList = (value: unknown): string[] => {
     .filter((item): item is string => Boolean(item));
 };
 
+const isFit = (value: unknown): value is HeroSlideFit => value === "cover" || value === "contain";
+const isPosition = (value: unknown): value is HeroSlidePosition =>
+  value === "center" || value === "top" || value === "bottom";
+
+const slideList = (value: unknown): HeroSlide[] => {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const record = item as Record<string, unknown>;
+    const url = typeof record.url === "string" ? record.url.trim() : "";
+    if (!url) return [];
+    return [
+      {
+        url,
+        fit: isFit(record.fit) ? record.fit : "contain",
+        position: isPosition(record.position) ? record.position : "center",
+      },
+    ];
+  });
+};
+
 export async function getSiteContent(): Promise<SiteContent> {
   if (!db) return DEFAULT_SITE_CONTENT;
   try {
@@ -62,15 +104,21 @@ export async function getSiteContent(): Promise<SiteContent> {
     if (!snap.exists()) return DEFAULT_SITE_CONTENT;
     const data = snap.data();
 
-    // `heroImages` manda. Si el documento viene del formato anterior (solo
-    // `heroImage`) se usa el carrusel nuevo por defecto: la portada pasó de una
-    // imagen única a la colección de slides.
-    const stored = imageList(data.heroImages);
-    const heroImages = stored.length ? stored : DEFAULT_HERO_IMAGES;
+    // `heroSlides` manda. Los documentos antiguos guardaban `heroImages`
+    // (solo URLs) o `heroImage` (una sola foto): en ambos casos se usa el
+    // carrusel nuevo por defecto.
+    const storedSlides = slideList(data.heroSlides);
+    const storedImages = imageList(data.heroImages);
+    const heroSlides = storedSlides.length
+      ? storedSlides
+      : storedImages.length
+        ? storedImages.map((url) => ({ url, fit: "contain" as const, position: "center" as const }))
+        : DEFAULT_HERO_SLIDES;
 
     return {
-      heroImage: heroImages[0],
-      heroImages,
+      heroImage: heroSlides[0].url,
+      heroImages: heroSlides.map((slide) => slide.url),
+      heroSlides,
       aboutImageOne: text(data.aboutImageOne, DEFAULT_SITE_CONTENT.aboutImageOne),
       aboutImageTwo: text(data.aboutImageTwo, DEFAULT_SITE_CONTENT.aboutImageTwo),
       updatedAt: data.updatedAt ? String(data.updatedAt) : undefined,

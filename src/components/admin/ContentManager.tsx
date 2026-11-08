@@ -5,15 +5,25 @@ import { ChevronLeft, ChevronRight, ImagePlus, Plus, Save, X } from "lucide-reac
 import { db } from "@/lib/firebase";
 import { uploadToR2 } from "@/lib/upload";
 import {
-  DEFAULT_HERO_IMAGES,
+  DEFAULT_HERO_SLIDES,
   DEFAULT_SITE_CONTENT,
   getSiteContent,
+  type HeroSlide,
+  type HeroSlideFit,
+  type HeroSlidePosition,
   type SiteContent,
 } from "@/lib/site-content";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ImageWithFallback } from "@/components/shop/ImageWithFallback";
 
 type AboutSlotKey = "aboutImageOne" | "aboutImageTwo";
@@ -21,6 +31,11 @@ type AboutSlotKey = "aboutImageOne" | "aboutImageTwo";
 interface DraftImage {
   url: string;
   file?: File;
+}
+
+interface DraftSlide extends DraftImage {
+  fit: HeroSlideFit;
+  position: HeroSlidePosition;
 }
 
 const ABOUT_SLOTS: { key: AboutSlotKey; label: string; hint: string }[] = [
@@ -36,6 +51,14 @@ const ABOUT_SLOTS: { key: AboutSlotKey; label: string; hint: string }[] = [
   },
 ];
 
+const fitClass = (fit: HeroSlideFit) => (fit === "contain" ? "object-contain" : "object-cover");
+
+const positionClass = (position: HeroSlidePosition) => {
+  if (position === "top") return "object-top";
+  if (position === "bottom") return "object-bottom";
+  return "object-center";
+};
+
 function toAboutDrafts(content: SiteContent): Record<AboutSlotKey, DraftImage> {
   return {
     aboutImageOne: { url: content.aboutImageOne },
@@ -43,9 +66,9 @@ function toAboutDrafts(content: SiteContent): Record<AboutSlotKey, DraftImage> {
   };
 }
 
-function toHeroDrafts(content: SiteContent): DraftImage[] {
-  const images = content.heroImages.length ? content.heroImages : DEFAULT_HERO_IMAGES;
-  return images.map((url) => ({ url }));
+function toHeroDrafts(content: SiteContent): DraftSlide[] {
+  const slides = content.heroSlides.length ? content.heroSlides : DEFAULT_HERO_SLIDES;
+  return slides.map((slide) => ({ ...slide }));
 }
 
 function ImageSlot({
@@ -118,10 +141,13 @@ function HeroImageList({
   items,
   onChange,
 }: {
-  items: DraftImage[];
-  onChange: (items: DraftImage[]) => void;
+  items: DraftSlide[];
+  onChange: (items: DraftSlide[]) => void;
 }) {
   const addInputRef = useRef<HTMLInputElement>(null);
+
+  const updateAt = (index: number, patch: Partial<DraftSlide>) =>
+    onChange(items.map((item, i) => (i === index ? { ...item, ...patch } : item)));
 
   const removeAt = (index: number) => {
     const target = items[index];
@@ -142,9 +168,10 @@ function HeroImageList({
       <div>
         <Label className="text-base">Carrusel del inicio</Label>
         <p className="mt-1 text-[11px] text-muted-foreground">
-          Estas imágenes se deslizan en la portada. Arrastra el orden con las flechas: la primera
-          es la que se ve al entrar. Recomendado 1400 px de ancho, verticales y con el mismo
-          encuadre.
+          Estas imágenes se deslizan en la portada. Usa las flechas para ordenarlas: la primera es
+          la que se ve al entrar. En cada foto elige cómo se muestra: <strong>Completa</strong> la
+          ajusta entera sin recortar (ideal para fotos muy verticales) y <strong>Rellenar</strong>
+          ocupa todo el panel aunque recorte los bordes.
         </p>
       </div>
 
@@ -156,7 +183,7 @@ function HeroImageList({
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((item, index) => (
-          <div key={`hero-${index}`} className="space-y-2 rounded-lg border p-3">
+          <div key={`hero-${index}`} className="space-y-3 rounded-lg border p-3">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-medium uppercase tracking-wider2 text-muted-foreground">
                 Slide {index + 1}
@@ -201,13 +228,51 @@ function HeroImageList({
               <ImageWithFallback
                 src={item.url}
                 alt={`Slide ${index + 1} del carrusel`}
-                className="h-full w-full object-cover"
+                className={`h-full w-full ${fitClass(item.fit)} ${positionClass(item.position)}`}
               />
               {item.file && (
                 <span className="absolute bottom-2 right-2 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">
                   se subirá al guardar
                 </span>
               )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-[11px] uppercase tracking-wider2 text-muted-foreground">
+                Tamaño en el carrusel
+              </Label>
+              <Select
+                value={item.fit}
+                onValueChange={(value) => updateAt(index, { fit: value as HeroSlideFit })}
+              >
+                <SelectTrigger className="h-9 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="contain">Completa (sin recortar)</SelectItem>
+                  <SelectItem value="cover">Rellenar el panel</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-[11px] uppercase tracking-wider2 text-muted-foreground">
+                Encuadre
+              </Label>
+              <Select
+                value={item.position}
+                disabled={item.fit === "contain"}
+                onValueChange={(value) => updateAt(index, { position: value as HeroSlidePosition })}
+              >
+                <SelectTrigger className="h-9 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="center">Centro</SelectItem>
+                  <SelectItem value="top">Arriba</SelectItem>
+                  <SelectItem value="bottom">Abajo</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         ))}
@@ -224,7 +289,12 @@ function HeroImageList({
           if (files.length) {
             onChange([
               ...items,
-              ...files.map((file) => ({ url: URL.createObjectURL(file), file })),
+              ...files.map((file) => ({
+                url: URL.createObjectURL(file),
+                file,
+                fit: "contain" as const,
+                position: "center" as const,
+              })),
             ]);
           }
           e.target.value = "";
@@ -241,7 +311,7 @@ function HeroImageList({
 }
 
 export function ContentManager() {
-  const [heroDrafts, setHeroDrafts] = useState<DraftImage[]>(() =>
+  const [heroDrafts, setHeroDrafts] = useState<DraftSlide[]>(() =>
     toHeroDrafts(DEFAULT_SITE_CONTENT)
   );
   const [aboutDrafts, setAboutDrafts] = useState<Record<AboutSlotKey, DraftImage>>(() =>
@@ -285,16 +355,17 @@ export function ContentManager() {
         return draft.url.trim() || fallback;
       };
 
-      const heroImages: string[] = [];
+      const heroSlides: HeroSlide[] = [];
       for (const draft of heroDrafts) {
         const url = await resolve(draft, "");
-        if (url) heroImages.push(url);
+        if (url) heroSlides.push({ url, fit: draft.fit, position: draft.position });
       }
-      const finalHeroImages = heroImages.length ? heroImages : DEFAULT_HERO_IMAGES;
+      const finalSlides = heroSlides.length ? heroSlides : DEFAULT_HERO_SLIDES;
 
       const payload: SiteContent = {
-        heroImage: finalHeroImages[0],
-        heroImages: finalHeroImages,
+        heroImage: finalSlides[0].url,
+        heroImages: finalSlides.map((slide) => slide.url),
+        heroSlides: finalSlides,
         aboutImageOne: await resolve(
           aboutDrafts.aboutImageOne,
           DEFAULT_SITE_CONTENT.aboutImageOne
