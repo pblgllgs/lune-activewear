@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { SlidersHorizontal } from "lucide-react";
 import { getProducts } from "@/lib/catalog";
-import { CATEGORIES } from "@/lib/categories";
+import { CATEGORIES, categoryInfo } from "@/lib/categories";
+import { collectionPageJsonLd, useSeo } from "@/lib/seo";
 import { ProductCard } from "@/components/shop/ProductCard";
 import type { Product } from "@/types/product";
 
@@ -20,6 +21,24 @@ export default function Shop() {
   const [sort, setSort] = useState("featured");
 
   const activeCategory = searchParams.get("categoria") ?? "todas";
+  const category = activeCategory === "todas" ? undefined : categoryInfo(activeCategory);
+
+  useSeo({
+    title: category
+      ? `${category.label} — Tienda | LUNÉ Activewear`
+      : "Tienda — Calzas, petos, shorts y poleras | LUNÉ Activewear",
+    description: category
+      ? `${category.blurb} Descubre nuestra colección de ${category.label.toLowerCase()} LUNÉ Activewear, diseñada en Chillán, Chile, con envíos a todo el país.`
+      : "Explora calzas, petos, shorts y poleras LUNÉ Activewear. Ropa deportiva femenina diseñada en Chillán, Chile, con envíos a todo el país y compra por WhatsApp.",
+    path: category ? `/tienda?categoria=${category.id}` : "/tienda",
+    jsonLd: collectionPageJsonLd({
+      name: category ? `${category.label} — LUNÉ Activewear` : "Tienda LUNÉ Activewear",
+      description: category
+        ? `${category.blurb} Colección de ${category.label.toLowerCase()} LUNÉ Activewear.`
+        : "Colección de ropa deportiva femenina LUNÉ Activewear: calzas, petos, shorts y poleras.",
+      path: category ? `/tienda?categoria=${category.id}` : "/tienda",
+    }),
+  });
 
   useEffect(() => {
     getProducts()

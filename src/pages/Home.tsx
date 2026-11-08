@@ -6,9 +6,11 @@ import { ProductCard } from "@/components/shop/ProductCard";
 import { SectionHeading } from "@/components/shop/SectionHeading";
 import { ImageWithFallback } from "@/components/shop/ImageWithFallback";
 import { ContactSection } from "@/components/contact/ContactSection";
+import { FaqSection, FAQS } from "@/components/shop/FaqSection";
 import { CATEGORIES } from "@/lib/categories";
 import { getProducts } from "@/lib/catalog";
 import { DEFAULT_SITE_CONTENT, getSiteContent } from "@/lib/site-content";
+import { faqJsonLd, useSeo } from "@/lib/seo";
 import type { Product } from "@/types/product";
 
 const benefits = [
@@ -38,6 +40,14 @@ export default function Home() {
   const { hash } = useLocation();
   const [products, setProducts] = useState<Product[]>([]);
   const [content, setContent] = useState(DEFAULT_SITE_CONTENT);
+
+  useSeo({
+    title: "LUNÉ Activewear — Ropa deportiva femenina en Chile | Chillán",
+    description:
+      "Calzas, petos, shorts y poleras diseñados en Chillán, Chile. Ropa deportiva femenina con comodidad y estilo. Compra online y coordina tu pedido por WhatsApp.",
+    path: "/",
+    jsonLd: faqJsonLd(FAQS),
+  });
 
   useEffect(() => {
     getProducts().then(setProducts);
@@ -93,6 +103,7 @@ export default function Home() {
             <ImageWithFallback
               src={content.heroImage}
               alt="Modelo con ropa deportiva LUNÉ"
+              priority
               className="absolute inset-0 h-full w-full object-cover"
             />
             <span className="absolute left-4 top-4 rounded-full bg-background/85 px-3 py-1.5 text-[10px] uppercase tracking-wider2 backdrop-blur">
@@ -205,6 +216,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <FaqSection />
 
       <ContactSection />
     </div>

@@ -24,5 +24,9 @@ dist-ssr
 *.sw?
 
 .env
+.wrangler/
 worker/.wrangler/
 worker/node_modules/
+
+# Generado en prebuild
+public/sitemap.xml

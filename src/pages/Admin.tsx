@@ -33,6 +33,7 @@ import { normalizeProduct, seedDemoProducts } from "@/lib/catalog";
 import { totalStock } from "@/lib/stock";
 import { CATEGORIES, categoryLabel } from "@/lib/categories";
 import { formatCLP } from "@/lib/utils";
+import { useSeo } from "@/lib/seo";
 import type { Product, ProductColor } from "@/types/product";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -658,6 +659,13 @@ export default function Admin() {
   const [products, setProducts] = useState<Product[]>([]);
   const [editing, setEditing] = useState<Product | null>(null);
   const [seeding, setSeeding] = useState(false);
+
+  useSeo({
+    title: "Administración | LUNÉ Activewear",
+    description: "Panel privado de administración de LUNÉ Activewear.",
+    path: "/admin",
+    noindex: true,
+  });
 
   useEffect(() => {
     const currentAuth = auth;

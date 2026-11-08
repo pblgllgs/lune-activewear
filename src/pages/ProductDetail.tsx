@@ -15,6 +15,7 @@ import { categoryLabel } from "@/lib/categories";
 import { firstAvailableSize, isSizeSoldOut, isSoldOut, sizeStock } from "@/lib/stock";
 import { discountPercent, formatCLP } from "@/lib/utils";
 import { whatsappLink } from "@/lib/constants";
+import { breadcrumbJsonLd, productJsonLd, truncate, useSeo } from "@/lib/seo";
 import { useCart } from "@/context/CartContext";
 import type { Product } from "@/types/product";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +34,33 @@ export default function ProductDetail() {
   const [size, setSize] = useState("");
   const [color, setColor] = useState("");
   const [qty, setQty] = useState(1);
+
+  useSeo({
+    title: product
+      ? `${product.name} — ${categoryLabel(product.category)} | LUNÉ Activewear`
+      : "Producto | LUNÉ Activewear",
+    description: product
+      ? truncate(product.description)
+      : "Descubre la colección de ropa deportiva femenina LUNÉ Activewear, diseñada en Chillán, Chile.",
+    path: `/producto/${id ?? ""}`,
+    image: product?.images[0],
+    type: "product",
+    noindex: !loading && !product,
+    jsonLd: product
+      ? [
+          productJsonLd(product),
+          breadcrumbJsonLd([
+            { name: "Inicio", path: "/" },
+            { name: "Tienda", path: "/tienda" },
+            {
+              name: categoryLabel(product.category),
+              path: `/tienda?categoria=${product.category}`,
+            },
+            { name: product.name, path: `/producto/${product.id}` },
+          ]),
+        ]
+      : undefined,
+  });
 
   useEffect(() => {
     if (!id) return;
@@ -117,7 +145,7 @@ export default function ProductDetail() {
 
   return (
     <div className="container py-8 md:py-12">
-      <nav className="mb-6 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+      <nav aria-label="Migas de pan" className="mb-6 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
         <Link to="/" className="hover:text-foreground">
           Inicio
         </Link>
@@ -135,7 +163,8 @@ export default function ProductDetail() {
           <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-secondary">
             <ImageWithFallback
               src={currentImage}
-              alt={product.name}
+              alt={`${product.name} — ${categoryLabel(product.category)} LUNÉ Activewear`}
+              priority
               className="h-full w-full object-cover"
             />
 

@@ -29,8 +29,9 @@ function InstagramIcon({ className }: { className?: string }) {
 }
 
 const helpLinks = [
-  { label: "Envíos y devoluciones", to: "/#contacto" },
-  { label: "Guía de tallas", to: "/#contacto" },
+  { label: "Preguntas frecuentes", to: "/#preguntas" },
+  { label: "Envíos y devoluciones", to: "/#preguntas" },
+  { label: "Guía de tallas", to: "/#preguntas" },
   { label: "Nosotros", to: "/nosotros" },
   { label: "Contacto", to: "/#contacto" },
 ];

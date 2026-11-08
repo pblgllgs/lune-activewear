@@ -4,6 +4,7 @@ import { ArrowRight, Heart, Sparkles, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ImageWithFallback } from "@/components/shop/ImageWithFallback";
 import { DEFAULT_SITE_CONTENT, getSiteContent } from "@/lib/site-content";
+import { absoluteUrl, SITE_NAME, SITE_URL, useSeo } from "@/lib/seo";
 
 const values = [
   {
@@ -25,6 +26,23 @@ const values = [
 
 export default function About() {
   const [content, setContent] = useState(DEFAULT_SITE_CONTENT);
+
+  useSeo({
+    title: "Nosotros — Ropa deportiva diseñada en Chillán | LUNÉ Activewear",
+    description:
+      "Conoce LUNÉ Activewear: ropa deportiva femenina nacida en Chillán, Chile. Prendas cómodas, femeninas y modernas, diseñadas para acompañarte dentro y fuera del gimnasio.",
+    path: "/nosotros",
+    image: content.aboutImageOne,
+    jsonLd: {
+      "@context": "https://schema.org",
+      "@type": "AboutPage",
+      name: "Nosotros — LUNÉ Activewear",
+      description:
+        "Historia de LUNÉ Activewear, marca de ropa deportiva femenina creada en Chillán, Chile.",
+      url: absoluteUrl("/nosotros"),
+      isPartOf: { "@type": "WebSite", name: SITE_NAME, url: SITE_URL },
+    },
+  });
 
   useEffect(() => {
     getSiteContent().then(setContent);
@@ -52,7 +70,8 @@ export default function About() {
           <div className="aspect-[4/5] overflow-hidden rounded-xl bg-secondary md:aspect-[5/6]">
             <ImageWithFallback
               src={content.aboutImageOne}
-              alt="Mujer entrenando con ropa deportiva"
+              alt="Mujer entrenando con ropa deportiva LUNÉ"
+              priority
               className="h-full w-full object-cover"
             />
           </div>

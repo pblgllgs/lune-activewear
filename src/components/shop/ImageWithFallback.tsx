@@ -6,10 +6,18 @@ interface ImageWithFallbackProps {
   alt: string;
   className?: string;
   fallbackClassName?: string;
+  /** Marca la imagen como crítica para LCP (hero, ficha de producto). */
+  priority?: boolean;
 }
 
 /** Imagen con placeholder de marca cuando la URL no carga. */
-export function ImageWithFallback({ src, alt, className, fallbackClassName }: ImageWithFallbackProps) {
+export function ImageWithFallback({
+  src,
+  alt,
+  className,
+  fallbackClassName,
+  priority = false,
+}: ImageWithFallbackProps) {
   const [failed, setFailed] = useState(false);
 
   if (!src || failed) {
@@ -32,7 +40,9 @@ export function ImageWithFallback({ src, alt, className, fallbackClassName }: Im
     <img
       src={src}
       alt={alt}
-      loading="lazy"
+      loading={priority ? "eager" : "lazy"}
+      fetchPriority={priority ? "high" : "auto"}
+      decoding="async"
       onError={() => setFailed(true)}
       className={className}
     />

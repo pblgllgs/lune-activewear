@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Link, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 import { CartProvider } from "@/context/CartContext";
@@ -7,11 +7,13 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { CartDrawer } from "@/components/layout/CartDrawer";
 import { WhatsAppFloat } from "@/components/layout/WhatsAppFloat";
+import { useSeo } from "@/lib/seo";
 import Home from "@/pages/Home";
-import Shop from "@/pages/Shop";
-import ProductDetail from "@/pages/ProductDetail";
-import About from "@/pages/About";
-import Admin from "@/pages/Admin";
+
+const Shop = lazy(() => import("@/pages/Shop"));
+const ProductDetail = lazy(() => import("@/pages/ProductDetail"));
+const About = lazy(() => import("@/pages/About"));
+const Admin = lazy(() => import("@/pages/Admin"));
 
 function ScrollToTop() {
   const { pathname, hash } = useLocation();
@@ -24,6 +26,15 @@ function ScrollToTop() {
 }
 
 function NotFound() {
+  const { pathname } = useLocation();
+
+  useSeo({
+    title: "Página no encontrada | LUNÉ Activewear",
+    description: "La página que buscas no existe o cambió de dirección.",
+    path: pathname,
+    noindex: true,
+  });
+
   return (
     <div className="container flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center">
       <p className="text-[10px] uppercase tracking-brand text-muted-foreground">Error 404</p>
@@ -41,6 +52,14 @@ function NotFound() {
   );
 }
 
+function RouteFallback() {
+  return (
+    <div className="container py-24 text-center text-sm text-muted-foreground">
+      Cargando…
+    </div>
+  );
+}
+
 function App() {
   return (
     <BrowserRouter>
@@ -51,14 +70,16 @@ function App() {
           <AnnouncementBar />
           <Navbar />
           <main className="flex-1">
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/tienda" element={<Shop />} />
-              <Route path="/producto/:id" element={<ProductDetail />} />
-              <Route path="/nosotros" element={<About />} />
-              <Route path="/admin" element={<Admin />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <Suspense fallback={<RouteFallback />}>
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/tienda" element={<Shop />} />
+                <Route path="/producto/:id" element={<ProductDetail />} />
+                <Route path="/nosotros" element={<About />} />
+                <Route path="/admin" element={<Admin />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
           </main>
           <Footer />
           <CartDrawer />
