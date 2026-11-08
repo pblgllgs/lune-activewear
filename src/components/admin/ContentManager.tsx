@@ -1,17 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { doc, setDoc } from "firebase/firestore";
 import { toast } from "sonner";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Eye,
-  EyeOff,
-  ImagePlus,
-  Plus,
-  Save,
-  Trash2,
-  X,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, ImagePlus, Plus, Save, X } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { uploadToR2 } from "@/lib/upload";
 import {
@@ -22,13 +12,10 @@ import {
   type HeroSlideFit,
   type HeroSlidePosition,
   type SiteContent,
-  type Testimonial,
 } from "@/lib/site-content";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -329,12 +316,6 @@ export function ContentManager() {
   const [aboutDrafts, setAboutDrafts] = useState<Record<AboutSlotKey, DraftImage>>(() =>
     toAboutDrafts(DEFAULT_SITE_CONTENT)
   );
-  const [testimonials, setTestimonials] = useState<Testimonial[]>(
-    () => DEFAULT_SITE_CONTENT.testimonials
-  );
-  const [showTestimonialsOnHome, setShowTestimonialsOnHome] = useState(
-    DEFAULT_SITE_CONTENT.showTestimonialsOnHome
-  );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -345,8 +326,6 @@ export function ContentManager() {
         if (!active) return;
         setHeroDrafts(toHeroDrafts(content));
         setAboutDrafts(toAboutDrafts(content));
-        setTestimonials(content.testimonials);
-        setShowTestimonialsOnHome(content.showTestimonialsOnHome);
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -382,17 +361,6 @@ export function ContentManager() {
       }
       const finalSlides = heroSlides.length ? heroSlides : DEFAULT_HERO_SLIDES;
 
-      const cleanTestimonials = testimonials
-        .map((t, i) => ({
-          id: t.id || `t-${i}-${Date.now()}`,
-          name: t.name.trim(),
-          text: t.text.trim(),
-          ...(t.rating ? { rating: Math.min(5, Math.max(1, Math.round(t.rating))) } : {}),
-          ...(t.photoUrl?.trim() ? { photoUrl: t.photoUrl.trim() } : {}),
-          visible: t.visible !== false,
-        }))
-        .filter((t) => t.name && t.text);
-
       const payload: SiteContent = {
         heroImage: finalSlides[0].url,
         heroImages: finalSlides.map((slide) => slide.url),
@@ -405,8 +373,6 @@ export function ContentManager() {
           aboutDrafts.aboutImageTwo,
           DEFAULT_SITE_CONTENT.aboutImageTwo
         ),
-        testimonials: cleanTestimonials,
-        showTestimonialsOnHome,
       };
 
       await setDoc(
@@ -425,25 +391,13 @@ export function ContentManager() {
     }
   };
 
-  const addTestimonial = () =>
-    setTestimonials((current) => [
-      ...current,
-      { id: `t-${Date.now()}`, name: "", text: "", rating: 5, visible: true },
-    ]);
-
-  const updateTestimonial = (id: string, patch: Partial<Testimonial>) =>
-    setTestimonials((current) => current.map((t) => (t.id === id ? { ...t, ...patch } : t)));
-
-  const removeTestimonial = (id: string) =>
-    setTestimonials((current) => current.filter((t) => t.id !== id));
-
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Contenido del sitio</CardTitle>
+        <CardTitle>Imágenes del sitio</CardTitle>
         <CardDescription>
-          Administra el carrusel del inicio, las fotos de Nosotros y los comentarios de clientas.
-          Las imágenes nuevas se suben a Cloudflare R2 al guardar.
+          Administra el carrusel del inicio y las fotos de Nosotros. Las imágenes nuevas se suben a
+          Cloudflare R2 al guardar. Las anteriores se conservan en R2 por si quieres volver a usarlas.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-8">
@@ -464,141 +418,12 @@ export function ContentManager() {
                 />
               ))}
             </div>
-
-            <div className="space-y-4 border-t pt-8">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <Label className="text-base">Comentarios de clientas</Label>
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    Reseñas que se muestran en el inicio. Puedes ocultar la sección completa o cada
-                    comentario por separado.
-                  </p>
-                </div>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={showTestimonialsOnHome}
-                    onChange={(e) => setShowTestimonialsOnHome(e.target.checked)}
-                    className="h-4 w-4 rounded border-input accent-primary"
-                  />
-                  Mostrar sección en el inicio
-                </label>
-              </div>
-
-              {testimonials.length === 0 ? (
-                <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                  No hay comentarios. Agrega el primero para mostrar prueba social en el inicio.
-                </p>
-              ) : (
-                <div className="space-y-4">
-                  {testimonials.map((t, index) => (
-                    <div key={t.id} className="space-y-3 rounded-lg border p-4">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[11px] font-medium uppercase tracking-wider2 text-muted-foreground">
-                          Comentario {index + 1}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            title={t.visible ? "Ocultar comentario" : "Mostrar comentario"}
-                            onClick={() => updateTestimonial(t.id, { visible: !t.visible })}
-                          >
-                            {t.visible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-destructive"
-                            title="Eliminar comentario"
-                            onClick={() => removeTestimonial(t.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <div className="space-y-1.5">
-                          <Label className="text-[11px] uppercase tracking-wider2 text-muted-foreground">
-                            Nombre
-                          </Label>
-                          <Input
-                            value={t.name}
-                            onChange={(e) => updateTestimonial(t.id, { name: e.target.value })}
-                            placeholder="Nombre de la clienta"
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-[11px] uppercase tracking-wider2 text-muted-foreground">
-                            Calificación (1–5)
-                          </Label>
-                          <Select
-                            value={String(t.rating ?? 5)}
-                            onValueChange={(v) => updateTestimonial(t.id, { rating: Number(v) })}
-                          >
-                            <SelectTrigger className="h-9">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {[5, 4, 3, 2, 1].map((n) => (
-                                <SelectItem key={n} value={String(n)}>
-                                  {n} {n === 1 ? "estrella" : "estrellas"}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <Label className="text-[11px] uppercase tracking-wider2 text-muted-foreground">
-                          Comentario
-                        </Label>
-                        <Textarea
-                          value={t.text}
-                          onChange={(e) => updateTestimonial(t.id, { text: e.target.value })}
-                          rows={3}
-                          placeholder="¿Qué le gustó de la prenda o de la compra?"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <Label className="text-[11px] uppercase tracking-wider2 text-muted-foreground">
-                          URL de foto (opcional)
-                        </Label>
-                        <Input
-                          value={t.photoUrl ?? ""}
-                          onChange={(e) =>
-                            updateTestimonial(t.id, { photoUrl: e.target.value || undefined })
-                          }
-                          placeholder="https://..."
-                        />
-                      </div>
-
-                      {!t.visible && (
-                        <p className="text-[11px] text-muted-foreground">
-                          Este comentario está oculto y no se mostrará en el inicio.
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <Button type="button" variant="secondary" size="sm" onClick={addTestimonial}>
-                <Plus className="h-3.5 w-3.5" /> Agregar comentario
-              </Button>
-            </div>
           </>
         )}
 
         <Button onClick={save} disabled={saving || loading} className="w-full">
           <Save className="h-4 w-4" />
-          {saving ? "Guardando…" : "Guardar contenido del sitio"}
+          {saving ? "Guardando…" : "Guardar imágenes del sitio"}
         </Button>
       </CardContent>
     </Card>

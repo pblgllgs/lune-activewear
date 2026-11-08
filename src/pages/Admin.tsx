@@ -27,6 +27,7 @@ import {
   LayoutDashboard,
   Link2,
   LogOut,
+  MessageSquare,
   Package,
   Pencil,
   Plus,
@@ -39,6 +40,7 @@ import {
 import { auth, db, isFirebaseConfigured } from "@/lib/firebase";
 import { ContentManager } from "@/components/admin/ContentManager";
 import { ProductPreview } from "@/components/admin/ProductPreview";
+import { ReviewsModeration } from "@/components/admin/ReviewsModeration";
 import { deleteFromR2, isUploadConfigured, slugify, uploadToR2 } from "@/lib/upload";
 import { normalizeProduct, seedDemoProducts } from "@/lib/catalog";
 import { defaultSizeGuide, resolveSizeGuide } from "@/lib/size-guide";
@@ -61,7 +63,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-type Tab = "dashboard" | "nuevo" | "productos" | "contenido";
+type Tab = "dashboard" | "nuevo" | "productos" | "contenido" | "comentarios";
 
 const ADMIN_EMAILS = ((import.meta.env.VITE_ADMIN_EMAILS as string) || "")
   .split(",")
@@ -868,6 +870,7 @@ const MENU: { tab: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { tab: "dashboard", label: "Resumen", icon: LayoutDashboard },
   { tab: "nuevo", label: "Nuevo producto", icon: Plus },
   { tab: "productos", label: "Productos", icon: Package },
+  { tab: "comentarios", label: "Comentarios", icon: MessageSquare },
   { tab: "contenido", label: "Contenido", icon: ImagePlus },
 ];
 
@@ -1026,7 +1029,11 @@ export default function Admin() {
           <div>
             <p className="text-[10px] uppercase tracking-brand text-muted-foreground">Administración</p>
             <h1 className="mt-1 font-display text-3xl font-medium tracking-tight">
-              {tab === "contenido" ? "Contenido del sitio" : "Catálogo"}
+              {tab === "contenido"
+                ? "Contenido del sitio"
+                : tab === "comentarios"
+                  ? "Comentarios"
+                  : "Catálogo"}
             </h1>
           </div>
           {firebaseAuth.currentUser?.email && (
@@ -1203,6 +1210,7 @@ export default function Admin() {
           </>
         )}
 
+        {tab === "comentarios" && <ReviewsModeration />}
         {tab === "contenido" && <ContentManager />}
       </main>
     </div>

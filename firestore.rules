@@ -11,6 +11,25 @@ service cloud.firestore {
     match /products/{productId} {
       allow read: if true;
       allow write: if isAdmin();
+
+      // Comentarios/reseñas por producto: la clienta crea (pendiente de aprobación)
+      // y el admin modera (aprueba/elimina).
+      match /reviews/{reviewId} {
+        allow read: if resource.data.approved == true || isAdmin();
+        allow create: if request.resource.data.approved == false
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 80
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 1200
+          && request.resource.data.productId == productId
+          && (!('rating' in request.resource.data)
+              || (request.resource.data.rating is int
+                  && request.resource.data.rating >= 1
+                  && request.resource.data.rating <= 5));
+        allow update, delete: if isAdmin();
+      }
     }
 
     // Contenido editable del sitio: hero del inicio e imágenes de Nosotros.

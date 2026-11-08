@@ -10,6 +10,7 @@ import {
   Plus,
   RefreshCw,
   ShoppingBag,
+  Star,
   Truck,
 } from "lucide-react";
 import { getProduct, getProducts } from "@/lib/catalog";
@@ -26,11 +27,15 @@ import {
 import { discountPercent, formatCLP } from "@/lib/utils";
 import { whatsappLink } from "@/lib/constants";
 import { breadcrumbJsonLd, productJsonLd, truncate, useSeo } from "@/lib/seo";
+import { getApprovedReviews, submitReview, type Review } from "@/lib/reviews";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
 import type { Product } from "@/types/product";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { ImageWithFallback } from "@/components/shop/ImageWithFallback";
 import { ProductCard } from "@/components/shop/ProductCard";
 import { SizeGuide } from "@/components/shop/SizeGuide";
@@ -47,6 +52,12 @@ export default function ProductDetail() {
   const [size, setSize] = useState("");
   const [color, setColor] = useState("");
   const [qty, setQty] = useState(1);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewName, setReviewName] = useState("");
+  const [reviewText, setReviewText] = useState("");
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewSending, setReviewSending] = useState(false);
+  const [reviewSent, setReviewSent] = useState(false);
 
   useSeo({
     title: product
@@ -88,6 +99,7 @@ export default function ProductDetail() {
       })
       .finally(() => setLoading(false));
 
+    getApprovedReviews(id).then(setReviews).catch(() => setReviews([]));
     getProducts().then((all) => setRelated(all.filter((p) => p.id !== id)));
   }, [id]);
 
@@ -174,6 +186,30 @@ export default function ProductDetail() {
         "Mi nombre:",
       ].join("\n")
     );
+
+  const handleReviewSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!product) return;
+    setReviewSending(true);
+    try {
+      await submitReview({
+        productId: product.id,
+        productName: product.name,
+        name: reviewName,
+        text: reviewText,
+        rating: reviewRating,
+      });
+      setReviewSent(true);
+      setReviewName("");
+      setReviewText("");
+      setReviewRating(5);
+      toast.success("Gracias. Tu comentario será revisado antes de publicarse.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo enviar el comentario.");
+    } finally {
+      setReviewSending(false);
+    }
+  };
 
   return (
     <div className="container py-8 md:py-12">
@@ -454,6 +490,108 @@ export default function ProductDetail() {
           </div>
         </div>
       </div>
+
+      {/* Comentarios (aprobados por el equipo) */}
+      <section className="mt-16 border-t pt-12">
+        <h2 className="font-display text-2xl font-medium tracking-tight md:text-3xl">
+          Comentarios
+        </h2>
+
+        {reviews.length === 0 ? (
+          <p className="mt-4 text-sm text-muted-foreground">
+            Aún no hay comentarios aprobados para este producto.
+          </p>
+        ) : (
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            {reviews.map((review) => (
+              <article key={review.id} className="rounded-xl border bg-card p-5">
+                {review.rating ? (
+                  <div className="flex items-center gap-0.5" aria-label={`${review.rating} de 5 estrellas`}>
+                    {Array.from({ length: 5 }, (_, i) => (
+                      <Star
+                        key={i}
+                        className={`h-3.5 w-3.5 ${i < review.rating! ? "fill-primary text-primary" : "text-primary/20"}`}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">“{review.text}”</p>
+                <p className="mt-3 text-xs font-medium uppercase tracking-wider2">{review.name}</p>
+              </article>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-10 max-w-xl rounded-xl border bg-secondary/30 p-5 md:p-6">
+          <h3 className="font-display text-lg font-medium">Deja tu comentario</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Tu comentario será revisado por el equipo antes de publicarse.
+          </p>
+
+          {reviewSent ? (
+            <p className="mt-4 rounded-md border bg-background p-3 text-sm text-muted-foreground">
+              ¡Gracias! Recibimos tu comentario y lo revisaremos pronto.
+            </p>
+          ) : (
+            <form onSubmit={handleReviewSubmit} className="mt-4 space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="review-name" className="text-[11px] uppercase tracking-wider2 text-muted-foreground">
+                    Nombre
+                  </Label>
+                  <Input
+                    id="review-name"
+                    value={reviewName}
+                    onChange={(e) => setReviewName(e.target.value)}
+                    placeholder="Tu nombre"
+                    maxLength={80}
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] uppercase tracking-wider2 text-muted-foreground">
+                    Calificación
+                  </Label>
+                  <div className="flex items-center gap-1 pt-1">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setReviewRating(n)}
+                        className="p-0.5"
+                        aria-label={`${n} estrella${n === 1 ? "" : "s"}`}
+                      >
+                        <Star
+                          className={`h-5 w-5 transition ${
+                            n <= reviewRating ? "fill-primary text-primary" : "text-primary/25 hover:text-primary/50"
+                          }`}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="review-text" className="text-[11px] uppercase tracking-wider2 text-muted-foreground">
+                  Comentario
+                </Label>
+                <Textarea
+                  id="review-text"
+                  value={reviewText}
+                  onChange={(e) => setReviewText(e.target.value)}
+                  rows={4}
+                  placeholder="Cuéntanos tu experiencia con esta prenda"
+                  maxLength={1200}
+                  required
+                />
+              </div>
+              <Button type="submit" disabled={reviewSending}>
+                {reviewSending ? "Enviando…" : "Enviar comentario"}
+              </Button>
+            </form>
+          )}
+        </div>
+      </section>
 
       {/* Relacionados */}
       {suggestions.length > 0 && (
