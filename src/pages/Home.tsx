@@ -7,6 +7,7 @@ import { SectionHeading } from "@/components/shop/SectionHeading";
 import { HeroCarousel } from "@/components/shop/HeroCarousel";
 import { ContactSection } from "@/components/contact/ContactSection";
 import { FaqSection, FAQS } from "@/components/shop/FaqSection";
+import { TestimonialsSection } from "@/components/shop/TestimonialsSection";
 import { CATEGORIES } from "@/lib/categories";
 import { getProducts } from "@/lib/catalog";
 import { DEFAULT_SITE_CONTENT, getSiteContent } from "@/lib/site-content";
@@ -215,6 +216,11 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <TestimonialsSection
+        testimonials={content.testimonials}
+        showOnHome={content.showTestimonialsOnHome}
+      />
 
       <FaqSection />
 

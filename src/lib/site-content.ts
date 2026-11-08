@@ -12,6 +12,18 @@ export interface HeroSlide {
   position: HeroSlidePosition;
 }
 
+export interface Testimonial {
+  id: string;
+  name: string;
+  text: string;
+  /** 1–5 estrellas. Opcional. */
+  rating?: number;
+  /** URL de foto/avatar (opcional). */
+  photoUrl?: string;
+  /** Si es `false`, el testimonio existe pero no se muestra. */
+  visible: boolean;
+}
+
 export interface SiteContent {
   /** Primera imagen del hero. Se mantiene por compatibilidad con el contenido antiguo. */
   heroImage: string;
@@ -21,6 +33,10 @@ export interface SiteContent {
   heroSlides: HeroSlide[];
   aboutImageOne: string;
   aboutImageTwo: string;
+  /** Testimonios/comentarios de clientas. */
+  testimonials: Testimonial[];
+  /** Si es `false`, la sección de testimonios se oculta en el inicio. */
+  showTestimonialsOnHome: boolean;
   updatedAt?: string;
 }
 
@@ -64,6 +80,8 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     "site/about-2.jpg",
     "https://images.pexels.com/photos/4498157/pexels-photo-4498157.jpeg?auto=compress&cs=tinysrgb&w=1000"
   ),
+  testimonials: [],
+  showTestimonialsOnHome: true,
 };
 
 const text = (value: unknown, fallback: string) =>
@@ -97,6 +115,33 @@ const slideList = (value: unknown): HeroSlide[] => {
   });
 };
 
+const testimonialList = (value: unknown): Testimonial[] => {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item, index) => {
+    if (!item || typeof item !== "object") return [];
+    const record = item as Record<string, unknown>;
+    const name = typeof record.name === "string" ? record.name.trim() : "";
+    const textValue = typeof record.text === "string" ? record.text.trim() : "";
+    if (!name || !textValue) return [];
+    const rating =
+      typeof record.rating === "number" && Number.isFinite(record.rating)
+        ? Math.min(5, Math.max(1, Math.round(record.rating)))
+        : undefined;
+    const photoUrl =
+      typeof record.photoUrl === "string" && record.photoUrl.trim() ? record.photoUrl.trim() : undefined;
+    return [
+      {
+        id: typeof record.id === "string" && record.id.trim() ? record.id.trim() : `t-${index}`,
+        name,
+        text: textValue,
+        ...(rating ? { rating } : {}),
+        ...(photoUrl ? { photoUrl } : {}),
+        visible: record.visible !== false,
+      },
+    ];
+  });
+};
+
 export async function getSiteContent(): Promise<SiteContent> {
   if (!db) return DEFAULT_SITE_CONTENT;
   try {
@@ -121,6 +166,8 @@ export async function getSiteContent(): Promise<SiteContent> {
       heroSlides,
       aboutImageOne: text(data.aboutImageOne, DEFAULT_SITE_CONTENT.aboutImageOne),
       aboutImageTwo: text(data.aboutImageTwo, DEFAULT_SITE_CONTENT.aboutImageTwo),
+      testimonials: testimonialList(data.testimonials),
+      showTestimonialsOnHome: data.showTestimonialsOnHome !== false,
       updatedAt: data.updatedAt ? String(data.updatedAt) : undefined,
     };
   } catch (error) {
