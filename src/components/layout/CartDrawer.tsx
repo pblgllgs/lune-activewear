@@ -1,14 +1,16 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Minus, Plus, ShoppingBag, Trash2, X } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { FREE_SHIPPING_THRESHOLD, whatsappLink } from "@/lib/constants";
 import { formatCLP } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ImageWithFallback } from "@/components/shop/ImageWithFallback";
 
 export function CartDrawer() {
   const { items, count, subtotal, isOpen, closeCart, removeItem, setQty } = useCart();
+  const [coupon, setCoupon] = useState("");
 
   useEffect(() => {
     if (!isOpen) return;
@@ -39,6 +41,9 @@ export function CartDrawer() {
       ),
       "",
       `Subtotal: ${formatCLP(subtotal)}`,
+      ...(coupon.trim()
+        ? [`Cupón: ${coupon.trim()}`, "(validar descuento, por favor)"]
+        : []),
       "",
       "Nombre:",
       "Dirección de envío:",
@@ -169,6 +174,32 @@ export function CartDrawer() {
               <p className="mt-1 text-[11px] text-muted-foreground">
                 Envío calculado al confirmar el pedido por WhatsApp.
               </p>
+              <div className="mt-4">
+                <label
+                  htmlFor="coupon"
+                  className="text-[10px] uppercase tracking-wider2 text-muted-foreground"
+                >
+                  Código de descuento (opcional)
+                </label>
+                <Input
+                  id="coupon"
+                  value={coupon}
+                  onChange={(event) =>
+                    setCoupon(
+                      event.target.value
+                        .toUpperCase()
+                        .replace(/[^A-Z0-9-]/g, "")
+                        .slice(0, 20)
+                    )
+                  }
+                  placeholder="Ej: LUNE10"
+                  autoComplete="off"
+                  className="mt-1 h-10 uppercase placeholder:normal-case"
+                />
+                <p className="mt-1 text-[10px] text-muted-foreground">
+                  El descuento se valida al confirmar el pedido por WhatsApp.
+                </p>
+              </div>
               <Button variant="whatsapp" className="mt-4 w-full" onClick={checkout}>
                 Finalizar compra por WhatsApp
               </Button>
