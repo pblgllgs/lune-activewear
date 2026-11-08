@@ -100,7 +100,7 @@ export function Footer() {
               {CATEGORIES.map((cat) => (
                 <li key={cat.id}>
                   <Link
-                    to={`/tienda?categoria=${cat.id}`}
+                    to={`/categoria/${cat.id}`}
                     className="transition hover:text-primary-foreground"
                   >
                     {cat.label}

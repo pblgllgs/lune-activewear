@@ -67,7 +67,7 @@ export default function ProductDetail() {
             { name: "Tienda", path: "/tienda" },
             {
               name: categoryLabel(product.category),
-              path: `/tienda?categoria=${product.category}`,
+              path: `/categoria/${product.category}`,
             },
             { name: product.name, path: `/producto/${product.id}` },
           ]),

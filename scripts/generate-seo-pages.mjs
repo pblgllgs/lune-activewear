@@ -19,6 +19,30 @@ const CATEGORY_LABELS = {
   poleras: "Poleras",
 };
 
+/** Categorías con su texto de portada (para las páginas estáticas). */
+const CATEGORY_PAGES = [
+  {
+    id: "calzas",
+    label: "Calzas",
+    blurb: "Tiro alto, compresión suave y silueta que acompaña.",
+  },
+  {
+    id: "petos",
+    label: "Petos",
+    blurb: "Sujeción y comodidad para entrenar sin distracciones.",
+  },
+  {
+    id: "shorts",
+    label: "Shorts",
+    blurb: "Libertad de movimiento para tus días más activos.",
+  },
+  {
+    id: "poleras",
+    label: "Poleras",
+    blurb: "Capas ligeras para antes y después del gym.",
+  },
+];
+
 const DEFAULT_IMAGE = `${SITE_URL}/og-image.jpg`;
 const SITE_NAME = "LUNÉ Activewear";
 
@@ -146,7 +170,7 @@ function breadcrumbJsonLd(product) {
         "@type": "ListItem",
         position: 3,
         name: CATEGORY_LABELS[product.category] ?? product.category,
-        item: `${SITE_URL}/tienda?categoria=${product.category}`,
+        item: `${SITE_URL}/categoria/${product.category}`,
       },
       {
         "@type": "ListItem",
@@ -228,6 +252,30 @@ const adminMeta = {
 
 await writePage("/tienda", applyMeta(template, shopMeta));
 count += 1;
+
+for (const category of CATEGORY_PAGES) {
+  const path = `/categoria/${category.id}`;
+  await writePage(
+    path,
+    applyMeta(template, {
+      title: `${category.label} — Tienda | LUNÉ Activewear`,
+      description: `${category.blurb} Descubre nuestra colección de ${category.label.toLowerCase()} LUNÉ Activewear, diseñada en Chillán, Chile, con envíos a todo el país.`,
+      canonical: `${SITE_URL}${path}`,
+      heading: category.label,
+      noscriptExtra: `<p>${escapeHtml(category.blurb)}</p>`,
+      jsonLd: {
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        name: `${category.label} — LUNÉ Activewear`,
+        description: `${category.blurb} Colección de ${category.label.toLowerCase()} LUNÉ Activewear.`,
+        url: `${SITE_URL}${path}`,
+        isPartOf: { "@type": "WebSite", name: SITE_NAME, url: SITE_URL },
+      },
+    })
+  );
+  count += 1;
+}
+
 await writePage("/nosotros", applyMeta(template, aboutMeta));
 count += 1;
 await writePage("/privacidad", applyMeta(template, privacyMeta));
@@ -288,6 +336,9 @@ const redirects = [
   "/nosotros /nosotros/index.html 200",
   "/privacidad /privacidad/index.html 200",
   "/admin /admin/index.html 200",
+  ...CATEGORY_PAGES.map(
+    (category) => `/categoria/${category.id} /categoria/${category.id}/index.html 200`
+  ),
   ...products
     .filter((product) => product.name)
     .map((product) => `/producto/${product.id} /producto/${product.id}/index.html 200`),

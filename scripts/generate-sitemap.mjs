@@ -12,7 +12,7 @@ const staticUrls = [
   { loc: "/", changefreq: "weekly", priority: "1.0" },
   { loc: "/tienda", changefreq: "weekly", priority: "0.9" },
   ...CATEGORIES.map((id) => ({
-    loc: `/tienda?categoria=${id}`,
+    loc: `/categoria/${id}`,
     changefreq: "weekly",
     priority: "0.8",
   })),

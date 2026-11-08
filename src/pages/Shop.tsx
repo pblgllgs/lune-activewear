@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowUpDown, X } from "lucide-react";
 import { getProducts } from "@/lib/catalog";
 import { CATEGORIES, categoryInfo } from "@/lib/categories";
 import { isSizeSoldOut } from "@/lib/stock";
 import { matchesQuery } from "@/lib/search";
-import { collectionPageJsonLd, useSeo } from "@/lib/seo";
+import { breadcrumbJsonLd, collectionPageJsonLd, useSeo } from "@/lib/seo";
 import { ProductCard } from "@/components/shop/ProductCard";
 import { PRICE_RANGES, ShopFilters } from "@/components/shop/ShopFilters";
 import type { Product } from "@/types/product";
@@ -19,18 +19,40 @@ const SORTS = [
 
 export default function Shop() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { categoria: pathCategory } = useParams<{ categoria?: string }>();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState("featured");
 
-  const activeCategory = searchParams.get("categoria") ?? "todas";
+  /** URL nueva por categoría: /categoria/<id>. La antigua ?categoria=<id> se redirige. */
+  const legacyCategory = searchParams.get("categoria");
+  const activeCategory = pathCategory ?? legacyCategory ?? "todas";
   const category = activeCategory === "todas" ? undefined : categoryInfo(activeCategory);
+  const invalidCategory = activeCategory !== "todas" && !category;
   const selectedSizes = (searchParams.get("tallas") ?? "").split(",").filter(Boolean);
   const selectedColors = (searchParams.get("colores") ?? "").split(",").filter(Boolean);
   const priceRange = searchParams.get("precio") ?? "";
   const searchQuery = searchParams.get("buscar") ?? "";
   const activeFilterCount =
     selectedSizes.length + selectedColors.length + (priceRange ? 1 : 0);
+
+  // Las URL antiguas con ?categoria= pasan a /categoria/<id> conservando filtros.
+  useEffect(() => {
+    if (!legacyCategory) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete("categoria");
+    const query = next.toString();
+    const base = legacyCategory === "todas" ? "/tienda" : `/categoria/${legacyCategory}`;
+    navigate(query ? `${base}?${query}` : base, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [legacyCategory]);
+
+  const seoPath = searchQuery
+    ? "/tienda"
+    : category
+      ? `/categoria/${category.id}`
+      : "/tienda";
 
   useSeo({
     title: searchQuery
@@ -43,15 +65,28 @@ export default function Shop() {
       : category
         ? `${category.blurb} Descubre nuestra colección de ${category.label.toLowerCase()} LUNÉ Activewear, diseñada en Chillán, Chile, con envíos a todo el país.`
         : "Explora calzas, petos, shorts y poleras LUNÉ Activewear. Ropa deportiva femenina diseñada en Chillán, Chile, con envíos a todo el país y compra por WhatsApp.",
-    path: searchQuery ? "/tienda" : category ? `/tienda?categoria=${category.id}` : "/tienda",
-    noindex: Boolean(searchQuery),
-    jsonLd: collectionPageJsonLd({
-      name: category ? `${category.label} — LUNÉ Activewear` : "Tienda LUNÉ Activewear",
-      description: category
-        ? `${category.blurb} Colección de ${category.label.toLowerCase()} LUNÉ Activewear.`
-        : "Colección de ropa deportiva femenina LUNÉ Activewear: calzas, petos, shorts y poleras.",
-      path: category ? `/tienda?categoria=${category.id}` : "/tienda",
-    }),
+    path: seoPath,
+    noindex: Boolean(searchQuery) || invalidCategory,
+    jsonLd:
+      category && !searchQuery
+        ? [
+            collectionPageJsonLd({
+              name: `${category.label} — LUNÉ Activewear`,
+              description: `${category.blurb} Colección de ${category.label.toLowerCase()} LUNÉ Activewear.`,
+              path: seoPath,
+            }),
+            breadcrumbJsonLd([
+              { name: "Inicio", path: "/" },
+              { name: "Tienda", path: "/tienda" },
+              { name: category.label, path: seoPath },
+            ]),
+          ]
+        : collectionPageJsonLd({
+            name: "Tienda LUNÉ Activewear",
+            description:
+              "Colección de ropa deportiva femenina LUNÉ Activewear: calzas, petos, shorts y poleras.",
+            path: "/tienda",
+          }),
   });
 
   useEffect(() => {
@@ -111,7 +146,14 @@ export default function Shop() {
     setSearchParams(next, { replace: true });
   };
 
-  const setCategory = (id: string) => setParam("categoria", id === "todas" ? null : id);
+  /** Cambia de categoría conservando los filtros activos en la URL. */
+  const setCategory = (id: string) => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("categoria");
+    const query = next.toString();
+    const base = id === "todas" ? "/tienda" : `/categoria/${id}`;
+    navigate(query ? `${base}?${query}` : base);
+  };
 
   const toggleValue = (key: string, current: string[], value: string) => {
     const next = current.includes(value)
@@ -132,14 +174,21 @@ export default function Shop() {
     <div className="container py-12 md:py-16">
       <header className="max-w-2xl">
         <p className="text-[10px] uppercase tracking-brand text-muted-foreground md:text-[11px]">
-          Tienda
+          {category ? `Tienda · ${category.label}` : "Tienda"}
         </p>
         <h1 className="mt-3 font-display text-4xl font-medium tracking-tight md:text-5xl">
-          Nuestra colección
+          {invalidCategory
+            ? "Categoría no encontrada"
+            : category
+              ? category.label
+              : "Nuestra colección"}
         </h1>
         <p className="mt-4 text-sm leading-relaxed text-muted-foreground md:text-base">
-          Calzas, petos, shorts y poleras pensadas para moverte con comodidad y estilo. Elige tus
-          favoritas y armá tu outfit Luné.
+          {invalidCategory
+            ? "La categoría que buscas no existe o cambió de nombre. Revisa toda la colección."
+            : category
+              ? `${category.blurb} Prendas LUNÉ Activewear diseñadas en Chillán, Chile, con envíos a todo el país y compra por WhatsApp.`
+              : "Calzas, petos, shorts y poleras pensadas para moverte con comodidad y estilo. Elige tus favoritas y armá tu outfit Luné."}
         </p>
       </header>
 
@@ -264,6 +313,20 @@ export default function Shop() {
                     className="rounded-md bg-primary px-5 py-2.5 text-[11px] uppercase tracking-wider2 text-primary-foreground"
                   >
                     Limpiar filtros
+                  </button>
+                </>
+              ) : invalidCategory ? (
+                <>
+                  <p className="font-display text-2xl">No encontramos esa categoría.</p>
+                  <p className="max-w-sm text-sm text-muted-foreground">
+                    Revisa el menú de categorías o mira toda la colección.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setCategory("todas")}
+                    className="rounded-md bg-primary px-5 py-2.5 text-[11px] uppercase tracking-wider2 text-primary-foreground"
+                  >
+                    Ver toda la tienda
                   </button>
                 </>
               ) : (

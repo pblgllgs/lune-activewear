@@ -128,7 +128,7 @@ export default function Home() {
             {CATEGORIES.map((cat) => (
               <Link
                 key={cat.id}
-                to={`/tienda?categoria=${cat.id}`}
+                to={`/categoria/${cat.id}`}
                 className={`group relative flex aspect-[4/5] flex-col justify-between overflow-hidden rounded-xl p-5 transition md:aspect-square md:p-6 ${cat.tint}`}
               >
                 <div>

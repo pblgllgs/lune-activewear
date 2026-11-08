@@ -126,7 +126,7 @@ export function Navbar() {
               {CATEGORIES.map((cat) => (
                 <Link
                   key={cat.id}
-                  to={`/tienda?categoria=${cat.id}`}
+                  to={`/categoria/${cat.id}`}
                   onClick={() => setOpen(false)}
                   className="rounded-md bg-secondary px-3 py-2 text-xs uppercase tracking-wider2"
                 >
