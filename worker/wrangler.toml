@@ -1,0 +1,12 @@
+name = "lune-activewear"
+main = "src/index.ts"
+compatibility_date = "2025-08-01"
+
+# npx wrangler secret put UPLOAD_TOKEN
+
+[vars]
+ALLOWED_ORIGIN = "http://localhost:5173"
+
+[[r2_buckets]]
+binding = "LUNE_BUCKET"
+bucket_name = "lune-activewear"
