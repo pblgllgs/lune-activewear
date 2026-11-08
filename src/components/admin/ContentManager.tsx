@@ -15,7 +15,6 @@ import {
 } from "@/lib/site-content";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -126,13 +125,6 @@ function ImageSlot({
           <X className="h-3.5 w-3.5" /> Quitar
         </Button>
       </div>
-
-      <Input
-        value={value.file ? "" : value.url}
-        onChange={(e) => onChange({ url: e.target.value })}
-        placeholder={value.file ? "Archivo pendiente de subir" : "https://... (o sube un archivo)"}
-        disabled={Boolean(value.file)}
-      />
     </div>
   );
 }

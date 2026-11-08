@@ -72,8 +72,10 @@ worker/          Cloudflare Worker para R2 (upload/serve/delete)
   `images[]`, `featured`, `isNew`, `createdAt`, `updatedAt`.
 - `stockBySize`: unidades por talla; una talla ausente o `null` se considera sin límite,
   `0` significa agotada.
-- Documento `settings/site`: `heroImage`, `aboutImageOne`, `aboutImageTwo`, editable desde
-  Admin → Contenido.
+- Documento `settings/site`: `heroSlides[{url, fit, position}]` (carrusel del inicio),
+  `heroImage`/`heroImages` (compatibilidad), `aboutImageOne`, `aboutImageTwo`; editable
+  desde Admin → Contenido. `fit` es `contain` (foto completa) o `cover` (rellena y recorta)
+  y `position` (`center`/`top`/`bottom`) elige el encuadre.
 - Las imágenes se guardan en R2 bajo `products/<slug>/` y `site/`.
 
 ## SEO
