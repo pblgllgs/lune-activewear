@@ -169,7 +169,7 @@ export function CartDrawer() {
               <p className="mt-1 text-[11px] text-muted-foreground">
                 Envío calculado al confirmar el pedido por WhatsApp.
               </p>
-              <Button className="mt-4 w-full" onClick={checkout}>
+              <Button variant="whatsapp" className="mt-4 w-full" onClick={checkout}>
                 Finalizar compra por WhatsApp
               </Button>
               <button

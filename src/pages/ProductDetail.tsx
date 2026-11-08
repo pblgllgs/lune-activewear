@@ -349,7 +349,7 @@ export default function ProductDetail() {
             </Button>
           </div>
 
-          <Button size="lg" variant="outline" className="mt-3 w-full" onClick={handleWhatsApp}>
+          <Button size="lg" variant="whatsapp-outline" className="mt-3 w-full" onClick={handleWhatsApp}>
             Comprar por WhatsApp
           </Button>
 

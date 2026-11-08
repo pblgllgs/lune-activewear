@@ -1,6 +1,6 @@
 export const WHATSAPP_NUMBER = "56957592973";
 export const WHATSAPP_DISPLAY = "+56 9 5759 2973";
-export const EMAIL = "hola@luneactivewear.cl";
+export const EMAIL = "lune.ventas@gmail.com";
 export const LOCATION = "Chillán, Chile";
 export const INSTAGRAM = "https://instagram.com/lune.activewear";
 

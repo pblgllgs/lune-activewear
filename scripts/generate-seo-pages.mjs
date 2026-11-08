@@ -1,6 +1,7 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
+  PROVISIONAL_URL,
   SITE_URL,
   escapeAttr,
   escapeHtml,
@@ -273,3 +274,35 @@ const redirects = [
 
 await writeFile(path.join(dist, "_redirects"), `${redirects}\n`, "utf8");
 console.log(`[seo-pages] _redirects con ${redirects.split("\n").length} reglas`);
+
+// La URL del sitio es provisoria hasta comprar el dominio. Se reescribe en el
+// build (index.html, robots.txt y páginas generadas) para que el cambio dependa
+// solo de VITE_SITE_URL.
+async function replaceProvisionalUrl(dir) {
+  const entries = await readdir(dir, { withFileTypes: true });
+  let replaced = 0;
+
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      replaced += await replaceProvisionalUrl(full);
+      continue;
+    }
+    if (!/\.(html|txt|xml)$/i.test(entry.name)) continue;
+
+    const content = await readFile(full, "utf8");
+    if (!content.includes(PROVISIONAL_URL)) continue;
+
+    await writeFile(full, content.split(PROVISIONAL_URL).join(SITE_URL), "utf8");
+    replaced += 1;
+  }
+
+  return replaced;
+}
+
+if (SITE_URL !== PROVISIONAL_URL) {
+  const replaced = await replaceProvisionalUrl(dist);
+  console.log(`[seo-pages] URL provisoria reemplazada por ${SITE_URL} en ${replaced} archivos`);
+} else {
+  console.log("[seo-pages] VITE_SITE_URL sin dominio definitivo: se mantiene la URL provisoria");
+}

@@ -45,6 +45,10 @@
     --border: 30 22% 86%;
     --input: 30 22% 86%;
     --ring: 21 24% 23%;
+    /* Verde oficial de WhatsApp: solo para CTAs de contacto */
+    --whatsapp: 142 70% 45%; /* #25D366 aprox. */
+    --whatsapp-dark: 142 70% 38%;
+    --whatsapp-foreground: 0 0% 100%;
     --radius: 0.375rem;
   }
 }

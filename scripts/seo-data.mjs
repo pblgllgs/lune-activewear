@@ -1,5 +1,12 @@
+/**
+ * URL de Pages mientras no exista el dominio definitivo. Cualquier aparición de
+ * esta cadena en el HTML/TXT del build se reemplaza por SITE_URL, de modo que
+ * al comprar el dominio solo haya que cambiar VITE_SITE_URL.
+ */
+export const PROVISIONAL_URL = "https://lune-activewear.pages.dev";
+
 export const SITE_URL = (
-  process.env.VITE_SITE_URL || "https://lune-activewear.pages.dev"
+  process.env.VITE_SITE_URL || PROVISIONAL_URL
 ).replace(/\/$/, "");
 export const PROJECT_ID = process.env.VITE_FIREBASE_PROJECT_ID || "lune-activewear";
 export const TODAY = new Date().toISOString().slice(0, 10);

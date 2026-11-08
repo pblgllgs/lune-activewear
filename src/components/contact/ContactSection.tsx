@@ -89,7 +89,7 @@ export function ContactSection() {
               href={whatsappLink("Hola Luné! Quiero información sobre sus prendas.")}
               target="_blank"
               rel="noreferrer"
-              className="mt-8 inline-flex items-center gap-2 rounded-md bg-primary px-5 py-3 text-[11px] font-medium uppercase tracking-wider2 text-primary-foreground transition hover:bg-primary/90"
+              className="mt-8 inline-flex items-center gap-2 rounded-md bg-whatsapp px-5 py-3 text-[11px] font-medium uppercase tracking-wider2 text-whatsapp-foreground shadow-sm transition hover:bg-whatsapp-dark"
             >
               <MessageCircle className="h-4 w-4" /> Escribir por WhatsApp
             </a>
@@ -139,7 +139,7 @@ export function ContactSection() {
                 rows={4}
               />
             </div>
-            <Button type="submit" className="mt-6 w-full">
+            <Button type="submit" variant="whatsapp" className="mt-6 w-full">
               <Send className="h-4 w-4" /> Enviar por WhatsApp
             </Button>
           </form>
