@@ -347,6 +347,16 @@ const redirects = [
 await writeFile(path.join(dist, "_redirects"), `${redirects}\n`, "utf8");
 console.log(`[seo-pages] _redirects con ${redirects.split("\n").length} reglas`);
 
+// Rutas que invocan las Pages Functions (edge). El resto se sirve como asset
+// estático y no consume invocaciones de Functions.
+const routes = {
+  version: 1,
+  include: ["/producto/*", "/sitemap.xml"],
+  exclude: [],
+};
+await writeFile(path.join(dist, "_routes.json"), `${JSON.stringify(routes, null, 2)}\n`, "utf8");
+console.log("[seo-pages] _routes.json: solo /producto/* y /sitemap.xml invocan Functions");
+
 // La URL del sitio es provisoria hasta comprar el dominio. Se reescribe en el
 // build (index.html, robots.txt y páginas generadas) para que el cambio dependa
 // solo de VITE_SITE_URL.

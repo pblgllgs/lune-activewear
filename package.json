@@ -9,6 +9,7 @@
     "build": "tsc -b && vite build",
     "postbuild": "node scripts/generate-seo-pages.mjs",
     "sitemap": "node scripts/generate-sitemap.mjs",
+    "test:edge": "node scripts/test-edge-seo.mjs",
     "lint": "oxlint",
     "preview": "vite preview"
   },
