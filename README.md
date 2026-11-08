@@ -59,11 +59,24 @@ src/
   context/       CartContext (carrito) y WishlistContext (favoritos), ambos en localStorage
   lib/           firebase, catalog (datos demo + Firestore), stock, size-guide, search,
                  site-content, seo (metadatos + JSON-LD), upload (R2), utils, constants
-  pages/         Home, Shop, ProductDetail, Favorites, About, Admin
+  pages/         Home, Shop, ProductDetail, Favorites, Privacy, About, Admin
   types/         Product, ProductColor
 scripts/         sitemap y páginas estáticas de SEO (pre/post build)
 worker/          Cloudflare Worker para R2 (upload/serve/delete)
 ```
+
+## Rutas
+
+| Ruta | Contenido |
+|---|---|
+| `/` | Home: hero, categorías, destacados, FAQ y contacto |
+| `/tienda` | Catálogo completo con filtros y orden |
+| `/categoria/<id>` | Categoría con URL propia e indexable (`calzas`, `petos`, `shorts`, `poleras`) |
+| `/producto/:id` | Ficha de producto con guía de tallas, stock y WhatsApp |
+| `/favoritos` | Wishlist del dispositivo (`noindex`) |
+| `/privacidad` | Política de datos (Ley 21.719) y cookies |
+| `/nosotros` | Historia de la marca |
+| `/admin` | Panel de administración (`noindex`) |
 
 ## Datos
 
