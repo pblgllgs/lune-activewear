@@ -105,6 +105,17 @@ function meta(html, kind, key) {
   check("404: noscript 404", /<h1>Producto no encontrado<\/h1>/.test(html));
 }
 
+/* ------------------------------------------------- ID con formato inválido */
+{
+  const response = await productoHandler({
+    request: new Request("https://lune-activewear.pages.dev/producto/mal%20id"),
+    params: { id: "mal id" },
+    env,
+    next: async () => new Response("STATIC", { status: 200 }),
+  });
+  check("id inválido: 404", response.status === 404, `status=${response.status}`);
+}
+
 /* ----------------------------------------------------------------- sitemap */
 {
   const response = await sitemapHandler({

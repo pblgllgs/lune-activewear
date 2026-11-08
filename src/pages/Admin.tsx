@@ -8,7 +8,15 @@ import {
   signOut,
   type Auth,
 } from "firebase/auth";
-import { addDoc, collection, deleteDoc, doc, onSnapshot, updateDoc } from "firebase/firestore";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  onSnapshot,
+  setDoc,
+  updateDoc,
+} from "firebase/firestore";
 import { toast } from "sonner";
 import Swal from "sweetalert2";
 import {
@@ -29,6 +37,7 @@ import {
 } from "lucide-react";
 import { auth, db, isFirebaseConfigured } from "@/lib/firebase";
 import { ContentManager } from "@/components/admin/ContentManager";
+import { ProductPreview } from "@/components/admin/ProductPreview";
 import { deleteFromR2, isUploadConfigured, slugify, uploadToR2 } from "@/lib/upload";
 import { normalizeProduct, seedDemoProducts } from "@/lib/catalog";
 import { defaultSizeGuide, resolveSizeGuide } from "@/lib/size-guide";
@@ -234,6 +243,7 @@ function ProductForm({ editing }: { editing: Product | null }) {
   );
   const [urlInput, setUrlInput] = useState("");
   const [status, setStatus] = useState("");
+  const [previewOpen, setPreviewOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const set = (key: keyof typeof form) => (
@@ -380,7 +390,17 @@ function ProductForm({ editing }: { editing: Product | null }) {
         }
         toast.success("Producto actualizado correctamente.");
       } else {
-        await addDoc(collection(db, "products"), {
+        // El ID del documento es el slug: mantiene URLs limpias (/producto/<slug>)
+        // y permite que la Function del edge resuelva la ficha sin rebuild.
+        const existing = await getDoc(doc(db, "products", slug));
+        if (existing.exists()) {
+          setStatus("");
+          toast.error(
+            `Ya existe un producto con el nombre "${name}". Edítalo o usa otro nombre.`
+          );
+          return;
+        }
+        await setDoc(doc(db, "products", slug), {
           ...payload,
           createdAt: new Date().toISOString(),
         });
@@ -413,14 +433,63 @@ function ProductForm({ editing }: { editing: Product | null }) {
 
   const pendingFiles = images.filter((i) => i.file).length;
 
+  /** Borrador tal como quedará publicado: alimenta la vista previa. */
+  const draft = useMemo<Product>(() => {
+    const slug = slugify(form.name);
+    return {
+      id: editing?.id ?? (slug || "producto"),
+      name: form.name.trim(),
+      category: form.category,
+      price: Number(form.price) || 0,
+      ...(form.compareAtPrice ? { compareAtPrice: Number(form.compareAtPrice) } : {}),
+      description: form.description,
+      composition: form.composition,
+      care: form.care,
+      shipping: form.shipping,
+      sizes,
+      stockBySize: Object.fromEntries(
+        sizes.map((size) => [size, Math.max(0, Math.floor(stockBySize[size] ?? 0))])
+      ),
+      sizeGuide,
+      colors: colors.filter((color) => color.name.trim()),
+      images: images.map((image) => image.url),
+      featured: form.featured,
+      isNew: form.isNew,
+    };
+  }, [
+    editing,
+    form,
+    sizes,
+    stockBySize,
+    sizeGuide,
+    colors,
+    images,
+  ]);
+
+  const previewUrl = `/producto/${editing?.id ?? (slugify(form.name) || "slug-del-producto")}`;
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{editing ? `Editar: ${editing.name}` : "Nuevo producto"}</CardTitle>
-        <CardDescription>
-          Completa la información de la prenda. Las imágenes se suben a Cloudflare R2 al guardar
-          {pendingFiles > 0 ? ` (${pendingFiles} pendiente${pendingFiles === 1 ? "" : "s"})` : ""}.
-        </CardDescription>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <CardTitle>{editing ? `Editar: ${editing.name}` : "Nuevo producto"}</CardTitle>
+            <CardDescription>
+              Completa la información de la prenda. Las imágenes se suben a Cloudflare R2 al guardar
+              {pendingFiles > 0 ? ` (${pendingFiles} pendiente${pendingFiles === 1 ? "" : "s"})` : ""}.
+            </CardDescription>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setPreviewOpen(true)}
+            className="shrink-0"
+          >
+            <Eye className="h-4 w-4" />
+            Vista previa
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -748,6 +817,13 @@ function ProductForm({ editing }: { editing: Product | null }) {
           {status && <p className="text-center text-sm text-muted-foreground">{status}</p>}
         </form>
       </CardContent>
+
+      <ProductPreview
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        product={draft}
+        url={previewUrl}
+      />
     </Card>
   );
 }

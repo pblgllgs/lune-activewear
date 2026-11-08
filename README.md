@@ -61,7 +61,8 @@ src/
                  site-content, seo (metadatos + JSON-LD), upload (R2), utils, constants
   pages/         Home, Shop, ProductDetail, Favorites, Privacy, About, Admin
   types/         Product, ProductColor
-scripts/         sitemap y páginas estáticas de SEO (pre/post build)
+scripts/         sitemap y páginas estáticas de SEO (pre/post build) + test del edge
+functions/       Pages Functions (edge): meta de productos y sitemap dinámico
 worker/          Cloudflare Worker para R2 (upload/serve/delete)
 ```
 
@@ -104,7 +105,12 @@ worker/          Cloudflare Worker para R2 (upload/serve/delete)
   y JSON-LD en cada ruta.
 - `prebuild` genera `public/sitemap.xml` desde Firestore.
 - `postbuild` genera HTML estático con metadatos propios para `/tienda`, `/nosotros`,
-  `/admin` y cada producto, más las reglas de `_redirects`.
+  `/admin` y cada producto, más las reglas de `_redirects` y `dist/_routes.json`.
+- `functions/` (Pages Functions) sirve `/producto/<slug>` y `/sitemap.xml` en el edge: leen
+  Firestore en cada petición e inyectan title, description, canonical, Open Graph, Twitter
+  y JSON-LD, así que **un producto nuevo ya tiene meta propia sin redesplegar**. Los
+  slugs inexistentes devuelven 404 con `noindex`. `dist/_routes.json` limita las
+  invocaciones de Functions a esas dos rutas.
 - `VITE_SITE_URL` define canonical, Open Graph y sitemap. La URL actual
   (`https://lune-activewear.pages.dev`) es provisoria: al comprar el dominio definitivo
   basta cambiarla y redesplegar.

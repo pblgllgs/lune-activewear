@@ -39,8 +39,11 @@ export async function onRequest(context: Context): Promise<Response> {
     return context.next();
   }
 
-  const id = decodeURIComponent(params.id ?? "").trim().toLowerCase();
-  if (!/^[a-z0-9-]{1,80}$/.test(id)) {
+  // El ID se busca tal cual (igual que hace la SPA). Se aceptan slugs en
+  // minúsculas y también los IDs automáticos de Firestore por si quedara
+  // algún documento antiguo.
+  const id = decodeURIComponent(params.id ?? "").trim();
+  if (!/^[A-Za-z0-9_-]{1,80}$/.test(id)) {
     return notFound(context);
   }
 
