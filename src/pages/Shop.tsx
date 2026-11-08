@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { SlidersHorizontal } from "lucide-react";
+import { ArrowUpDown } from "lucide-react";
 import { getProducts } from "@/lib/catalog";
 import { CATEGORIES, categoryInfo } from "@/lib/categories";
+import { isSizeSoldOut } from "@/lib/stock";
 import { collectionPageJsonLd, useSeo } from "@/lib/seo";
 import { ProductCard } from "@/components/shop/ProductCard";
+import { PRICE_RANGES, ShopFilters } from "@/components/shop/ShopFilters";
 import type { Product } from "@/types/product";
 
 const SORTS = [
@@ -22,6 +24,11 @@ export default function Shop() {
 
   const activeCategory = searchParams.get("categoria") ?? "todas";
   const category = activeCategory === "todas" ? undefined : categoryInfo(activeCategory);
+  const selectedSizes = (searchParams.get("tallas") ?? "").split(",").filter(Boolean);
+  const selectedColors = (searchParams.get("colores") ?? "").split(",").filter(Boolean);
+  const priceRange = searchParams.get("precio") ?? "";
+  const activeFilterCount =
+    selectedSizes.length + selectedColors.length + (priceRange ? 1 : 0);
 
   useSeo({
     title: category
@@ -47,10 +54,29 @@ export default function Shop() {
   }, []);
 
   const filtered = useMemo(() => {
-    const list =
+    let list =
       activeCategory === "todas"
         ? [...products]
         : products.filter((p) => p.category === activeCategory);
+
+    if (selectedSizes.length > 0) {
+      list = list.filter((product) =>
+        selectedSizes.some(
+          (size) => product.sizes.includes(size) && !isSizeSoldOut(product, size)
+        )
+      );
+    }
+
+    if (selectedColors.length > 0) {
+      list = list.filter((product) =>
+        product.colors.some((color) => selectedColors.includes(color.name))
+      );
+    }
+
+    const range = PRICE_RANGES.find((item) => item.id === priceRange);
+    if (range) {
+      list = list.filter((product) => product.price >= range.min && product.price <= range.max);
+    }
 
     switch (sort) {
       case "price-asc":
@@ -64,14 +90,31 @@ export default function Shop() {
           (a, b) => Number(Boolean(b.featured)) - Number(Boolean(a.featured))
         );
     }
-  }, [products, activeCategory, sort]);
+  }, [products, activeCategory, selectedSizes, selectedColors, priceRange, sort]);
 
-  const setCategory = (id: string) => {
-    if (id === "todas") {
-      setSearchParams({});
-    } else {
-      setSearchParams({ categoria: id });
-    }
+  /** Actualiza un parámetro de la URL sin perder los demás filtros. */
+  const setParam = (key: string, value: string | null) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    setSearchParams(next, { replace: true });
+  };
+
+  const setCategory = (id: string) => setParam("categoria", id === "todas" ? null : id);
+
+  const toggleValue = (key: string, current: string[], value: string) => {
+    const next = current.includes(value)
+      ? current.filter((item) => item !== value)
+      : [...current, value];
+    setParam(key, next.length > 0 ? next.join(",") : null);
+  };
+
+  const clearFilters = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("tallas");
+    next.delete("colores");
+    next.delete("precio");
+    setSearchParams(next, { replace: true });
   };
 
   return (
@@ -123,7 +166,7 @@ export default function Shop() {
             {loading ? "Cargando…" : `${filtered.length} producto${filtered.length === 1 ? "" : "s"}`}
           </span>
           <label className="flex items-center gap-2 text-xs text-muted-foreground">
-            <SlidersHorizontal className="h-3.5 w-3.5" />
+            <ArrowUpDown className="h-3.5 w-3.5" />
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value)}
@@ -139,37 +182,71 @@ export default function Shop() {
         </div>
       </div>
 
-      {loading ? (
-        <div className="mt-12 grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-3 lg:grid-cols-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="animate-pulse">
-              <div className="aspect-[4/5] rounded-xl bg-secondary" />
-              <div className="mt-3 h-3 w-2/3 rounded bg-secondary" />
-              <div className="mt-2 h-3 w-1/3 rounded bg-secondary" />
+      <div className="mt-6 lg:grid lg:grid-cols-[220px_1fr] lg:items-start lg:gap-10">
+        <ShopFilters
+          products={products}
+          selectedSizes={selectedSizes}
+          selectedColors={selectedColors}
+          priceRange={priceRange}
+          resultCount={filtered.length}
+          onToggleSize={(size) => toggleValue("tallas", selectedSizes, size)}
+          onToggleColor={(color) => toggleValue("colores", selectedColors, color)}
+          onChangePrice={(id) => setParam("precio", priceRange === id ? null : id)}
+          onClear={clearFilters}
+        />
+
+        <div>
+          {loading ? (
+            <div className="mt-8 grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-3 lg:mt-0 lg:grid-cols-3 xl:grid-cols-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="animate-pulse">
+                  <div className="aspect-[4/5] rounded-xl bg-secondary" />
+                  <div className="mt-3 h-3 w-2/3 rounded bg-secondary" />
+                  <div className="mt-2 h-3 w-1/3 rounded bg-secondary" />
+                </div>
+              ))}
             </div>
-          ))}
+          ) : filtered.length === 0 ? (
+            <div className="mt-10 flex flex-col items-center gap-4 text-center lg:mt-0">
+              {activeFilterCount > 0 ? (
+                <>
+                  <p className="font-display text-2xl">No encontramos prendas con esos filtros.</p>
+                  <p className="max-w-sm text-sm text-muted-foreground">
+                    Prueba quitando una talla, un color o el tramo de precio.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="rounded-md bg-primary px-5 py-2.5 text-[11px] uppercase tracking-wider2 text-primary-foreground"
+                  >
+                    Limpiar filtros
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="font-display text-2xl">Aún no hay prendas en esta categoría.</p>
+                  <p className="max-w-sm text-sm text-muted-foreground">
+                    Estamos preparando nuevos lanzamientos. Mientras tanto, revisa toda la colección.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setCategory("todas")}
+                    className="rounded-md bg-primary px-5 py-2.5 text-[11px] uppercase tracking-wider2 text-primary-foreground"
+                  >
+                    Ver todo
+                  </button>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="mt-8 grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-3 lg:mt-0 lg:grid-cols-3 xl:grid-cols-4">
+              {filtered.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          )}
         </div>
-      ) : filtered.length === 0 ? (
-        <div className="mt-16 flex flex-col items-center gap-4 text-center">
-          <p className="font-display text-2xl">Aún no hay prendas en esta categoría.</p>
-          <p className="max-w-sm text-sm text-muted-foreground">
-            Estamos preparando nuevos lanzamientos. Mientras tanto, revisa toda la colección.
-          </p>
-          <button
-            type="button"
-            onClick={() => setCategory("todas")}
-            className="rounded-md bg-primary px-5 py-2.5 text-[11px] uppercase tracking-wider2 text-primary-foreground"
-          >
-            Ver todo
-          </button>
-        </div>
-      ) : (
-        <div className="mt-12 grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-3 lg:grid-cols-4">
-          {filtered.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
-      )}
+      </div>
     </div>
   );
 }
