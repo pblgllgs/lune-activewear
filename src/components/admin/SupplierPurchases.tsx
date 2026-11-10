@@ -22,7 +22,9 @@ import { deleteFromR2, isUploadConfigured, uploadToR2 } from "@/lib/upload";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Pagination } from "@/components/ui/pagination";
 import { Textarea } from "@/components/ui/textarea";
+import { usePagination } from "@/lib/use-pagination";
 import type { Product } from "@/types/product";
 import type { Supplier } from "@/types/supplier";
 import type { SupplierPurchase } from "@/types/supplier-purchase";
@@ -106,6 +108,8 @@ export function SupplierPurchases({
         .filter((product): product is Product => Boolean(product)),
     [supplier.productIds, productById]
   );
+
+  const purchasePagination = usePagination(purchases, { pageSize: 5 });
 
   const addProductName = (value: string) => {
     const name = value.trim();
@@ -508,7 +512,7 @@ export function SupplierPurchases({
         </div>
       ) : (
         <div className="mt-3 space-y-2">
-          {purchases.map((purchase) => (
+          {purchasePagination.pageItems.map((purchase) => (
             <div key={purchase.id} className="rounded-lg border bg-card p-3">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
@@ -571,6 +575,16 @@ export function SupplierPurchases({
               )}
             </div>
           ))}
+          <Pagination
+            page={purchasePagination.page}
+            pageSize={purchasePagination.pageSize}
+            total={purchasePagination.total}
+            totalPages={purchasePagination.totalPages}
+            onPageChange={purchasePagination.setPage}
+            onPageSizeChange={purchasePagination.setPageSize}
+            pageSizeOptions={[5, 10, 20]}
+            itemLabel="compras"
+          />
         </div>
       )}
     </div>

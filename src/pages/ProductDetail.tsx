@@ -26,6 +26,7 @@ import {
 } from "@/lib/stock";
 import { discountPercent, formatCLP } from "@/lib/utils";
 import { whatsappLink } from "@/lib/constants";
+import { usePagination } from "@/lib/use-pagination";
 import { breadcrumbJsonLd, productJsonLd, truncate, useSeo } from "@/lib/seo";
 import { getApprovedReviews, submitReview, type Review } from "@/lib/reviews";
 import { useCart } from "@/context/CartContext";
@@ -35,6 +36,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Pagination } from "@/components/ui/pagination";
 import { Textarea } from "@/components/ui/textarea";
 import { ImageWithFallback } from "@/components/shop/ImageWithFallback";
 import { ProductCard } from "@/components/shop/ProductCard";
@@ -58,6 +60,8 @@ export default function ProductDetail() {
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewSending, setReviewSending] = useState(false);
   const [reviewSent, setReviewSent] = useState(false);
+
+  const reviewPagination = usePagination(reviews, { pageSize: 6, resetKey: id });
 
   useSeo({
     title: product
@@ -542,24 +546,36 @@ export default function ProductDetail() {
             Aún no hay comentarios aprobados para este producto.
           </p>
         ) : (
-          <div className="mt-6 grid gap-4 sm:grid-cols-2">
-            {reviews.map((review) => (
-              <article key={review.id} className="rounded-xl border bg-card p-5">
-                {review.rating ? (
-                  <div className="flex items-center gap-0.5" aria-label={`${review.rating} de 5 estrellas`}>
-                    {Array.from({ length: 5 }, (_, i) => (
-                      <Star
-                        key={i}
-                        className={`h-3.5 w-3.5 ${i < review.rating! ? "fill-primary text-primary" : "text-primary/20"}`}
-                      />
-                    ))}
-                  </div>
-                ) : null}
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">“{review.text}”</p>
-                <p className="mt-3 text-xs font-medium uppercase tracking-wider2">{review.name}</p>
-              </article>
-            ))}
-          </div>
+          <>
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              {reviewPagination.pageItems.map((review) => (
+                <article key={review.id} className="rounded-xl border bg-card p-5">
+                  {review.rating ? (
+                    <div className="flex items-center gap-0.5" aria-label={`${review.rating} de 5 estrellas`}>
+                      {Array.from({ length: 5 }, (_, i) => (
+                        <Star
+                          key={i}
+                          className={`h-3.5 w-3.5 ${i < review.rating! ? "fill-primary text-primary" : "text-primary/20"}`}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">“{review.text}”</p>
+                  <p className="mt-3 text-xs font-medium uppercase tracking-wider2">{review.name}</p>
+                </article>
+              ))}
+            </div>
+            <Pagination
+              page={reviewPagination.page}
+              pageSize={reviewPagination.pageSize}
+              total={reviewPagination.total}
+              totalPages={reviewPagination.totalPages}
+              onPageChange={reviewPagination.setPage}
+              onPageSizeChange={reviewPagination.setPageSize}
+              itemLabel="comentarios"
+              className="mt-6"
+            />
+          </>
         )}
 
         <div className="mt-10 max-w-xl rounded-xl border bg-secondary/30 p-5 md:p-6">

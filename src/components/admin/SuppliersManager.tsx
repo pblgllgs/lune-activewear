@@ -30,7 +30,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Pagination } from "@/components/ui/pagination";
 import { Textarea } from "@/components/ui/textarea";
+import { usePagination } from "@/lib/use-pagination";
 import type { Product } from "@/types/product";
 import type { Supplier } from "@/types/supplier";
 
@@ -110,6 +112,21 @@ export function SuppliersManager({ products }: { products: Product[] }) {
         .includes(term)
     );
   }, [products, query]);
+
+  const supplierPagination = usePagination(suppliers, { pageSize: 10 });
+  const selectorPagination = usePagination(filteredProducts, {
+    pageSize: 12,
+    resetKey: query,
+  });
+
+  const expandedSupplier = useMemo(
+    () => suppliers.find((supplier) => supplier.id === expandedId) ?? null,
+    [suppliers, expandedId]
+  );
+  const expandedPagination = usePagination(expandedSupplier?.productIds ?? [], {
+    pageSize: 6,
+    resetKey: expandedId,
+  });
 
   const openCreate = () => {
     setEditingId(null);
@@ -235,7 +252,7 @@ export function SuppliersManager({ products }: { products: Product[] }) {
             </div>
           ) : (
             <div className="space-y-3">
-              {suppliers.map((supplier) => {
+              {supplierPagination.pageItems.map((supplier) => {
                 const assigned = supplier.productIds
                   .map((id) => productById.get(id))
                   .filter((product): product is Product => Boolean(product));
@@ -365,7 +382,7 @@ export function SuppliersManager({ products }: { products: Product[] }) {
                           </div>
                         ) : (
                           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                            {supplier.productIds.map((productId) => {
+                            {expandedPagination.pageItems.map((productId) => {
                               const product = productById.get(productId);
                               if (!product) {
                                 return (
@@ -485,12 +502,33 @@ export function SuppliersManager({ products }: { products: Product[] }) {
                             })}
                           </div>
                         )}
+                        <Pagination
+                          page={expandedPagination.page}
+                          pageSize={expandedPagination.pageSize}
+                          total={expandedPagination.total}
+                          totalPages={expandedPagination.totalPages}
+                          onPageChange={expandedPagination.setPage}
+                          onPageSizeChange={expandedPagination.setPageSize}
+                          pageSizeOptions={[6, 12, 24]}
+                          itemLabel="productos"
+                          className="mt-3"
+                        />
                         <SupplierPurchases supplier={supplier} products={products} />
                       </div>
                     )}
                   </div>
                 );
               })}
+              <Pagination
+                page={supplierPagination.page}
+                pageSize={supplierPagination.pageSize}
+                total={supplierPagination.total}
+                totalPages={supplierPagination.totalPages}
+                onPageChange={supplierPagination.setPage}
+                onPageSizeChange={supplierPagination.setPageSize}
+                itemLabel="proveedores"
+                className="pt-1"
+              />
             </div>
           )}
         </CardContent>
@@ -618,7 +656,7 @@ export function SuppliersManager({ products }: { products: Product[] }) {
                       </p>
                     ) : (
                       <div className="grid max-h-80 gap-2 overflow-y-auto rounded-lg border p-2 sm:grid-cols-2">
-                        {filteredProducts.map((product) => {
+                        {selectorPagination.pageItems.map((product) => {
                           const checked = form.productIds.includes(product.id);
                           return (
                             <label
@@ -658,6 +696,17 @@ export function SuppliersManager({ products }: { products: Product[] }) {
                         })}
                       </div>
                     )}
+                    <Pagination
+                      page={selectorPagination.page}
+                      pageSize={selectorPagination.pageSize}
+                      total={selectorPagination.total}
+                      totalPages={selectorPagination.totalPages}
+                      onPageChange={selectorPagination.setPage}
+                      onPageSizeChange={selectorPagination.setPageSize}
+                      pageSizeOptions={[12, 24, 48]}
+                      itemLabel="productos"
+                      className="mt-2"
+                    />
                   </>
                 )}
               </div>

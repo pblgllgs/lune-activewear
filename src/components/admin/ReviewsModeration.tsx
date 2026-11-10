@@ -5,6 +5,8 @@ import Swal from "sweetalert2";
 import { approveReview, deleteReview, getPendingReviews, type Review } from "@/lib/reviews";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Pagination } from "@/components/ui/pagination";
+import { usePagination } from "@/lib/use-pagination";
 
 function Stars({ rating }: { rating?: number }) {
   if (!rating) return null;
@@ -24,6 +26,8 @@ export function ReviewsModeration() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+
+  const pagination = usePagination(reviews, { pageSize: 10 });
 
   const load = async () => {
     setLoading(true);
@@ -101,7 +105,7 @@ export function ReviewsModeration() {
           </div>
         ) : (
           <div className="space-y-3">
-            {reviews.map((review) => (
+            {pagination.pageItems.map((review) => (
               <div key={`${review.productId}-${review.id}`} className="rounded-lg border p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -141,6 +145,16 @@ export function ReviewsModeration() {
                 </div>
               </div>
             ))}
+            <Pagination
+              page={pagination.page}
+              pageSize={pagination.pageSize}
+              total={pagination.total}
+              totalPages={pagination.totalPages}
+              onPageChange={pagination.setPage}
+              onPageSizeChange={pagination.setPageSize}
+              itemLabel="comentarios"
+              className="pt-1"
+            />
           </div>
         )}
       </CardContent>

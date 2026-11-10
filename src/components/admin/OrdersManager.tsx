@@ -24,12 +24,14 @@ import {
   updateOrder,
 } from "@/lib/orders";
 import { auth } from "@/lib/firebase";
+import { usePagination } from "@/lib/use-pagination";
 import { formatCLP } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Pagination } from "@/components/ui/pagination";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -134,6 +136,11 @@ export function OrdersManager() {
         .some((value) => value.toLowerCase().includes(term));
     });
   }, [orders, filter, query]);
+
+  const orderPagination = usePagination(visible, {
+    pageSize: 10,
+    resetKey: `${filter}|${query}`,
+  });
 
   const adminEmail = auth?.currentUser?.email ?? "admin";
 
@@ -420,7 +427,7 @@ export function OrdersManager() {
             </div>
           ) : (
             <div className="space-y-3">
-              {visible.map((order) => {
+              {orderPagination.pageItems.map((order) => {
                 const isOpen = expandedId === order.id;
                 const isEditing = editingId === order.id;
                 const busy = busyId === order.id;
@@ -893,6 +900,16 @@ export function OrdersManager() {
                   </div>
                 );
               })}
+              <Pagination
+                page={orderPagination.page}
+                pageSize={orderPagination.pageSize}
+                total={orderPagination.total}
+                totalPages={orderPagination.totalPages}
+                onPageChange={orderPagination.setPage}
+                onPageSizeChange={orderPagination.setPageSize}
+                itemLabel="órdenes"
+                className="pt-1"
+              />
             </div>
           )}
         </CardContent>

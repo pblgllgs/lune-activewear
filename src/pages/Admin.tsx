@@ -49,6 +49,8 @@ import { OrdersManager } from "@/components/admin/OrdersManager";
 import { ProductPreview } from "@/components/admin/ProductPreview";
 import { ReviewsModeration } from "@/components/admin/ReviewsModeration";
 import { SuppliersManager } from "@/components/admin/SuppliersManager";
+import { Pagination } from "@/components/ui/pagination";
+import { usePagination } from "@/lib/use-pagination";
 import { deleteFromR2, isUploadConfigured, slugify, uploadToR2 } from "@/lib/upload";
 import { normalizeProduct, seedDemoProducts } from "@/lib/catalog";
 import { defaultSizeGuide, resolveSizeGuide } from "@/lib/size-guide";
@@ -1235,6 +1237,8 @@ export default function Admin() {
   );
   const missingSkus = products.filter((p) => !p.sku).length;
 
+  const productPagination = usePagination(products, { pageSize: 10 });
+
   if (!isFirebaseConfigured || !auth) return <SetupNotice />;
 
   if (isAdmin === null) {
@@ -1503,7 +1507,7 @@ export default function Admin() {
               </Card>
             ) : (
               <div className="space-y-3">
-                {products.map((product) => (
+                {productPagination.pageItems.map((product) => (
                   <Card key={product.id} className={product.published === false ? "opacity-70" : ""}>
                     <CardContent className="flex items-center gap-3 p-3 sm:gap-4 sm:p-4">
                       <div className="h-16 w-14 shrink-0 overflow-hidden rounded-md border bg-secondary">
@@ -1592,6 +1596,16 @@ export default function Admin() {
                     </CardContent>
                   </Card>
                 ))}
+                <Pagination
+                  page={productPagination.page}
+                  pageSize={productPagination.pageSize}
+                  total={productPagination.total}
+                  totalPages={productPagination.totalPages}
+                  onPageChange={productPagination.setPage}
+                  onPageSizeChange={productPagination.setPageSize}
+                  itemLabel="productos"
+                  className="pt-1"
+                />
               </div>
             )}
           </>

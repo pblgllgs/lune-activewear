@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Pagination } from "@/components/ui/pagination";
 import {
   Select,
   SelectContent,
@@ -14,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { CATEGORIES, categoryLabel } from "@/lib/categories";
 import { LAST_UNITS_THRESHOLD, isLowStock, isSoldOut, sizeStock, totalStock } from "@/lib/stock";
+import { usePagination } from "@/lib/use-pagination";
 import { formatCLP } from "@/lib/utils";
 import type { Product } from "@/types/product";
 
@@ -63,6 +65,11 @@ export function InventoryPanel({
         .includes(term);
     });
   }, [products, category, status, query]);
+
+  const pagination = usePagination(filtered, {
+    pageSize: 10,
+    resetKey: `${category}|${status}|${query}`,
+  });
 
   const totals = useMemo(() => {
     const units = filtered.reduce((sum, product) => sum + totalStock(product), 0);
@@ -450,7 +457,7 @@ export function InventoryPanel({
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((product) => {
+                  {pagination.pageItems.map((product) => {
                     const registered = hasStockInfo(product);
                     const units = totalStock(product);
                     return (
@@ -564,6 +571,16 @@ export function InventoryPanel({
               </table>
             </div>
           )}
+
+          <Pagination
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            total={pagination.total}
+            totalPages={pagination.totalPages}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+            itemLabel="productos"
+          />
 
           <p className="text-[11px] text-muted-foreground">
             «—» significa que el producto no tiene stock registrado: la tienda lo considera

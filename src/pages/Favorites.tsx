@@ -5,6 +5,8 @@ import { getProducts } from "@/lib/catalog";
 import { useSeo } from "@/lib/seo";
 import { useWishlist } from "@/context/WishlistContext";
 import { ProductCard } from "@/components/shop/ProductCard";
+import { Pagination } from "@/components/ui/pagination";
+import { usePagination } from "@/lib/use-pagination";
 import type { Product } from "@/types/product";
 
 export default function Favorites() {
@@ -32,6 +34,11 @@ export default function Favorites() {
       return product ? [product] : [];
     });
   }, [ids, products]);
+
+  const pagination = usePagination(favorites, {
+    pageSize: 12,
+    resetKey: ids.join(","),
+  });
 
   return (
     <div className="container py-12 md:py-16">
@@ -82,10 +89,20 @@ export default function Favorites() {
             </button>
           </div>
           <div className="mt-8 grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-3 lg:grid-cols-4">
-            {favorites.map((product) => (
+            {pagination.pageItems.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
           </div>
+          <Pagination
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            total={pagination.total}
+            totalPages={pagination.totalPages}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+            itemLabel="prendas"
+            className="mt-10"
+          />
         </>
       )}
     </div>

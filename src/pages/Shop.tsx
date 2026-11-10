@@ -8,6 +8,8 @@ import { matchesQuery } from "@/lib/search";
 import { breadcrumbJsonLd, collectionPageJsonLd, useSeo } from "@/lib/seo";
 import { ProductCard } from "@/components/shop/ProductCard";
 import { PRICE_RANGES, ShopFilters } from "@/components/shop/ShopFilters";
+import { Pagination } from "@/components/ui/pagination";
+import { usePagination } from "@/lib/use-pagination";
 import type { Product } from "@/types/product";
 
 const SORTS = [
@@ -137,6 +139,11 @@ export default function Shop() {
         );
     }
   }, [products, activeCategory, selectedSizes, selectedColors, priceRange, searchQuery, sort]);
+
+  const pagination = usePagination(filtered, {
+    pageSize: 12,
+    resetKey: `${activeCategory}|${selectedSizes.join(",")}|${selectedColors.join(",")}|${priceRange}|${searchQuery}|${sort}`,
+  });
 
   /** Actualiza un parámetro de la URL sin perder los demás filtros. */
   const setParam = (key: string, value: string | null) => {
@@ -346,11 +353,23 @@ export default function Shop() {
               )}
             </div>
           ) : (
-            <div className="mt-8 grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-3 lg:mt-0 lg:grid-cols-3 xl:grid-cols-4">
-              {filtered.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
+            <>
+              <div className="mt-8 grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-3 lg:mt-0 lg:grid-cols-3 xl:grid-cols-4">
+                {pagination.pageItems.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
+              <Pagination
+                page={pagination.page}
+                pageSize={pagination.pageSize}
+                total={pagination.total}
+                totalPages={pagination.totalPages}
+                onPageChange={pagination.setPage}
+                onPageSizeChange={pagination.setPageSize}
+                itemLabel="prendas"
+                className="mt-10"
+              />
+            </>
           )}
         </div>
       </div>
