@@ -31,6 +31,7 @@ function Wordmark() {
 export function Navbar() {
   const [open, setOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const { user, displayName, signOutUser } = useAuth();
   const { count, openCart } = useCart();
   const { count: wishlistCount } = useWishlist();
@@ -41,6 +42,7 @@ export function Navbar() {
   useEffect(() => {
     setOpen(false);
     setSearchOpen(false);
+    setAccountMenuOpen(false);
   }, [location.pathname, location.hash]);
 
   return (
@@ -73,7 +75,17 @@ export function Navbar() {
         <Wordmark />
 
         <div className="flex items-center justify-end gap-1">
-          <div className="group relative">
+          <div
+            className="relative"
+            onMouseEnter={() => setAccountMenuOpen(true)}
+            onMouseLeave={() => setAccountMenuOpen(false)}
+            onFocus={() => setAccountMenuOpen(true)}
+            onBlur={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                setAccountMenuOpen(false);
+              }
+            }}
+          >
             <Link
               to={isAdmin ? "/admin" : "/cuenta"}
               className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-2 transition hover:bg-secondary"
@@ -94,19 +106,27 @@ export function Navbar() {
                 </span>
               )}
             </Link>
-            <div className="invisible absolute right-0 top-full z-50 pt-1 opacity-0 transition group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
+            <div
+              className={`absolute right-0 top-full z-50 pt-1 transition ${
+                accountMenuOpen ? "visible opacity-100" : "invisible opacity-0"
+              }`}
+            >
               <div className="min-w-[11rem] rounded-md border border-border bg-background p-1 shadow-md">
                 {user ? (
                   <>
                     <Link
                       to={isAdmin ? "/admin" : "/cuenta"}
+                      onClick={() => setAccountMenuOpen(false)}
                       className="block rounded-sm px-3 py-2 text-[11px] uppercase tracking-wider2 text-foreground/80 transition hover:bg-secondary hover:text-foreground"
                     >
                       {isAdmin ? "Panel de administración" : "Mi cuenta"}
                     </Link>
                     <button
                       type="button"
-                      onClick={() => void signOutUser()}
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                        void signOutUser();
+                      }}
                       className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-[11px] uppercase tracking-wider2 text-foreground/80 transition hover:bg-secondary hover:text-foreground"
                     >
                       <LogOut className="h-3.5 w-3.5" /> Cerrar sesión
@@ -115,6 +135,7 @@ export function Navbar() {
                 ) : (
                   <Link
                     to="/cuenta"
+                    onClick={() => setAccountMenuOpen(false)}
                     className="block rounded-sm px-3 py-2 text-[11px] uppercase tracking-wider2 text-foreground/80 transition hover:bg-secondary hover:text-foreground"
                   >
                     Iniciar sesión
