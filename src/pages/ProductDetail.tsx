@@ -97,10 +97,10 @@ export default function ProductDetail() {
         setSize(found ? firstAvailableSize(found) : "Único");
         // El color inicial sigue a la primera foto si tiene uno asignado.
         const firstUrl = found?.images[0];
-        const firstColor = firstUrl ? found?.imageColors?.[firstUrl] : undefined;
+        const firstColor = firstUrl ? found?.imageColors?.[firstUrl]?.trim() : undefined;
         const validFirstColor =
-          firstColor && found?.colors.some((c) => c.name === firstColor)
-            ? firstColor
+          firstColor && found?.colors.some((c) => c.name.trim() === firstColor)
+            ? found.colors.find((c) => c.name.trim() === firstColor)?.name
             : undefined;
         setColor(validFirstColor ?? found?.colors[0]?.name ?? "Único");
       })
@@ -150,8 +150,9 @@ export default function ProductDetail() {
   /** Color asociado a una foto, solo si existe en los colores del producto. */
   const colorForImage = (url: string | undefined) => {
     if (!url) return undefined;
-    const name = product.imageColors?.[url];
-    return name && product.colors.some((c) => c.name === name) ? name : undefined;
+    const name = product.imageColors?.[url]?.trim();
+    if (!name) return undefined;
+    return product.colors.find((c) => c.name.trim() === name)?.name;
   };
 
   /** Selecciona una foto y, si tiene color asignado, lo activa. */
@@ -370,7 +371,7 @@ export default function ProductDetail() {
                       setColor(c.name);
                       // Salta a la primera foto de ese color, si tiene.
                       const first = images.findIndex(
-                        (url) => product.imageColors?.[url] === c.name
+                        (url) => product.imageColors?.[url]?.trim() === c.name.trim()
                       );
                       if (first >= 0) setIndex(first);
                     }}

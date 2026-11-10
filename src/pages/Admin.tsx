@@ -535,7 +535,9 @@ function ProductForm({
           hipMin: Math.max(0, Math.floor(row.hipMin || 0)),
           hipMax: Math.max(0, Math.floor(row.hipMax || 0)),
         })),
-        colors: colors.filter((c) => c.name.trim()),
+        colors: colors
+          .map((c) => ({ ...c, name: c.name.trim() }))
+          .filter((c) => c.name),
         images: urls,
         imageColors,
         featured: form.featured,
@@ -619,7 +621,9 @@ function ProductForm({
         sizes.map((size) => [size, Math.max(0, Math.floor(stockBySize[size] ?? 0))])
       ),
       sizeGuide,
-      colors: colors.filter((color) => color.name.trim()),
+      colors: colors
+        .map((color) => ({ ...color, name: color.name.trim() }))
+        .filter((color) => color.name),
       images: images.map((image) => image.url),
       imageColors: Object.fromEntries(
         images
