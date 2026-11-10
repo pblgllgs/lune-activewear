@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import Swal from "sweetalert2";
 import {
   AlertCircle,
+  Boxes,
   Eye,
   EyeOff,
   Hash,
@@ -41,6 +42,7 @@ import {
 } from "lucide-react";
 import { auth, db, isFirebaseConfigured } from "@/lib/firebase";
 import { ContentManager } from "@/components/admin/ContentManager";
+import { InventoryPanel } from "@/components/admin/InventoryPanel";
 import { ProductPreview } from "@/components/admin/ProductPreview";
 import { ReviewsModeration } from "@/components/admin/ReviewsModeration";
 import { deleteFromR2, isUploadConfigured, slugify, uploadToR2 } from "@/lib/upload";
@@ -67,7 +69,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-type Tab = "dashboard" | "nuevo" | "productos" | "contenido" | "comentarios";
+type Tab =
+  | "dashboard"
+  | "nuevo"
+  | "productos"
+  | "inventario"
+  | "contenido"
+  | "comentarios";
 
 const ADMIN_EMAILS = ((import.meta.env.VITE_ADMIN_EMAILS as string) || "")
   .split(",")
@@ -1122,6 +1130,7 @@ const MENU: { tab: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { tab: "dashboard", label: "Resumen", icon: LayoutDashboard },
   { tab: "nuevo", label: "Nuevo producto", icon: Plus },
   { tab: "productos", label: "Productos", icon: Package },
+  { tab: "inventario", label: "Inventario", icon: Boxes },
   { tab: "comentarios", label: "Comentarios", icon: MessageSquare },
   { tab: "contenido", label: "Contenido", icon: ImagePlus },
 ];
@@ -1354,7 +1363,9 @@ export default function Admin() {
                 ? "Contenido del sitio"
                 : tab === "comentarios"
                   ? "Comentarios"
-                  : "Catálogo"}
+                  : tab === "inventario"
+                    ? "Inventario"
+                    : "Catálogo"}
             </h1>
           </div>
           {firebaseAuth.currentUser?.email && (
@@ -1423,6 +1434,9 @@ export default function Admin() {
                 <Button variant="outline" onClick={() => setTab("productos")}>
                   <Package className="h-4 w-4" /> Gestionar catálogo
                 </Button>
+                <Button variant="outline" onClick={() => setTab("inventario")}>
+                  <Boxes className="h-4 w-4" /> Ver inventario
+                </Button>
                 {missingSkus > 0 && (
                   <Button variant="outline" onClick={fillMissingSkus} disabled={fillingSkus}>
                     <Hash className="h-4 w-4" />
@@ -1437,6 +1451,16 @@ export default function Admin() {
         )}
 
         {tab === "nuevo" && <ProductForm editing={editing} takenSkus={takenSkus} />}
+
+        {tab === "inventario" && (
+          <InventoryPanel
+            products={products}
+            onEdit={(product) => {
+              setEditing(product);
+              setTab("nuevo");
+            }}
+          />
+        )}
 
         {tab === "productos" && (
           <>
