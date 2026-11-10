@@ -37,6 +37,7 @@ import {
   RotateCcw,
   Star,
   Trash2,
+  Truck,
   UploadCloud,
   X,
 } from "lucide-react";
@@ -45,6 +46,7 @@ import { ContentManager } from "@/components/admin/ContentManager";
 import { InventoryPanel } from "@/components/admin/InventoryPanel";
 import { ProductPreview } from "@/components/admin/ProductPreview";
 import { ReviewsModeration } from "@/components/admin/ReviewsModeration";
+import { SuppliersManager } from "@/components/admin/SuppliersManager";
 import { deleteFromR2, isUploadConfigured, slugify, uploadToR2 } from "@/lib/upload";
 import { normalizeProduct, seedDemoProducts } from "@/lib/catalog";
 import { defaultSizeGuide, resolveSizeGuide } from "@/lib/size-guide";
@@ -74,6 +76,7 @@ type Tab =
   | "nuevo"
   | "productos"
   | "inventario"
+  | "proveedores"
   | "contenido"
   | "comentarios";
 
@@ -1131,6 +1134,7 @@ const MENU: { tab: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { tab: "nuevo", label: "Nuevo producto", icon: Plus },
   { tab: "productos", label: "Productos", icon: Package },
   { tab: "inventario", label: "Inventario", icon: Boxes },
+  { tab: "proveedores", label: "Proveedores", icon: Truck },
   { tab: "comentarios", label: "Comentarios", icon: MessageSquare },
   { tab: "contenido", label: "Contenido", icon: ImagePlus },
 ];
@@ -1365,7 +1369,9 @@ export default function Admin() {
                   ? "Comentarios"
                   : tab === "inventario"
                     ? "Inventario"
-                    : "Catálogo"}
+                    : tab === "proveedores"
+                      ? "Proveedores"
+                      : "Catálogo"}
             </h1>
           </div>
           {firebaseAuth.currentUser?.email && (
@@ -1437,6 +1443,9 @@ export default function Admin() {
                 <Button variant="outline" onClick={() => setTab("inventario")}>
                   <Boxes className="h-4 w-4" /> Ver inventario
                 </Button>
+                <Button variant="outline" onClick={() => setTab("proveedores")}>
+                  <Truck className="h-4 w-4" /> Proveedores
+                </Button>
                 {missingSkus > 0 && (
                   <Button variant="outline" onClick={fillMissingSkus} disabled={fillingSkus}>
                     <Hash className="h-4 w-4" />
@@ -1461,6 +1470,8 @@ export default function Admin() {
             }}
           />
         )}
+
+        {tab === "proveedores" && <SuppliersManager products={products} />}
 
         {tab === "productos" && (
           <>

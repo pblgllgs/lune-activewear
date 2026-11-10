@@ -38,6 +38,11 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Proveedores y los productos que proveen (solo admin).
+    match /suppliers/{supplierId} {
+      allow read, write: if isAdmin();
+    }
+
     // Bloqueo total del resto
     match /{document=**} {
       allow read, write: if false;
