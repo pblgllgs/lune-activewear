@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -60,6 +60,7 @@ export default function ProductDetail() {
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewSending, setReviewSending] = useState(false);
   const [reviewSent, setReviewSent] = useState(false);
+  const touchX = useRef<number | null>(null);
 
   const reviewPagination = usePagination(reviews, { pageSize: 6, resetKey: id });
 
@@ -258,7 +259,22 @@ export default function ProductDetail() {
       <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
         {/* Galería */}
         <div className="min-w-0">
-          <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-secondary">
+          <div
+            className="relative aspect-[4/5] touch-pan-y overflow-hidden rounded-xl bg-secondary"
+            onTouchStart={(event) => {
+              touchX.current = event.touches[0]?.clientX ?? null;
+            }}
+            onTouchEnd={(event) => {
+              if (touchX.current === null || images.length < 2) return;
+              const delta =
+                (event.changedTouches[0]?.clientX ?? touchX.current) - touchX.current;
+              touchX.current = null;
+              if (Math.abs(delta) > 40) {
+                if (delta < 0) next();
+                else prev();
+              }
+            }}
+          >
             <ImageWithFallback
               src={currentImage}
               alt={`${product.name} — ${categoryLabel(product.category)} LUNÉ Activewear`}
