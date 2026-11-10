@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pencil, Plus, ShoppingCart, Trash2, X } from "lucide-react";
+import {
+  Check,
+  ExternalLink,
+  FileText,
+  Pencil,
+  Plus,
+  ShoppingCart,
+  Trash2,
+  UploadCloud,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import Swal from "sweetalert2";
 import {
@@ -8,33 +18,23 @@ import {
   subscribePurchases,
   updatePurchase,
 } from "@/lib/supplier-purchases";
-import { formatCLP } from "@/lib/utils";
+import { deleteFromR2, isUploadConfigured, uploadToR2 } from "@/lib/upload";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import type { Product } from "@/types/product";
 import type { Supplier } from "@/types/supplier";
 import type { SupplierPurchase } from "@/types/supplier-purchase";
 
-type FormItem = {
-  productId: string;
-  productName: string;
-  quantity: string;
-  unitCost: string;
-};
-
 type FormState = {
   date: string;
   notes: string;
-  items: FormItem[];
+  productNames: string[];
+  documentUrl: string;
+  documentName: string;
+  file: File | null;
+  removeDocument: boolean;
 };
 
 function todayIso(): string {
@@ -55,12 +55,19 @@ function formatDate(value: string): string {
   });
 }
 
-function itemTotal(item: FormItem): number {
-  const quantity = Number(item.quantity);
-  const unitCost = Number(item.unitCost);
-  if (!Number.isFinite(quantity) || !Number.isFinite(unitCost)) return 0;
-  return Math.max(0, quantity) * Math.max(0, unitCost);
+function emptyForm(): FormState {
+  return {
+    date: todayIso(),
+    notes: "",
+    productNames: [],
+    documentUrl: "",
+    documentName: "",
+    file: null,
+    removeDocument: false,
+  };
 }
+
+const MAX_DOCUMENT_SIZE = 15 * 1024 * 1024;
 
 export function SupplierPurchases({
   supplier,
@@ -73,11 +80,8 @@ export function SupplierPurchases({
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>({
-    date: todayIso(),
-    notes: "",
-    items: [],
-  });
+  const [form, setForm] = useState<FormState>(emptyForm);
+  const [productInput, setProductInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -95,26 +99,50 @@ export function SupplierPurchases({
     [products]
   );
 
-  const defaultProductId = useMemo(() => {
-    const own = supplier.productIds.find((id) => productById.has(id));
-    return own ?? products[0]?.id ?? "";
-  }, [supplier.productIds, productById, products]);
-
-  const totalSpent = useMemo(
-    () => purchases.reduce((sum, purchase) => sum + purchase.total, 0),
-    [purchases]
+  const supplierProducts = useMemo(
+    () =>
+      supplier.productIds
+        .map((id) => productById.get(id))
+        .filter((product): product is Product => Boolean(product)),
+    [supplier.productIds, productById]
   );
 
-  const newItem = (productId = defaultProductId): FormItem => ({
-    productId,
-    productName: productById.get(productId)?.name ?? "",
-    quantity: "1",
-    unitCost: "",
-  });
+  const addProductName = (value: string) => {
+    const name = value.trim();
+    if (!name) return;
+    setForm((current) => {
+      const exists = current.productNames.some(
+        (productName) => productName.toLowerCase() === name.toLowerCase()
+      );
+      return exists
+        ? current
+        : { ...current, productNames: [...current.productNames, name] };
+    });
+    setProductInput("");
+  };
+
+  const removeProductName = (name: string) => {
+    setForm((current) => ({
+      ...current,
+      productNames: current.productNames.filter((productName) => productName !== name),
+    }));
+  };
+
+  const toggleSupplierProduct = (product: Product) => {
+    const exists = form.productNames.some(
+      (name) => name.toLowerCase() === product.name.toLowerCase()
+    );
+    if (exists) {
+      removeProductName(form.productNames.find((name) => name.toLowerCase() === product.name.toLowerCase()) ?? product.name);
+    } else {
+      addProductName(product.name);
+    }
+  };
 
   const openCreate = () => {
     setEditingId(null);
-    setForm({ date: todayIso(), notes: "", items: [newItem()] });
+    setForm(emptyForm());
+    setProductInput("");
     setFormOpen(true);
   };
 
@@ -123,45 +151,30 @@ export function SupplierPurchases({
     setForm({
       date: purchase.date || todayIso(),
       notes: purchase.notes ?? "",
-      items:
-        purchase.items.length > 0
-          ? purchase.items.map((item) => ({
-              productId: item.productId,
-              productName: item.productName,
-              quantity: String(item.quantity),
-              unitCost: String(item.unitCost),
-            }))
-          : [newItem()],
+      productNames: purchase.productNames,
+      documentUrl: purchase.documentUrl ?? "",
+      documentName: purchase.documentName ?? "",
+      file: null,
+      removeDocument: false,
     });
+    setProductInput("");
     setFormOpen(true);
   };
 
   const closeForm = () => {
     setFormOpen(false);
     setEditingId(null);
+    setProductInput("");
+    setForm(emptyForm());
   };
 
-  const updateItem = (index: number, patch: Partial<FormItem>) => {
-    setForm((current) => ({
-      ...current,
-      items: current.items.map((item, itemIndex) =>
-        itemIndex === index ? { ...item, ...patch } : item
-      ),
-    }));
+  const selectFile = (file: File | null) => {
+    if (file && file.size > MAX_DOCUMENT_SIZE) {
+      toast.error("El documento supera el máximo de 15 MB.");
+      return;
+    }
+    setForm((current) => ({ ...current, file, removeDocument: false }));
   };
-
-  const addItem = () => {
-    setForm((current) => ({ ...current, items: [...current.items, newItem()] }));
-  };
-
-  const removeItem = (index: number) => {
-    setForm((current) => ({
-      ...current,
-      items: current.items.filter((_, itemIndex) => itemIndex !== index),
-    }));
-  };
-
-  const formTotal = form.items.reduce((sum, item) => sum + itemTotal(item), 0);
 
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -169,38 +182,52 @@ export function SupplierPurchases({
       toast.error("Indica la fecha de la compra.");
       return;
     }
-    const items = form.items
-      .filter((item) => item.productId && Number(item.quantity) > 0)
-      .map((item) => ({
-        productId: item.productId,
-        productName:
-          productById.get(item.productId)?.name || item.productName || item.productId,
-        quantity: Math.max(1, Math.floor(Number(item.quantity) || 0)),
-        unitCost: Math.max(0, Math.round(Number(item.unitCost) || 0)),
-      }));
-
-    if (items.length === 0) {
-      toast.error("Agrega al menos un producto con cantidad mayor a 0.");
+    if (form.productNames.length === 0) {
+      toast.error("Agrega al menos un producto comprado.");
       return;
     }
 
+    let uploadedUrl: string | null = null;
     setSaving(true);
     try {
+      let documentUrl = form.removeDocument ? "" : form.documentUrl;
+      let documentName = form.removeDocument ? "" : form.documentName;
+
+      if (form.file) {
+        if (!isUploadConfigured()) {
+          throw new Error(
+            "La subida de documentos no está configurada (VITE_R2_WORKER_URL / VITE_UPLOAD_TOKEN)."
+          );
+        }
+        uploadedUrl = await uploadToR2(form.file, `suppliers/${supplier.id}/purchases`);
+        documentUrl = uploadedUrl;
+        documentName = form.file.name;
+      }
+
       const input = {
         supplierId: supplier.id,
         date: form.date,
-        items,
+        productNames: form.productNames,
+        documentUrl,
+        documentName,
         notes: form.notes,
       };
+
       if (editingId) {
         await updatePurchase(supplier.id, editingId, input);
-        toast.success("Compra actualizada.");
       } else {
         await createPurchase(input);
-        toast.success("Compra registrada.");
       }
+
+      // Limpieza best effort del documento anterior si se reemplazó o quitó.
+      if (form.documentUrl && form.documentUrl !== documentUrl) {
+        void deleteFromR2(form.documentUrl).catch(() => {});
+      }
+
+      toast.success(editingId ? "Compra actualizada." : "Compra registrada.");
       closeForm();
     } catch (error) {
+      if (uploadedUrl) void deleteFromR2(uploadedUrl).catch(() => {});
       toast.error(error instanceof Error ? error.message : "No se pudo guardar la compra.");
     } finally {
       setSaving(false);
@@ -210,9 +237,9 @@ export function SupplierPurchases({
   const remove = async (purchase: SupplierPurchase) => {
     const result = await Swal.fire({
       title: "¿Eliminar compra?",
-      text: `Se eliminará la compra del ${formatDate(purchase.date)} por ${formatCLP(
-        purchase.total
-      )}.`,
+      text: `Se eliminará la compra del ${formatDate(purchase.date)}${
+        purchase.documentUrl ? " y su documento adjunto" : ""
+      }.`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonText: "Sí, eliminar",
@@ -223,6 +250,7 @@ export function SupplierPurchases({
     setBusyId(purchase.id);
     try {
       await deletePurchase(supplier.id, purchase.id);
+      if (purchase.documentUrl) void deleteFromR2(purchase.documentUrl).catch(() => {});
       if (editingId === purchase.id) closeForm();
       toast.success("Compra eliminada.");
     } catch (error) {
@@ -243,32 +271,24 @@ export function SupplierPurchases({
             {purchases.length === 0
               ? "Aún no hay compras registradas con este proveedor."
               : `${purchases.length} ${
-                  purchases.length === 1 ? "compra" : "compras"
-                } · ${formatCLP(totalSpent)} en total`}
+                  purchases.length === 1 ? "compra registrada" : "compras registradas"
+                }`}
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={openCreate}
-          disabled={formOpen || products.length === 0}
-        >
+        <Button variant="outline" size="sm" onClick={openCreate} disabled={formOpen}>
           <Plus className="h-3.5 w-3.5" /> Registrar compra
         </Button>
       </div>
 
       {formOpen && (
-        <form
-          onSubmit={save}
-          className="mt-3 space-y-4 rounded-lg border bg-card p-4 shadow-sm"
-        >
+        <form onSubmit={save} className="mt-3 space-y-4 rounded-lg border bg-card p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="font-display text-base font-medium">
                 {editingId ? "Editar compra" : "Nueva compra"}
               </p>
               <p className="text-[11px] text-muted-foreground">
-                Registra productos, cantidades y costos de esta compra.
+                Agrega los productos comprados y adjunta la factura o boleta.
               </p>
             </div>
             <Button type="button" variant="ghost" size="icon" onClick={closeForm} title="Cerrar">
@@ -301,115 +321,168 @@ export function SupplierPurchases({
           </div>
 
           <div className="space-y-2">
-            <div className="hidden gap-2 text-[10px] uppercase tracking-wider2 text-muted-foreground sm:grid sm:grid-cols-[minmax(0,1fr)_80px_130px_110px_36px]">
-              <span>Producto</span>
-              <span>Cantidad</span>
-              <span>Costo unit. (CLP)</span>
-              <span className="text-right">Subtotal</span>
-              <span />
-            </div>
-
-            {form.items.map((item, index) => {
-              const missingProduct =
-                item.productId && !productById.has(item.productId) ? item : null;
-              return (
-                <div
-                  key={`${item.productId}-${index}`}
-                  className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_80px_130px_110px_36px] sm:items-center"
-                >
-                  <div className="space-y-1 sm:space-y-0">
-                    <Label className="text-[10px] text-muted-foreground sm:hidden">Producto</Label>
-                    <Select
-                      value={item.productId}
-                      onValueChange={(value) =>
-                        updateItem(index, {
-                          productId: value,
-                          productName: productById.get(value)?.name ?? "",
-                        })
-                      }
-                    >
-                      <SelectTrigger aria-label={`Producto de la línea ${index + 1}`}>
-                        <SelectValue placeholder="Elegir producto" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {products.map((product) => (
-                          <SelectItem key={product.id} value={product.id}>
-                            {product.name}
-                            {product.sku ? ` · ${product.sku}` : ""}
-                          </SelectItem>
-                        ))}
-                        {missingProduct && (
-                          <SelectItem value={missingProduct.productId}>
-                            {missingProduct.productName || missingProduct.productId} (no disponible)
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1 sm:space-y-0">
-                    <Label className="text-[10px] text-muted-foreground sm:hidden">
-                      Cantidad
-                    </Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={99999}
-                      step={1}
-                      value={item.quantity}
-                      onChange={(event) => updateItem(index, { quantity: event.target.value })}
-                      aria-label={`Cantidad de la línea ${index + 1}`}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1 sm:space-y-0">
-                    <Label className="text-[10px] text-muted-foreground sm:hidden">
-                      Costo unit. (CLP)
-                    </Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={99999999}
-                      step={1}
-                      value={item.unitCost}
-                      onChange={(event) => updateItem(index, { unitCost: event.target.value })}
-                      placeholder="0"
-                      aria-label={`Costo unitario de la línea ${index + 1}`}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-2 sm:justify-end">
-                    <Label className="text-[10px] text-muted-foreground sm:hidden">
-                      Subtotal
-                    </Label>
-                    <span className="text-sm font-medium tabular-nums">
-                      {formatCLP(itemTotal(item))}
-                    </span>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    title="Quitar línea"
-                    onClick={() => removeItem(index)}
-                    disabled={form.items.length === 1}
-                    className="justify-self-end"
+            <Label>Productos comprados</Label>
+            {form.productNames.length === 0 ? (
+              <p className="rounded-md border border-dashed p-3 text-center text-xs text-muted-foreground">
+                Agrega al menos un producto.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {form.productNames.map((name) => (
+                  <span
+                    key={name}
+                    className="inline-flex items-center gap-1 rounded-full border bg-secondary/60 px-2.5 py-1 text-xs"
                   >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
-              );
-            })}
-
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-              <Button type="button" variant="outline" size="sm" onClick={addItem}>
-                <Plus className="h-3.5 w-3.5" /> Agregar producto
-              </Button>
-              <div className="text-right">
-                <p className="text-[10px] uppercase tracking-wider2 text-muted-foreground">
-                  Total compra
-                </p>
-                <p className="font-display text-2xl font-medium">{formatCLP(formTotal)}</p>
+                    {name}
+                    <button
+                      type="button"
+                      onClick={() => removeProductName(name)}
+                      className="text-muted-foreground transition hover:text-destructive"
+                      aria-label={`Quitar ${name}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
               </div>
+            )}
+
+            <div className="flex flex-wrap gap-2">
+              <Input
+                value={productInput}
+                onChange={(event) => setProductInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    addProductName(productInput);
+                  }
+                }}
+                placeholder="Nombre del producto"
+                className="min-w-[12rem] flex-1"
+                maxLength={120}
+                aria-label="Nombre del producto comprado"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => addProductName(productInput)}
+                disabled={!productInput.trim()}
+              >
+                <Plus className="h-4 w-4" /> Agregar
+              </Button>
             </div>
+
+            {supplierProducts.length > 0 && (
+              <div>
+                <p className="mt-1 text-[10px] uppercase tracking-wider2 text-muted-foreground">
+                  Productos de este proveedor
+                </p>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {supplierProducts.map((product) => {
+                    const added = form.productNames.some(
+                      (name) => name.toLowerCase() === product.name.toLowerCase()
+                    );
+                    return (
+                      <button
+                        key={product.id}
+                        type="button"
+                        onClick={() => toggleSupplierProduct(product)}
+                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] transition ${
+                          added
+                            ? "border-primary/40 bg-secondary text-foreground"
+                            : "border-border bg-background text-muted-foreground hover:border-primary/25 hover:text-foreground"
+                        }`}
+                      >
+                        {added ? <Check className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                        {product.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor={`purchase-document-${supplier.id}`}>Factura o boleta</Label>
+
+            {form.documentUrl && !form.removeDocument && !form.file && (
+              <div className="flex flex-wrap items-center gap-2 rounded-md border bg-secondary/30 px-3 py-2 text-xs">
+                <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <a
+                  href={form.documentUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="min-w-0 flex-1 truncate underline-offset-2 hover:underline"
+                >
+                  {form.documentName || "Ver documento adjunto"}
+                </a>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setForm({ ...form, removeDocument: true })}
+                >
+                  Quitar
+                </Button>
+              </div>
+            )}
+
+            {form.removeDocument && (
+              <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800">
+                El documento actual se eliminará al guardar.{" "}
+                <button
+                  type="button"
+                  className="underline underline-offset-2"
+                  onClick={() => setForm({ ...form, removeDocument: false })}
+                >
+                  Deshacer
+                </button>
+              </p>
+            )}
+
+            {form.file && (
+              <div className="flex flex-wrap items-center gap-2 rounded-md border bg-secondary/30 px-3 py-2 text-xs">
+                <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 flex-1 truncate">{form.file.name}</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  title="Quitar archivo"
+                  onClick={() => selectFile(null)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+
+            {!form.file && (
+              <label
+                htmlFor={`purchase-document-${supplier.id}`}
+                className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed px-3 py-3 text-xs text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
+              >
+                <UploadCloud className="h-4 w-4" />
+                <span>
+                  {form.documentUrl && !form.removeDocument
+                    ? "Subir un documento nuevo (reemplaza el actual)"
+                    : "Subir factura o boleta (PDF o imagen, máx. 15 MB)"}
+                </span>
+                <input
+                  id={`purchase-document-${supplier.id}`}
+                  type="file"
+                  accept="application/pdf,image/*"
+                  className="sr-only"
+                  onChange={(event) => selectFile(event.target.files?.[0] ?? null)}
+                />
+              </label>
+            )}
+
+            {!isUploadConfigured() && (
+              <p className="text-[11px] text-amber-700">
+                La subida de archivos no está configurada; puedes guardar la compra sin documento.
+              </p>
+            )}
           </div>
 
           <div className="flex flex-wrap justify-end gap-2">
@@ -429,11 +502,9 @@ export function SupplierPurchases({
         <div className="mt-3 flex flex-col items-center gap-2 rounded-lg border border-dashed bg-card/60 p-6 text-center text-sm text-muted-foreground">
           <ShoppingCart className="h-6 w-6" />
           <p>Sin compras registradas todavía.</p>
-          {products.length > 0 && (
-            <Button variant="outline" size="sm" onClick={openCreate}>
-              <Plus className="h-3.5 w-3.5" /> Registrar la primera
-            </Button>
-          )}
+          <Button variant="outline" size="sm" onClick={openCreate}>
+            <Plus className="h-3.5 w-3.5" /> Registrar la primera
+          </Button>
         </div>
       ) : (
         <div className="mt-3 space-y-2">
@@ -443,9 +514,8 @@ export function SupplierPurchases({
                 <div>
                   <p className="text-sm font-medium">{formatDate(purchase.date)}</p>
                   <p className="text-[11px] text-muted-foreground">
-                    {purchase.items.length}{" "}
-                    {purchase.items.length === 1 ? "producto" : "productos"} ·{" "}
-                    {formatCLP(purchase.total)}
+                    {purchase.productNames.length}{" "}
+                    {purchase.productNames.length === 1 ? "producto" : "productos"}
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-1">
@@ -470,25 +540,29 @@ export function SupplierPurchases({
                 </div>
               </div>
 
-              <div className="mt-2 space-y-1">
-                {purchase.items.map((item, index) => (
-                  <div
-                    key={`${purchase.id}-${item.productId}-${index}`}
-                    className="flex items-center justify-between gap-3 text-xs"
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {purchase.productNames.map((name) => (
+                  <span
+                    key={name}
+                    className="rounded-full border bg-secondary/60 px-2 py-0.5 text-[11px]"
                   >
-                    <span className="min-w-0 truncate">
-                      {item.productName}
-                      <span className="text-muted-foreground">
-                        {" "}
-                        · {item.quantity} × {formatCLP(item.unitCost)}
-                      </span>
-                    </span>
-                    <span className="shrink-0 font-medium tabular-nums">
-                      {formatCLP(item.quantity * item.unitCost)}
-                    </span>
-                  </div>
+                    {name}
+                  </span>
                 ))}
               </div>
+
+              {purchase.documentUrl && (
+                <a
+                  href={purchase.documentUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  {purchase.documentName || "Ver factura o boleta"}
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              )}
 
               {purchase.notes && (
                 <p className="mt-2 whitespace-pre-line text-[11px] leading-relaxed text-muted-foreground">

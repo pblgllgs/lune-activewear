@@ -1,18 +1,14 @@
-export interface SupplierPurchaseItem {
-  productId: string;
-  productName: string;
-  quantity: number;
-  unitCost: number;
-}
-
 export interface SupplierPurchase {
   id: string;
   supplierId: string;
   /** Fecha de la compra en formato ISO `YYYY-MM-DD`. */
   date: string;
-  items: SupplierPurchaseItem[];
-  /** Costo total calculado: Σ cantidad × costo unitario. */
-  total: number;
+  /** Nombres de los productos comprados (sin cantidades ni costos). */
+  productNames: string[];
+  /** URL pública del documento adjunto (factura o boleta). */
+  documentUrl?: string;
+  /** Nombre original del archivo adjunto. */
+  documentName?: string;
   notes?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -21,6 +17,8 @@ export interface SupplierPurchase {
 export interface SupplierPurchaseInput {
   supplierId: string;
   date: string;
-  items: SupplierPurchaseItem[];
+  productNames: string[];
+  documentUrl?: string;
+  documentName?: string;
   notes?: string;
 }

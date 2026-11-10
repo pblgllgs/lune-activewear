@@ -7,32 +7,27 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type {
-  SupplierPurchase,
-  SupplierPurchaseInput,
-  SupplierPurchaseItem,
-} from "@/types/supplier-purchase";
+import type { SupplierPurchase, SupplierPurchaseInput } from "@/types/supplier-purchase";
 
 const str = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
 
-function normalizeItem(value: unknown): SupplierPurchaseItem | null {
-  if (!value || typeof value !== "object") return null;
-  const data = value as Record<string, unknown>;
-  const productId = str(data.productId);
-  const productName = str(data.productName);
-  if (!productId && !productName) return null;
-  const quantity = Math.max(0, Math.floor(Number(data.quantity)));
-  const unitCost = Math.max(0, Math.round(Number(data.unitCost)));
-  return {
-    productId,
-    productName: productName || productId,
-    quantity: Number.isFinite(quantity) ? quantity : 0,
-    unitCost: Number.isFinite(unitCost) ? unitCost : 0,
-  };
+function normalizeNames(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const names = value
+    .map((name) => (typeof name === "string" ? name.trim() : ""))
+    .filter(Boolean);
+  return [...new Set(names)];
 }
 
-function purchaseTotal(items: SupplierPurchaseItem[]): number {
-  return items.reduce((sum, item) => sum + item.quantity * item.unitCost, 0);
+/** Compatibilidad con compras antiguas que guardaban líneas con `productName`. */
+function legacyNames(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return normalizeNames(
+    value.map((item) => {
+      if (!item || typeof item !== "object") return "";
+      return str((item as Record<string, unknown>).productName);
+    })
+  );
 }
 
 export function normalizePurchase(
@@ -40,17 +35,16 @@ export function normalizePurchase(
   supplierId: string,
   data: Record<string, unknown>
 ): SupplierPurchase {
-  const items = Array.isArray(data.items)
-    ? data.items
-        .map(normalizeItem)
-        .filter((item): item is SupplierPurchaseItem => item !== null)
-    : [];
   return {
     id,
     supplierId,
     date: str(data.date),
-    items,
-    total: purchaseTotal(items),
+    productNames:
+      Array.isArray(data.productNames) && data.productNames.length > 0
+        ? normalizeNames(data.productNames)
+        : legacyNames(data.items),
+    documentUrl: str(data.documentUrl) || undefined,
+    documentName: str(data.documentName) || undefined,
     notes: str(data.notes) || undefined,
     createdAt: data.createdAt ? String(data.createdAt) : undefined,
     updatedAt: data.updatedAt ? String(data.updatedAt) : undefined,
@@ -84,20 +78,12 @@ export function subscribePurchases(
 }
 
 function payload(input: SupplierPurchaseInput) {
-  const items = input.items
-    .map((item) => ({
-      productId: item.productId.trim(),
-      productName: item.productName.trim() || item.productId.trim(),
-      quantity: Math.max(0, Math.floor(item.quantity)),
-      unitCost: Math.max(0, Math.round(item.unitCost)),
-    }))
-    .filter((item) => item.productId && item.quantity > 0);
-
   return {
     supplierId: input.supplierId,
     date: input.date,
-    items,
-    total: purchaseTotal(items),
+    productNames: normalizeNames(input.productNames),
+    documentUrl: input.documentUrl?.trim() || "",
+    documentName: input.documentName?.trim() || "",
     notes: input.notes?.trim() || "",
     updatedAt: new Date().toISOString(),
   };
