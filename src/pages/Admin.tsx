@@ -1628,7 +1628,7 @@ export default function Admin() {
         )}
 
         {tab === "proveedores" && <SuppliersManager products={products} />}
-        {tab === "ordenes" && <OrdersManager />}
+        {tab === "ordenes" && <OrdersManager products={products} />}
         {tab === "ventas" && <SalesManager />}
 
         {tab === "productos" && (

@@ -1,4 +1,7 @@
-export type OrderStatus = "pendiente" | "aprobada" | "rechazada";
+export type OrderStatus = "pendiente" | "aprobada" | "rechazada" | "pagado" | "enviado";
+
+/** Estados que representan una venta confirmada (stock descontado cuando aplica). */
+export const SALE_STATUSES: readonly OrderStatus[] = ["aprobada", "pagado", "enviado"];
 
 export interface OrderItem {
   productId: string;
@@ -31,12 +34,18 @@ export interface Order {
   subtotal: number;
   coupon?: string;
   notes?: string;
-  /** `true` cuando un admin aprobó la orden y se descontó el stock. */
+  /** `true` cuando la venta se confirmó y se descontó el stock. */
   stockApplied: boolean;
+  /** Origen de la orden: compra web o registro manual del admin (WhatsApp, etc.). */
+  source?: "web" | "manual";
   createdAt?: string;
   updatedAt?: string;
   approvedAt?: string;
   approvedBy?: string;
+  paidAt?: string;
+  paidBy?: string;
+  shippedAt?: string;
+  shippedBy?: string;
   rejectedAt?: string;
   rejectedBy?: string;
   rejectionReason?: string;
@@ -50,6 +59,17 @@ export interface CreateOrderInput {
   notes?: string;
   /** UID de la clienta si tiene sesión; ausente en compras de invitada. */
   userId?: string;
+}
+
+export interface CreateManualOrderInput {
+  customer: OrderCustomer;
+  items: OrderItem[];
+  subtotal?: number;
+  coupon?: string;
+  notes?: string;
+  status: OrderStatus;
+  /** Correo del admin que registra la orden. */
+  adminEmail: string;
 }
 
 export interface UpdateOrderInput {

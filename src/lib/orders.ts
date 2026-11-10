@@ -14,6 +14,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type {
+  CreateManualOrderInput,
   CreateOrderInput,
   Order,
   OrderCustomer,
@@ -21,6 +22,7 @@ import type {
   OrderStatus,
   UpdateOrderInput,
 } from "@/types/order";
+import { SALE_STATUSES } from "@/types/order";
 
 const str = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
 const int = (value: unknown): number => {
@@ -29,7 +31,16 @@ const int = (value: unknown): number => {
 };
 
 function normalizeStatus(value: unknown): OrderStatus {
-  return value === "aprobada" || value === "rechazada" ? value : "pendiente";
+  return value === "aprobada" ||
+    value === "rechazada" ||
+    value === "pagado" ||
+    value === "enviado"
+    ? value
+    : "pendiente";
+}
+
+function isSaleStatus(status: OrderStatus): boolean {
+  return (SALE_STATUSES as readonly string[]).includes(status);
 }
 
 function normalizeCustomer(value: unknown): OrderCustomer {
@@ -63,6 +74,7 @@ function normalizeItem(value: unknown): OrderItem | null {
 export function normalizeOrder(id: string, data: Record<string, unknown>): Order {
   const customer = normalizeCustomer(data.customer);
   const customerEmail = str(data.customerEmail).toLowerCase() || customer.email?.toLowerCase();
+  const sourceRaw = str(data.source);
   return {
     id,
     code: str(data.code) || id.slice(0, 8).toUpperCase(),
@@ -77,10 +89,15 @@ export function normalizeOrder(id: string, data: Record<string, unknown>): Order
     coupon: str(data.coupon) || undefined,
     notes: str(data.notes) || undefined,
     stockApplied: data.stockApplied === true,
+    ...(sourceRaw === "manual" || sourceRaw === "web" ? { source: sourceRaw } : {}),
     createdAt: data.createdAt ? String(data.createdAt) : undefined,
     updatedAt: data.updatedAt ? String(data.updatedAt) : undefined,
     approvedAt: data.approvedAt ? String(data.approvedAt) : undefined,
     approvedBy: data.approvedBy ? String(data.approvedBy) : undefined,
+    paidAt: data.paidAt ? String(data.paidAt) : undefined,
+    paidBy: data.paidBy ? String(data.paidBy) : undefined,
+    shippedAt: data.shippedAt ? String(data.shippedAt) : undefined,
+    shippedBy: data.shippedBy ? String(data.shippedBy) : undefined,
     rejectedAt: data.rejectedAt ? String(data.rejectedAt) : undefined,
     rejectedBy: data.rejectedBy ? String(data.rejectedBy) : undefined,
     rejectionReason: data.rejectionReason ? String(data.rejectionReason) : undefined,
@@ -142,6 +159,7 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     coupon: input.coupon?.trim() || "",
     notes: input.notes?.trim() || "",
     stockApplied: false,
+    source: "web",
     createdAt: now,
     updatedAt: now,
   });
@@ -158,6 +176,7 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     coupon: input.coupon?.trim() || undefined,
     notes: input.notes?.trim() || undefined,
     stockApplied: false,
+    source: "web",
     createdAt: now,
     updatedAt: now,
   };
@@ -408,8 +427,8 @@ function writeStock(
 
 /**
  * Cambia el estado de una orden y ajusta el stock:
- * - al aprobar, descuenta las unidades (valida stock antes de escribir);
- * - al pasar de aprobada a pendiente/rechazada, devuelve las unidades al stock.
+ * - al confirmar venta (aprobada/pagado/enviado), descuenta unidades si aún no se aplicó;
+ * - al pasar de una venta aplicada a pendiente/rechazada, devuelve las unidades.
  */
 export async function setOrderStatus(
   orderId: string,
@@ -428,8 +447,10 @@ export async function setOrderStatus(
     if (order.status === nextStatus) return;
 
     const requested = groupRequested(order.items);
-    const deduct = nextStatus === "aprobada" && !order.stockApplied;
-    const restore = order.stockApplied && nextStatus !== "aprobada";
+    const nextIsSale = isSaleStatus(nextStatus);
+    const currentIsSale = isSaleStatus(order.status);
+    const deduct = nextIsSale && !order.stockApplied;
+    const restore = order.stockApplied && !nextIsSale;
 
     // Todas las lecturas antes de las escrituras.
     const products =
@@ -443,44 +464,55 @@ export async function setOrderStatus(
     if (deduct) writeStock(transaction, products, requested, "deduct", now);
     if (restore) writeStock(transaction, products, requested, "restore", now);
 
-    if (nextStatus === "aprobada") {
-      transaction.update(orderRef, {
-        status: nextStatus,
-        stockApplied: true,
-        approvedAt: now,
-        approvedBy: adminEmail,
-        rejectedAt: deleteField(),
-        rejectedBy: deleteField(),
-        rejectionReason: deleteField(),
-        updatedAt: now,
-      });
+    const base: Record<string, unknown> = {
+      status: nextStatus,
+      updatedAt: now,
+    };
+
+    if (nextIsSale) {
+      base.stockApplied = true;
+      base.rejectedAt = deleteField();
+      base.rejectedBy = deleteField();
+      base.rejectionReason = deleteField();
+      // Conserva marcas previas si ya estaba aplicada; agrega la del estado actual.
+      if (nextStatus === "aprobada") {
+        base.approvedAt = order.approvedAt ?? now;
+        base.approvedBy = order.approvedBy ?? adminEmail;
+      } else if (nextStatus === "pagado") {
+        base.paidAt = order.paidAt ?? now;
+        base.paidBy = order.paidBy ?? adminEmail;
+      } else if (nextStatus === "enviado") {
+        // Si pasa directo a enviado sin pasar por pagado, registra pago también.
+        base.paidAt = order.paidAt ?? now;
+        base.paidBy = order.paidBy ?? adminEmail;
+        base.shippedAt = now;
+        base.shippedBy = adminEmail;
+      }
+      transaction.update(orderRef, base);
       return;
     }
 
     if (nextStatus === "rechazada") {
-      transaction.update(orderRef, {
-        status: nextStatus,
-        stockApplied: false,
-        rejectedAt: now,
-        rejectedBy: adminEmail,
-        rejectionReason: reason.trim(),
-        approvedAt: deleteField(),
-        approvedBy: deleteField(),
-        updatedAt: now,
-      });
+      base.stockApplied = false;
+      base.rejectedAt = now;
+      base.rejectedBy = adminEmail;
+      base.rejectionReason = reason.trim();
+      base.approvedAt = deleteField();
+      base.approvedBy = deleteField();
+      transaction.update(orderRef, base);
       return;
     }
 
-    transaction.update(orderRef, {
-      status: "pendiente",
-      stockApplied: false,
-      approvedAt: deleteField(),
-      approvedBy: deleteField(),
-      rejectedAt: deleteField(),
-      rejectedBy: deleteField(),
-      rejectionReason: deleteField(),
-      updatedAt: now,
-    });
+    // pendiente
+    base.stockApplied = false;
+    base.approvedAt = deleteField();
+    base.approvedBy = deleteField();
+    base.rejectedAt = deleteField();
+    base.rejectedBy = deleteField();
+    base.rejectionReason = deleteField();
+    transaction.update(orderRef, base);
+    // currentIsSale used only conceptually; no-op extra.
+    void currentIsSale;
   });
 }
 
@@ -496,6 +528,105 @@ export async function rejectOrder(
   adminEmail: string
 ): Promise<void> {
   await setOrderStatus(orderId, "rechazada", adminEmail, reason);
+}
+
+/** Registra una orden manual (p. ej. venta por WhatsApp) desde el panel admin. */
+export async function createManualOrder(input: CreateManualOrderInput): Promise<Order> {
+  const firestore = db;
+  if (!firestore) throw new Error("Firebase no está configurado.");
+
+  const customer = normalizeCustomer(input.customer);
+  if (customer.name.trim().length < 2) throw new Error("Escribe el nombre de la clienta.");
+  if (customer.phone.replace(/\D/g, "").length < 8) throw new Error("Escribe un teléfono válido.");
+  if (customer.address.trim().length < 4) throw new Error("Escribe la dirección de envío.");
+  if (customer.city.trim().length < 2) throw new Error("Indica la comuna o ciudad.");
+
+  const items = input.items.map(normalizeItem).filter((item): item is OrderItem => item !== null);
+  if (items.length === 0) throw new Error("La orden debe tener al menos un producto.");
+  for (const item of items) {
+    if (!item.name.trim()) throw new Error("Cada producto necesita un nombre.");
+    if (!item.size.trim()) throw new Error("Cada producto necesita una talla.");
+    if (!item.color.trim()) throw new Error("Cada producto necesita un color.");
+    if (item.qty < 1) throw new Error("La cantidad debe ser al menos 1.");
+    if (item.price < 0) throw new Error("El precio no puede ser negativo.");
+  }
+
+  const status = normalizeStatus(input.status);
+  const subtotal =
+    typeof input.subtotal === "number" && Number.isFinite(input.subtotal)
+      ? Math.max(0, Math.round(input.subtotal))
+      : calculateSubtotal(items);
+  const code = makeCode();
+  const now = new Date().toISOString();
+  const orderRef = doc(collection(firestore, "orders"));
+  const applied = isSaleStatus(status);
+  const requested = groupRequested(items);
+
+  await runTransaction(firestore, async (transaction) => {
+    let products: StockProduct[] = [];
+    if (applied) {
+      products = await readProducts(firestore, transaction, requested, true);
+      validateStock(products, requested);
+      writeStock(transaction, products, requested, "deduct", now);
+    }
+
+    const data: Record<string, unknown> = {
+      code,
+      status,
+      customer,
+      customerEmail: customer.email?.toLowerCase() ?? "",
+      userId: "",
+      items,
+      subtotal,
+      coupon: input.coupon?.trim() || "",
+      notes: input.notes?.trim() || "",
+      stockApplied: applied,
+      source: "manual",
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    if (status === "aprobada") {
+      data.approvedAt = now;
+      data.approvedBy = input.adminEmail;
+    } else if (status === "pagado") {
+      data.paidAt = now;
+      data.paidBy = input.adminEmail;
+    } else if (status === "enviado") {
+      data.paidAt = now;
+      data.paidBy = input.adminEmail;
+      data.shippedAt = now;
+      data.shippedBy = input.adminEmail;
+    } else if (status === "rechazada") {
+      data.rejectedAt = now;
+      data.rejectedBy = input.adminEmail;
+      data.rejectionReason = "";
+    }
+
+    transaction.set(orderRef, data);
+  });
+
+  return {
+    id: orderRef.id,
+    code,
+    status,
+    customer,
+    ...(customer.email ? { customerEmail: customer.email.toLowerCase() } : {}),
+    items,
+    subtotal,
+    coupon: input.coupon?.trim() || undefined,
+    notes: input.notes?.trim() || undefined,
+    stockApplied: applied,
+    source: "manual",
+    createdAt: now,
+    updatedAt: now,
+    ...(status === "aprobada" ? { approvedAt: now, approvedBy: input.adminEmail } : {}),
+    ...(status === "pagado" ? { paidAt: now, paidBy: input.adminEmail } : {}),
+    ...(status === "enviado"
+      ? { paidAt: now, paidBy: input.adminEmail, shippedAt: now, shippedBy: input.adminEmail }
+      : {}),
+    ...(status === "rechazada" ? { rejectedAt: now, rejectedBy: input.adminEmail } : {}),
+  };
 }
 
 /**

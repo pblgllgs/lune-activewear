@@ -26,7 +26,10 @@ import { Label } from "@/components/ui/label";
 import { Pagination } from "@/components/ui/pagination";
 
 function statusBadge(status: OrderStatus) {
-  if (status === "aprobada") return <Badge>Aprobada</Badge>;
+  if (status === "aprobada" || status === "pagado")
+    return <Badge className="border-emerald-600/20 bg-emerald-600/10 text-emerald-700">{status === "pagado" ? "Pagado" : "Aprobada"}</Badge>;
+  if (status === "enviado")
+    return <Badge className="border-sky-600/20 bg-sky-600/10 text-sky-700">Enviado</Badge>;
   if (status === "rechazada")
     return <Badge className="border-destructive/20 bg-destructive/10 text-destructive">Rechazada</Badge>;
   return <Badge variant="secondary">Pendiente</Badge>;
@@ -125,6 +128,11 @@ function MyOrders({ email, userId }: { email: string; userId?: string }) {
             {order.status === "rechazada" && order.rejectionReason && (
               <p className="mt-2 text-[11px] text-muted-foreground">
                 Motivo: {order.rejectionReason}
+              </p>
+            )}
+            {order.status === "enviado" && (
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Tu pedido fue enviado{order.shippedAt ? ` el ${formatDate(order.shippedAt)}` : ""}.
               </p>
             )}
 

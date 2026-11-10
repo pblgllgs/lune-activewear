@@ -53,40 +53,61 @@ service cloud.firestore {
     }
 
     // Órdenes de compra: la clienta crea una orden pendiente desde el carrito;
-    // cada clienta puede leer solo sus pedidos (por UID o correo) y el admin
-    // puede leer, aprobar/rechazar o eliminar todos.
+    // el admin puede registrar ventas manuales (p. ej. WhatsApp) y gestionar todas.
+    // Cada clienta puede leer solo sus pedidos (por UID o correo).
     match /orders/{orderId} {
-      allow create: if request.resource.data.status == 'pendiente'
-        && request.resource.data.stockApplied == false
-        && request.resource.data.code is string
-        && request.resource.data.code.size() > 0
-        && request.resource.data.code.size() <= 40
-        && request.resource.data.customer is map
-        && request.resource.data.customer.name is string
-        && request.resource.data.customer.name.size() > 0
-        && request.resource.data.customer.name.size() <= 120
-        && request.resource.data.customer.phone is string
-        && request.resource.data.customer.phone.size() >= 8
-        && request.resource.data.customer.phone.size() <= 40
-        && request.resource.data.customer.address is string
-        && request.resource.data.customer.address.size() > 0
-        && request.resource.data.customer.address.size() <= 300
-        && request.resource.data.customer.city is string
-        && request.resource.data.customer.city.size() > 0
-        && request.resource.data.customer.city.size() <= 120
-        && (!('customerEmail' in request.resource.data)
-            || (request.resource.data.customerEmail is string
-                && request.resource.data.customerEmail.size() <= 254))
-        // El UID solo puede ser el de la propia sesión (o vacío si es invitada).
-        && (!('userId' in request.resource.data)
-            || request.resource.data.userId == ''
-            || (request.auth != null
-                && request.resource.data.userId == request.auth.uid))
-        && request.resource.data.items is list
-        && request.resource.data.items.size() > 0
-        && request.resource.data.items.size() <= 50
-        && request.resource.data.subtotal is number
-        && request.resource.data.subtotal >= 0;
+      allow create: if
+        (request.resource.data.status == 'pendiente'
+          && request.resource.data.stockApplied == false
+          && request.resource.data.code is string
+          && request.resource.data.code.size() > 0
+          && request.resource.data.code.size() <= 40
+          && request.resource.data.customer is map
+          && request.resource.data.customer.name is string
+          && request.resource.data.customer.name.size() > 0
+          && request.resource.data.customer.name.size() <= 120
+          && request.resource.data.customer.phone is string
+          && request.resource.data.customer.phone.size() >= 8
+          && request.resource.data.customer.phone.size() <= 40
+          && request.resource.data.customer.address is string
+          && request.resource.data.customer.address.size() > 0
+          && request.resource.data.customer.address.size() <= 300
+          && request.resource.data.customer.city is string
+          && request.resource.data.customer.city.size() > 0
+          && request.resource.data.customer.city.size() <= 120
+          && (!('customerEmail' in request.resource.data)
+              || (request.resource.data.customerEmail is string
+                  && request.resource.data.customerEmail.size() <= 254))
+          // El UID solo puede ser el de la propia sesión (o vacío si es invitada).
+          && (!('userId' in request.resource.data)
+              || request.resource.data.userId == ''
+              || (request.auth != null
+                  && request.resource.data.userId == request.auth.uid))
+          && request.resource.data.items is list
+          && request.resource.data.items.size() > 0
+          && request.resource.data.items.size() <= 50
+          && request.resource.data.subtotal is number
+          && request.resource.data.subtotal >= 0)
+        || (isAdmin()
+          && request.resource.data.status in ['pendiente', 'aprobada', 'rechazada', 'pagado', 'enviado']
+          && request.resource.data.stockApplied is bool
+          && request.resource.data.code is string
+          && request.resource.data.code.size() > 0
+          && request.resource.data.code.size() <= 40
+          && request.resource.data.customer is map
+          && request.resource.data.customer.name is string
+          && request.resource.data.customer.name.size() > 0
+          && request.resource.data.customer.phone is string
+          && request.resource.data.customer.phone.size() >= 8
+          && request.resource.data.customer.address is string
+          && request.resource.data.customer.address.size() > 0
+          && request.resource.data.customer.city is string
+          && request.resource.data.customer.city.size() > 0
+          && request.resource.data.items is list
+          && request.resource.data.items.size() > 0
+          && request.resource.data.items.size() <= 50
+          && request.resource.data.subtotal is number
+          && request.resource.data.subtotal >= 0);
       allow read: if isAdmin()
         || (request.auth != null
             && (resource.data.get('userId', '') == request.auth.uid

@@ -42,7 +42,7 @@ function monthLabel(key: string): string {
 }
 
 function saleDate(order: Order): string | undefined {
-  return order.approvedAt || order.createdAt;
+  return order.approvedAt || order.paidAt || order.shippedAt || order.createdAt;
 }
 
 export function SalesManager() {
@@ -62,7 +62,7 @@ export function SalesManager() {
   const sales = useMemo(
     () =>
       orders
-        .filter((o) => o.status === "aprobada")
+        .filter((o) => o.status === "aprobada" || o.status === "pagado" || o.status === "enviado")
         .sort((a, b) => (saleDate(b) ?? "").localeCompare(saleDate(a) ?? "")),
     [orders]
   );
@@ -191,7 +191,7 @@ export function SalesManager() {
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="p-4">
-            <p className="text-[10px] uppercase tracking-wider2 text-muted-foreground">Ingresos (aprobadas)</p>
+            <p className="text-[10px] uppercase tracking-wider2 text-muted-foreground">Ingresos (ventas realizadas)</p>
             <p className="mt-1 font-display text-2xl">{formatCLP(totalRevenue)}</p>
           </CardContent>
         </Card>
@@ -224,11 +224,11 @@ export function SalesManager() {
             <CardTitle className="flex items-center gap-2 text-lg">
               <BarChart3 className="h-4 w-4" /> Ventas por mes
             </CardTitle>
-            <CardDescription>Ingresos de órdenes aprobadas agrupados por mes.</CardDescription>
+            <CardDescription>Ingresos de ventas realizadas (aprobadas, pagadas o enviadas) por mes.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {byMonth.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Aún no hay ventas aprobadas.</p>
+              <p className="text-sm text-muted-foreground">Aún no hay ventas realizadas.</p>
             ) : (
               byMonth.map((m) => (
                 <div key={m.key} className="space-y-1">
@@ -254,11 +254,11 @@ export function SalesManager() {
             <CardTitle className="flex items-center gap-2 text-lg">
               <TrendingUp className="h-4 w-4" /> Productos más vendidos
             </CardTitle>
-            <CardDescription>Top productos por unidades vendidas (órdenes aprobadas).</CardDescription>
+            <CardDescription>Top productos por unidades vendidas (ventas realizadas).</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {byProduct.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Aún no hay ventas aprobadas.</p>
+              <p className="text-sm text-muted-foreground">Aún no hay ventas realizadas.</p>
             ) : (
               byProduct.slice(0, 8).map((p, i) => (
                 <div key={p.id} className="space-y-1">
@@ -329,12 +329,12 @@ export function SalesManager() {
           <CardTitle className="flex items-center gap-2 text-lg">
             <Package className="h-4 w-4" /> Ventas detalladas
           </CardTitle>
-          <CardDescription>Órdenes aprobadas (ventas realizadas).</CardDescription>
+          <CardDescription>Ventas realizadas (aprobadas, pagadas o enviadas), incluidas las manuales.</CardDescription>
         </CardHeader>
         <CardContent>
           {sales.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              Aún no hay ventas aprobadas. Las órdenes aprobadas aparecerán aquí.
+              Aún no hay ventas realizadas. Las ventas aprobadas, pagadas o enviadas aparecerán aquí.
             </p>
           ) : (
             <div className="space-y-3">
