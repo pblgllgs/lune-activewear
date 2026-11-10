@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Boxes, Download, Pencil, Search } from "lucide-react";
+import { Boxes, Download, FileDown, Pencil, Search } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,6 +41,7 @@ export function InventoryPanel({
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("todas");
   const [status, setStatus] = useState<StatusFilter>("todos");
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -113,6 +115,193 @@ export function InventoryPanel({
     URL.revokeObjectURL(url);
   };
 
+  const exportPdf = async () => {
+    if (filtered.length === 0 || pdfBusy) return;
+    setPdfBusy(true);
+    try {
+      const [{ jsPDF }, { default: autoTable }] = await Promise.all([
+        import("jspdf"),
+        import("jspdf-autotable"),
+      ]);
+
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 12;
+      const generatedAt = new Date().toLocaleString("es-CL", {
+        dateStyle: "long",
+        timeStyle: "short",
+      });
+      const filterSummary = [
+        category === "todas" ? "Todas las categorías" : categoryLabel(category),
+        status === "todos"
+          ? "Todos los estados"
+          : status === "publicados"
+            ? "Publicados"
+            : status === "borradores"
+              ? "Borradores"
+              : status === "agotados"
+                ? "Agotados"
+                : "Bajo stock",
+        query.trim() ? `Búsqueda: "${query.trim()}"` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+
+      doc.setProperties({
+        title: "Inventario detallado | LUNÉ Activewear",
+        subject: "Inventario de productos",
+        creator: "LUNÉ Activewear",
+      });
+
+      // Cabecera de marca.
+      doc.setFillColor(73, 55, 45);
+      doc.rect(0, 0, pageWidth, 20, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(15);
+      doc.text("LUNÉ ACTIVEWEAR", margin, 9);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.text("Inventario detallado", margin, 15);
+      doc.setFontSize(8);
+      doc.text(generatedAt, pageWidth - margin, 9, { align: "right" });
+
+      // Resumen de filtros y métricas.
+      doc.setTextColor(120, 105, 95);
+      doc.setFontSize(8);
+      doc.text(`Filtros: ${filterSummary}`, margin, 27);
+
+      const metrics = [
+        { label: "PRODUCTOS", value: String(filtered.length) },
+        { label: "UNIDADES EN STOCK", value: String(totals.units) },
+        { label: "VALOR DEL INVENTARIO", value: formatCLP(totals.value) },
+        { label: "AGOTADOS / BAJO STOCK", value: `${totals.soldOut} / ${totals.low}` },
+      ];
+      const boxGap = 4;
+      const boxWidth = (pageWidth - margin * 2 - boxGap * (metrics.length - 1)) / metrics.length;
+      metrics.forEach((metric, index) => {
+        const x = margin + index * (boxWidth + boxGap);
+        doc.setFillColor(246, 241, 235);
+        doc.roundedRect(x, 31, boxWidth, 15, 2, 2, "F");
+        doc.setTextColor(130, 115, 105);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(6.5);
+        doc.text(metric.label, x + 3, 36);
+        doc.setTextColor(73, 55, 45);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        doc.text(metric.value, x + 3, 43);
+      });
+
+      doc.setTextColor(150, 135, 125);
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(7);
+      doc.text(
+        '"-" = sin stock registrado: la tienda lo considera disponible sin límite.',
+        margin,
+        51
+      );
+
+      const body = filtered.map((product) => {
+        const registered = hasStockInfo(product);
+        const units = totalStock(product);
+        const state =
+          product.published === false
+            ? "Borrador"
+            : isSoldOut(product)
+              ? "Agotado"
+              : isLowStock(product)
+                ? "Bajo stock"
+                : "Disponible";
+        return [
+          product.name,
+          product.sku ?? "-",
+          categoryLabel(product.category),
+          state,
+          product.colors.map((color) => color.name).join(", ") || "-",
+          product.sizes.length > 0
+            ? product.sizes
+                .map((size) => `${size}: ${sizeStock(product, size) ?? "-"}`)
+                .join(" · ")
+            : "Sin tallas",
+          registered ? String(units) : "-",
+          formatCLP(product.price),
+          registered ? formatCLP(product.price * units) : "-",
+        ];
+      });
+
+      autoTable(doc, {
+        startY: 55,
+        head: [
+          [
+            "Producto",
+            "SKU",
+            "Categoría",
+            "Estado",
+            "Colores",
+            "Stock por talla",
+            "Unidades",
+            "Precio",
+            "Valor",
+          ],
+        ],
+        body,
+        margin: { left: margin, right: margin, bottom: 16 },
+        theme: "grid",
+        styles: {
+          font: "helvetica",
+          fontSize: 7.2,
+          cellPadding: 1.8,
+          textColor: [60, 50, 45],
+          lineColor: [225, 216, 208],
+          lineWidth: 0.15,
+          overflow: "linebreak",
+          valign: "middle",
+        },
+        headStyles: {
+          fillColor: [73, 55, 45],
+          textColor: [255, 255, 255],
+          fontSize: 7,
+          fontStyle: "bold",
+          halign: "left",
+        },
+        alternateRowStyles: { fillColor: [248, 244, 239] },
+        columnStyles: {
+          0: { cellWidth: 50, fontStyle: "bold" },
+          1: { cellWidth: 27, font: "courier" },
+          2: { cellWidth: 20 },
+          3: { cellWidth: 20 },
+          4: { cellWidth: 38 },
+          5: { cellWidth: 50 },
+          6: { cellWidth: 15, halign: "right" },
+          7: { cellWidth: 21, halign: "right" },
+          8: { cellWidth: 22, halign: "right" },
+        },
+      });
+
+      // Pie de página con numeración.
+      const pageCount = doc.getNumberOfPages();
+      for (let page = 1; page <= pageCount; page += 1) {
+        doc.setPage(page);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7);
+        doc.setTextColor(150, 135, 125);
+        doc.text("LUNÉ Activewear · Inventario", margin, pageHeight - 7);
+        doc.text(`Página ${page} de ${pageCount}`, pageWidth - margin, pageHeight - 7, {
+          align: "right",
+        });
+      }
+
+      doc.save(`inventario-lune-${new Date().toISOString().slice(0, 10)}.pdf`);
+      toast.success("Inventario exportado en PDF.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo generar el PDF.");
+    } finally {
+      setPdfBusy(false);
+    }
+  };
+
   if (products.length === 0) {
     return (
       <Card>
@@ -170,9 +359,20 @@ export function InventoryPanel({
               Stock por talla, unidades totales y valor de cada producto.
             </CardDescription>
           </div>
-          <Button variant="outline" size="sm" onClick={exportCsv} disabled={filtered.length === 0}>
-            <Download className="h-4 w-4" /> Exportar CSV
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void exportPdf()}
+              disabled={filtered.length === 0 || pdfBusy}
+            >
+              <FileDown className="h-4 w-4" />
+              {pdfBusy ? "Generando…" : "Exportar PDF"}
+            </Button>
+            <Button variant="outline" size="sm" onClick={exportCsv} disabled={filtered.length === 0}>
+              <Download className="h-4 w-4" /> Exportar CSV
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
