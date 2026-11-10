@@ -35,6 +35,7 @@ import {
   Pencil,
   Plus,
   RotateCcw,
+  Settings,
   Star,
   Trash2,
   Truck,
@@ -42,6 +43,7 @@ import {
   X,
 } from "lucide-react";
 import { auth, db, isFirebaseConfigured } from "@/lib/firebase";
+import { AuthSettings } from "@/components/admin/AuthSettings";
 import { ContentManager } from "@/components/admin/ContentManager";
 import { InventoryPanel } from "@/components/admin/InventoryPanel";
 import { OrdersManager } from "@/components/admin/OrdersManager";
@@ -84,7 +86,8 @@ type Tab =
   | "proveedores"
   | "ordenes"
   | "contenido"
-  | "comentarios";
+  | "comentarios"
+  | "ajustes";
 
 const ADMIN_EMAILS = ((import.meta.env.VITE_ADMIN_EMAILS as string) || "")
   .split(",")
@@ -1125,6 +1128,7 @@ const MENU: { tab: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { tab: "ordenes", label: "Órdenes de compra", icon: ClipboardList },
   { tab: "comentarios", label: "Comentarios", icon: MessageSquare },
   { tab: "contenido", label: "Contenido", icon: ImagePlus },
+  { tab: "ajustes", label: "Ajustes", icon: Settings },
 ];
 
 export default function Admin() {
@@ -1363,7 +1367,9 @@ export default function Admin() {
                       ? "Proveedores"
                       : tab === "ordenes"
                         ? "Órdenes de compra"
-                        : "Catálogo"}
+                        : tab === "ajustes"
+                          ? "Ajustes"
+                          : "Catálogo"}
             </h1>
           </div>
           {firebaseAuth.currentUser?.email && (
@@ -1595,6 +1601,7 @@ export default function Admin() {
 
         {tab === "comentarios" && <ReviewsModeration />}
         {tab === "contenido" && <ContentManager />}
+        {tab === "ajustes" && <AuthSettings />}
       </main>
     </div>
   );

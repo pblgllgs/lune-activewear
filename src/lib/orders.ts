@@ -3,8 +3,11 @@ import {
   collection,
   deleteField,
   doc,
+  getDocs,
   onSnapshot,
+  query,
   runTransaction,
+  where,
   type DocumentReference,
   type Firestore,
   type Transaction,
@@ -58,11 +61,15 @@ function normalizeItem(value: unknown): OrderItem | null {
 }
 
 export function normalizeOrder(id: string, data: Record<string, unknown>): Order {
+  const customer = normalizeCustomer(data.customer);
+  const customerEmail = str(data.customerEmail).toLowerCase() || customer.email?.toLowerCase();
   return {
     id,
     code: str(data.code) || id.slice(0, 8).toUpperCase(),
     status: normalizeStatus(data.status),
-    customer: normalizeCustomer(data.customer),
+    customer,
+    ...(customerEmail ? { customerEmail } : {}),
+    ...(str(data.userId) ? { userId: str(data.userId) } : {}),
     items: Array.isArray(data.items)
       ? data.items.map(normalizeItem).filter((item): item is OrderItem => item !== null)
       : [],
@@ -128,6 +135,8 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     code,
     status: "pendiente",
     customer,
+    customerEmail: customer.email?.toLowerCase() ?? "",
+    userId: input.userId ?? "",
     items,
     subtotal,
     coupon: input.coupon?.trim() || "",
@@ -142,6 +151,8 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     code,
     status: "pendiente",
     customer,
+    ...(customer.email ? { customerEmail: customer.email.toLowerCase() } : {}),
+    ...(input.userId ? { userId: input.userId } : {}),
     items,
     subtotal,
     coupon: input.coupon?.trim() || undefined,
@@ -150,6 +161,42 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     createdAt: now,
     updatedAt: now,
   };
+}
+
+/**
+ * Pedidos de una clienta, por correo normalizado y por UID cuando tiene sesión.
+ * Se ordenan en el cliente para no necesitar un índice compuesto
+ * (`customerEmail`/`userId` + `createdAt`).
+ */
+export async function getMyOrders(email: string, userId?: string): Promise<Order[]> {
+  if (!db) return [];
+  const normalized = email.trim().toLowerCase();
+  const queries: Promise<Order[]>[] = [];
+
+  if (normalized) {
+    queries.push(
+      getDocs(query(collection(db, "orders"), where("customerEmail", "==", normalized))).then(
+        (snap) => snap.docs.map((document) => normalizeOrder(document.id, document.data()))
+      )
+    );
+  }
+
+  if (userId) {
+    queries.push(
+      getDocs(query(collection(db, "orders"), where("userId", "==", userId))).then((snap) =>
+        snap.docs.map((document) => normalizeOrder(document.id, document.data()))
+      )
+    );
+  }
+
+  if (queries.length === 0) return [];
+
+  const byId = new Map<string, Order>();
+  (await Promise.all(queries)).flat().forEach((order) => byId.set(order.id, order));
+
+  return [...byId.values()].sort((a, b) =>
+    (b.createdAt ?? "").localeCompare(a.createdAt ?? "")
+  );
 }
 
 /**
@@ -181,6 +228,7 @@ export async function updateOrder(orderId: string, input: UpdateOrderInput): Pro
 
     transaction.update(ref, {
       customer,
+      customerEmail: customer.email?.toLowerCase() ?? "",
       items,
       subtotal: calculateSubtotal(items),
       coupon: input.coupon?.trim() || "",

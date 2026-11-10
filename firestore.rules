@@ -4,8 +4,13 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function isAdmin() {
       return request.auth != null
-        && (request.auth.token.email == 'pablogallegosgonzalez@gmail.com'
-            || request.auth.token.email == 'admin@luneactivewear.cl');
+        && (request.auth.token.get('email', '') == 'pablogallegosgonzalez@gmail.com'
+            || request.auth.token.get('email', '') == 'admin@luneactivewear.cl');
+    }
+
+    // Correo de la sesión en minúsculas, sin errores si el token no lo trae.
+    function ownerEmail() {
+      return request.auth != null ? request.auth.token.get('email', '').lower() : '';
     }
 
     match /products/{productId} {
@@ -48,7 +53,8 @@ service cloud.firestore {
     }
 
     // Órdenes de compra: la clienta crea una orden pendiente desde el carrito;
-    // solo el admin puede leer, aprobar/rechazar o eliminar.
+    // cada clienta puede leer solo sus pedidos (por UID o correo) y el admin
+    // puede leer, aprobar/rechazar o eliminar todos.
     match /orders/{orderId} {
       allow create: if request.resource.data.status == 'pendiente'
         && request.resource.data.stockApplied == false
@@ -68,12 +74,25 @@ service cloud.firestore {
         && request.resource.data.customer.city is string
         && request.resource.data.customer.city.size() > 0
         && request.resource.data.customer.city.size() <= 120
+        && (!('customerEmail' in request.resource.data)
+            || (request.resource.data.customerEmail is string
+                && request.resource.data.customerEmail.size() <= 254))
+        // El UID solo puede ser el de la propia sesión (o vacío si es invitada).
+        && (!('userId' in request.resource.data)
+            || request.resource.data.userId == ''
+            || (request.auth != null
+                && request.resource.data.userId == request.auth.uid))
         && request.resource.data.items is list
         && request.resource.data.items.size() > 0
         && request.resource.data.items.size() <= 50
         && request.resource.data.subtotal is number
         && request.resource.data.subtotal >= 0;
-      allow read, update, delete: if isAdmin();
+      allow read: if isAdmin()
+        || (request.auth != null
+            && (resource.data.get('userId', '') == request.auth.uid
+                || (ownerEmail() != ''
+                    && resource.data.get('customerEmail', '') == ownerEmail())));
+      allow update, delete: if isAdmin();
     }
 
     // Bloqueo total del resto

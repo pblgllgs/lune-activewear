@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, Loader2, Minus, Plus, ShoppingBag, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { useCart } from "@/context/CartContext";
+import { useAuth } from "@/context/AuthContext";
 import { FREE_SHIPPING_THRESHOLD, whatsappLink } from "@/lib/constants";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import { createOrder } from "@/lib/orders";
@@ -28,11 +29,20 @@ function emptyCustomer(): CustomerForm {
 
 export function CartDrawer() {
   const { items, count, subtotal, isOpen, closeCart, removeItem, setQty, clear } = useCart();
+  const { user } = useAuth();
   const [coupon, setCoupon] = useState("");
   const [step, setStep] = useState<"cart" | "checkout">("cart");
   const [customer, setCustomer] = useState<CustomerForm>(emptyCustomer);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  // Si la clienta tiene sesión, su correo ya viene escrito.
+  useEffect(() => {
+    if (!isOpen || !user?.email) return;
+    setCustomer((current) =>
+      current.email ? current : { ...current, email: user.email ?? "" }
+    );
+  }, [isOpen, user?.email]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -69,6 +79,8 @@ export function CartDrawer() {
   const validate = (): string => {
     if (customer.name.trim().length < 2) return "Escribe tu nombre completo.";
     if (customer.phone.replace(/\D/g, "").length < 8) return "Escribe un teléfono de contacto válido.";
+    if (!/^\S+@\S+\.\S+$/.test(customer.email.trim()))
+      return "Escribe un correo válido: ahí verás tu pedido.";
     if (customer.address.trim().length < 4) return "Escribe tu dirección de envío.";
     if (customer.city.trim().length < 2) return "Indica tu comuna o ciudad.";
     return "";
@@ -137,6 +149,7 @@ export function CartDrawer() {
           subtotal,
           coupon: coupon.trim() || undefined,
           notes: customer.notes.trim() || undefined,
+          userId: user?.uid,
         });
         code = order.code;
       }
@@ -385,7 +398,7 @@ export function CartDrawer() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="customer-email">Email (opcional)</Label>
+                    <Label htmlFor="customer-email">Email *</Label>
                     <Input
                       id="customer-email"
                       type="email"
@@ -395,6 +408,9 @@ export function CartDrawer() {
                       autoComplete="email"
                       className="mt-1 h-10"
                     />
+                    <p className="mt-1 text-[10px] text-muted-foreground">
+                      Con este correo podrás ver el pedido en «Mi cuenta».
+                    </p>
                   </div>
                 </div>
                 <div>

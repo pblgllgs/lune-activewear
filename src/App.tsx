@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Link, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 import { CartProvider } from "@/context/CartContext";
+import { AuthProvider } from "@/context/AuthContext";
 import { WishlistProvider } from "@/context/WishlistContext";
 import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
 import { Navbar } from "@/components/layout/Navbar";
@@ -17,6 +18,7 @@ const ProductDetail = lazy(() => import("@/pages/ProductDetail"));
 const Favorites = lazy(() => import("@/pages/Favorites"));
 const Privacy = lazy(() => import("@/pages/Privacy"));
 const About = lazy(() => import("@/pages/About"));
+const Account = lazy(() => import("@/pages/Account"));
 const Admin = lazy(() => import("@/pages/Admin"));
 
 function ScrollToTop() {
@@ -67,35 +69,38 @@ function RouteFallback() {
 function App() {
   return (
     <BrowserRouter>
-      <CartProvider>
-        <WishlistProvider>
-          <ScrollToTop />
-          <Toaster richColors position="top-right" />
-          <div className="flex min-h-screen flex-col bg-background">
-            <AnnouncementBar />
-            <Navbar />
-            <main className="flex-1">
-              <Suspense fallback={<RouteFallback />}>
-                <Routes>
-                  <Route path="/" element={<Home />} />
-                  <Route path="/tienda" element={<Shop />} />
-                  <Route path="/categoria/:categoria" element={<Shop />} />
-                  <Route path="/producto/:id" element={<ProductDetail />} />
-                  <Route path="/favoritos" element={<Favorites />} />
-                  <Route path="/privacidad" element={<Privacy />} />
-                  <Route path="/nosotros" element={<About />} />
-                  <Route path="/admin" element={<Admin />} />
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </Suspense>
-            </main>
-            <Footer />
-            <CartDrawer />
-            <CookieBanner />
-            <WhatsAppFloat />
-          </div>
-        </WishlistProvider>
-      </CartProvider>
+      <AuthProvider>
+        <CartProvider>
+          <WishlistProvider>
+            <ScrollToTop />
+            <Toaster richColors position="top-right" />
+            <div className="flex min-h-screen flex-col bg-background">
+              <AnnouncementBar />
+              <Navbar />
+              <main className="flex-1">
+                <Suspense fallback={<RouteFallback />}>
+                  <Routes>
+                    <Route path="/" element={<Home />} />
+                    <Route path="/tienda" element={<Shop />} />
+                    <Route path="/categoria/:categoria" element={<Shop />} />
+                    <Route path="/producto/:id" element={<ProductDetail />} />
+                    <Route path="/favoritos" element={<Favorites />} />
+                    <Route path="/privacidad" element={<Privacy />} />
+                    <Route path="/nosotros" element={<About />} />
+                    <Route path="/cuenta" element={<Account />} />
+                    <Route path="/admin" element={<Admin />} />
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </Suspense>
+              </main>
+              <Footer />
+              <CartDrawer />
+              <CookieBanner />
+              <WhatsAppFloat />
+            </div>
+          </WishlistProvider>
+        </CartProvider>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

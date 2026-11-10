@@ -23,6 +23,10 @@ export interface Order {
   code: string;
   status: OrderStatus;
   customer: OrderCustomer;
+  /** Correo normalizado (minúsculas) para que la clienta encuentre sus pedidos. */
+  customerEmail?: string;
+  /** UID de Firebase si la compra se hizo con sesión iniciada. */
+  userId?: string;
   items: OrderItem[];
   subtotal: number;
   coupon?: string;
@@ -44,6 +48,8 @@ export interface CreateOrderInput {
   subtotal: number;
   coupon?: string;
   notes?: string;
+  /** UID de la clienta si tiene sesión; ausente en compras de invitada. */
+  userId?: string;
 }
 
 export interface UpdateOrderInput {

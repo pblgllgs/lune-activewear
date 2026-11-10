@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, Heart, Search, ShoppingBag, X } from "lucide-react";
+import { Menu, Heart, Search, ShoppingBag, UserRound, X } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
 import { CATEGORIES } from "@/lib/categories";
@@ -68,6 +68,13 @@ export function Navbar() {
         <Wordmark />
 
         <div className="flex items-center justify-end gap-1">
+          <Link
+            to="/cuenta"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-md transition hover:bg-secondary"
+            aria-label="Mi cuenta"
+          >
+            <UserRound className="h-5 w-5" />
+          </Link>
           <button
             type="button"
             onClick={() => setSearchOpen(true)}
@@ -136,9 +143,17 @@ export function Navbar() {
             </div>
 
             <Link
+              to="/cuenta"
+              onClick={() => setOpen(false)}
+              className="mt-4 flex items-center gap-2 px-2 py-2 text-[11px] uppercase tracking-wider2 text-muted-foreground"
+            >
+              <UserRound className="h-4 w-4" /> Mi cuenta
+            </Link>
+
+            <Link
               to="/admin"
               onClick={() => setOpen(false)}
-              className="mt-4 px-2 py-2 text-[11px] uppercase tracking-wider2 text-muted-foreground"
+              className="mt-1 px-2 py-2 text-[11px] uppercase tracking-wider2 text-muted-foreground"
             >
               Administración
             </Link>

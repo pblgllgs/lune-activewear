@@ -20,12 +20,14 @@ informativo hasta conectar Firebase.
 ## Configuración
 
 1. Copia `.env.example` a `.env` y completa las variables.
-2. Crea un proyecto en Firebase y habilita **Authentication** (email/contraseña y Google)
-   y **Firestore**.
+2. Crea un proyecto en Firebase y habilita **Authentication** (email/contraseña, Google y
+   **Email link** para las clientas) y **Firestore**.
 3. Publica las reglas: `firebase deploy --only firestore:rules` (o pégalas desde
    `firestore.rules`).
 4. Agrega los emails administradores en `VITE_ADMIN_EMAILS` y en `firestore.rules`.
 5. Crea el usuario administrador en Firebase Authentication.
+6. Autoriza los dominios de la app en Authentication → Settings → Authorized domains
+   (`localhost` y el dominio de Pages) para que funcione el enlace mágico.
 6. (Opcional) Despliega el worker de R2 para subir imágenes:
    ```bash
    cd worker
@@ -56,11 +58,11 @@ src/
     shop/        ProductCard, ShopFilters, SearchDialog, SizeGuide, ImageWithFallback,
                  SectionHeading, FaqSection
     ui/          Componentes shadcn/ui + Pagination reutilizable
-  context/       CartContext (carrito) y WishlistContext (favoritos), ambos en localStorage
-  lib/           firebase, catalog (datos demo + Firestore), stock, size-guide, search,
-                 site-content, seo (metadatos + JSON-LD), upload (R2), use-pagination,
-                 utils, constants
-  pages/         Home, Shop, ProductDetail, Favorites, Privacy, About, Admin
+  context/       CartContext (carrito), WishlistContext (favoritos) y AuthContext (sesión)
+  lib/           firebase, auth (magic link), auth-settings, catalog (datos demo + Firestore),
+                 stock, size-guide, search, site-content, seo (metadatos + JSON-LD), upload
+                 (R2), use-pagination, utils, constants
+  pages/         Home, Shop, ProductDetail, Favorites, Account, Privacy, About, Admin
   types/         Product, ProductColor
 scripts/         sitemap y páginas estáticas de SEO (pre/post build) + test del edge
 functions/       Pages Functions (edge): meta de productos y sitemap dinámico
@@ -76,6 +78,7 @@ worker/          Cloudflare Worker para R2 (upload/serve/delete)
 | `/categoria/<id>` | Categoría con URL propia e indexable (`calzas`, `petos`, `shorts`, `poleras`) |
 | `/producto/:id` | Ficha de producto con guía de tallas, stock y WhatsApp |
 | `/favoritos` | Wishlist del dispositivo (`noindex`) |
+| `/cuenta` | Acceso de clientas con enlace al correo y «Mis pedidos» (`noindex`) |
 | `/privacidad` | Política de datos (Ley 21.719) y cookies |
 | `/nosotros` | Historia de la marca |
 | `/admin` | Panel de administración (`noindex`) |
@@ -101,6 +104,11 @@ worker/          Cloudflare Worker para R2 (upload/serve/delete)
 - En el formulario de producto las fotos también se eligen solo con el selector de
   archivos (múltiple); no hay entrada manual de URLs.
 - Las imágenes se guardan en R2 bajo `products/<slug>/` y `site/`.
+- Documento `settings/auth`: `magicLinkEnabled` controla el enlace mágico de `/cuenta`
+  (lectura pública, escritura admin). Se activa o desactiva en Admin → Ajustes; si no
+  existe, se asume activo.
+- Colección `orders`: además de los datos de la clienta, cada orden guarda
+  `customerEmail` (minúsculas) y `userId` (si hay sesión) para «Mis pedidos».
 
 ## Descripción enriquecida
 
@@ -129,6 +137,7 @@ Todas las listas y tablas dinámicas usan paginación local en el cliente con
 |---|---|---|
 | `/tienda` y `/categoria/*` | Productos | 12 |
 | `/favoritos` | Prendas guardadas | 12 |
+| `/cuenta` | Mis pedidos | 10 |
 | Admin → Productos | Catálogo | 10 |
 | Admin → Inventario | Tabla de inventario | 10 |
 | Admin → Proveedores | Proveedores | 10 |
