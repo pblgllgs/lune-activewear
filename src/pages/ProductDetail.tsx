@@ -444,7 +444,7 @@ export default function ProductDetail() {
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
               {product.sizes.map((s) => {
-                const out = isSizeSoldOut(product, s);
+                const out = isSizeSoldOut(product, s, color);
                 return (
                   <button
                     key={s}
