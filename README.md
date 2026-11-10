@@ -55,10 +55,11 @@ src/
     layout/      AnnouncementBar, Navbar, Footer, CartDrawer, WhatsAppFloat
     shop/        ProductCard, ShopFilters, SearchDialog, SizeGuide, ImageWithFallback,
                  SectionHeading, FaqSection
-    ui/          Componentes shadcn/ui
+    ui/          Componentes shadcn/ui + Pagination reutilizable
   context/       CartContext (carrito) y WishlistContext (favoritos), ambos en localStorage
   lib/           firebase, catalog (datos demo + Firestore), stock, size-guide, search,
-                 site-content, seo (metadatos + JSON-LD), upload (R2), utils, constants
+                 site-content, seo (metadatos + JSON-LD), upload (R2), use-pagination,
+                 utils, constants
   pages/         Home, Shop, ProductDetail, Favorites, Privacy, About, Admin
   types/         Product, ProductColor
 scripts/         sitemap y páginas estáticas de SEO (pre/post build) + test del edge
@@ -98,6 +99,35 @@ worker/          Cloudflare Worker para R2 (upload/serve/delete)
   subir una foto se detecta su orientación: vertical → `contain`, horizontal → `cover`;
   el ajuste y el encuadre se pueden cambiar por slide.
 - Las imágenes se guardan en R2 bajo `products/<slug>/` y `site/`.
+
+## Paginación
+
+Todas las listas y tablas dinámicas usan paginación local en el cliente con
+`src/lib/use-pagination.ts` (`usePagination`) y `src/components/ui/pagination.tsx`.
+
+- Muestra el rango visible («Mostrando 1–10 de 34»), números con elipsis,
+  anterior/siguiente y un selector **Por página**.
+- Se oculta sola cuando toda la lista cabe en una página.
+- Vuelve a la página 1 al cambiar búsqueda, filtros u orden (`resetKey`) y se ajusta si se
+  elimina el último elemento de la página actual.
+
+| Lugar | Lista / tabla | Por página |
+|---|---|---|
+| `/tienda` y `/categoria/*` | Productos | 12 |
+| `/favoritos` | Prendas guardadas | 12 |
+| Admin → Productos | Catálogo | 10 |
+| Admin → Inventario | Tabla de inventario | 10 |
+| Admin → Proveedores | Proveedores | 10 |
+| Admin → Proveedores (desplegado) | Productos del proveedor | 6 |
+| Admin → Proveedores (formulario) | Selector de productos | 12 |
+| Admin → Proveedores (compra) | Historial de compras | 5 |
+| Admin → Órdenes de compra | Historial de órdenes | 10 |
+| Admin → Comentarios | Pendientes de revisión | 10 |
+| Ficha de producto | Comentarios aprobados | 6 |
+
+No se paginan las listas limitadas por diseño (4 destacados del inicio, 6 resultados del
+buscador rápido, carrito, slides ordenables de Contenido) ni las tablas estáticas
+(legales, FAQ, guía de tallas).
 
 ## SEO
 
