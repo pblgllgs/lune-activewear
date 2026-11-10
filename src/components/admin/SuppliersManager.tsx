@@ -1,5 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, Mail, Package, Pencil, Phone, Plus, Search, Trash2, Truck, X } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  ImageOff,
+  Mail,
+  Package,
+  Pencil,
+  Phone,
+  Plus,
+  Search,
+  Trash2,
+  Truck,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import Swal from "sweetalert2";
 import {
@@ -9,6 +22,8 @@ import {
   updateSupplier,
 } from "@/lib/suppliers";
 import { categoryLabel } from "@/lib/categories";
+import { isLowStock, isSoldOut, sizeStock, totalStock } from "@/lib/stock";
+import { formatCLP } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,6 +62,18 @@ function toForm(supplier: Supplier): FormState {
   };
 }
 
+/** ¿El producto tiene unidades registradas? (null/ausente = sin información). */
+function hasStockInfo(product: Product): boolean {
+  return Boolean(product.stockBySize && Object.keys(product.stockBySize).length > 0);
+}
+
+function stockChipTone(stock: number | null): string {
+  if (stock === null) return "border-border bg-background text-muted-foreground";
+  if (stock === 0) return "border-destructive/30 bg-destructive/10 text-destructive";
+  if (stock <= 3) return "border-amber-500/30 bg-amber-500/10 text-amber-700";
+  return "border-primary/10 bg-secondary text-foreground";
+}
+
 export function SuppliersManager({ products }: { products: Product[] }) {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,6 +83,7 @@ export function SuppliersManager({ products }: { products: Product[] }) {
   const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -101,6 +129,10 @@ export function SuppliersManager({ products }: { products: Product[] }) {
     setEditingId(null);
     setForm(EMPTY_FORM);
     setQuery("");
+  };
+
+  const toggleExpanded = (supplierId: string) => {
+    setExpandedId((current) => (current === supplierId ? null : supplierId));
   };
 
   const toggleProduct = (productId: string) => {
@@ -207,12 +239,29 @@ export function SuppliersManager({ products }: { products: Product[] }) {
                   .map((id) => productById.get(id))
                   .filter((product): product is Product => Boolean(product));
                 const missing = supplier.productIds.length - assigned.length;
+                const expanded = expandedId === supplier.id;
                 return (
                   <div
                     key={supplier.id}
-                    className="rounded-lg border p-4 transition hover:border-primary/25"
+                    className={`overflow-hidden rounded-lg border transition ${
+                      expanded ? "border-primary/30 shadow-sm" : "hover:border-primary/25"
+                    }`}
                   >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      aria-expanded={expanded}
+                      aria-controls={`supplier-products-${supplier.id}`}
+                      onClick={() => toggleExpanded(supplier.id)}
+                      onKeyDown={(event) => {
+                        if (event.target !== event.currentTarget) return;
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          toggleExpanded(supplier.id);
+                        }
+                      }}
+                      className="flex cursor-pointer flex-wrap items-start justify-between gap-3 p-4 transition hover:bg-secondary/20"
+                    >
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="font-display text-lg font-medium">{supplier.name}</p>
@@ -237,6 +286,7 @@ export function SuppliersManager({ products }: { products: Product[] }) {
                             {supplier.email && (
                               <a
                                 href={`mailto:${supplier.email}`}
+                                onClick={(event) => event.stopPropagation()}
                                 className="inline-flex items-center gap-1 underline-offset-2 hover:underline"
                               >
                                 <Mail className="h-3 w-3" /> {supplier.email}
@@ -249,34 +299,28 @@ export function SuppliersManager({ products }: { products: Product[] }) {
                             {supplier.notes}
                           </p>
                         )}
-                        <div className="mt-3 flex flex-wrap gap-1.5">
-                          {assigned.length === 0 ? (
-                            <span className="text-xs text-muted-foreground">
-                              Sin productos asociados.
-                            </span>
-                          ) : (
-                            assigned.map((product) => (
-                              <span
-                                key={product.id}
-                                className="inline-flex items-center gap-1 rounded-full border bg-secondary/60 px-2 py-0.5 text-[11px]"
-                              >
-                                {product.name}
-                                {product.sku && (
-                                  <span className="font-mono text-[10px] text-muted-foreground">
-                                    {product.sku}
-                                  </span>
-                                )}
-                              </span>
-                            ))
-                          )}
-                        </div>
+                        <p className="mt-2 text-[11px] text-muted-foreground">
+                          {assigned.length === 0
+                            ? "Sin productos asociados · clic para ver el detalle"
+                            : `${assigned.length} ${
+                                assigned.length === 1 ? "producto asociado" : "productos asociados"
+                              } · clic para ver el detalle`}
+                        </p>
                       </div>
-                      <div className="flex shrink-0 gap-1">
+                      <div className="flex shrink-0 items-center gap-1">
+                        <ChevronDown
+                          className={`mr-1 h-4 w-4 text-muted-foreground transition-transform ${
+                            expanded ? "rotate-180" : ""
+                          }`}
+                        />
                         <Button
                           variant="ghost"
                           size="icon"
                           title="Editar proveedor"
-                          onClick={() => openEdit(supplier)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            openEdit(supplier);
+                          }}
                           disabled={busyId === supplier.id}
                         >
                           <Pencil className="h-4 w-4" />
@@ -285,13 +329,163 @@ export function SuppliersManager({ products }: { products: Product[] }) {
                           variant="ghost"
                           size="icon"
                           title="Eliminar proveedor"
-                          onClick={() => void remove(supplier)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void remove(supplier);
+                          }}
                           disabled={busyId === supplier.id}
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
                     </div>
+
+                    {expanded && (
+                      <div
+                        id={`supplier-products-${supplier.id}`}
+                        className="border-t bg-secondary/20 p-4"
+                      >
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-[10px] uppercase tracking-brand text-muted-foreground">
+                            Productos que provee
+                          </p>
+                          <Button variant="outline" size="sm" onClick={() => openEdit(supplier)}>
+                            <Pencil className="h-3.5 w-3.5" /> Asociar productos
+                          </Button>
+                        </div>
+
+                        {supplier.productIds.length === 0 ? (
+                          <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed bg-card/60 p-6 text-center text-sm text-muted-foreground">
+                            <Package className="h-6 w-6" />
+                            <p>Este proveedor aún no tiene productos asociados.</p>
+                            <Button variant="outline" size="sm" onClick={() => openEdit(supplier)}>
+                              <Plus className="h-3.5 w-3.5" /> Asociar el primero
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                            {supplier.productIds.map((productId) => {
+                              const product = productById.get(productId);
+                              if (!product) {
+                                return (
+                                  <div
+                                    key={productId}
+                                    className="flex gap-3 rounded-lg border border-dashed bg-card/60 p-3"
+                                  >
+                                    <div className="flex h-20 w-16 shrink-0 items-center justify-center rounded-md border bg-secondary text-muted-foreground">
+                                      <ImageOff className="h-5 w-5" />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-medium">Producto no disponible</p>
+                                      <p className="mt-0.5 break-all text-[11px] text-muted-foreground">
+                                        ID: {productId}
+                                      </p>
+                                      <p className="mt-1 text-[11px] text-muted-foreground">
+                                        Ya no existe en el catálogo.
+                                      </p>
+                                    </div>
+                                  </div>
+                                );
+                              }
+
+                              const registered = hasStockInfo(product);
+                              const units = totalStock(product);
+                              return (
+                                <div
+                                  key={product.id}
+                                  className="flex gap-3 rounded-lg border bg-card p-3"
+                                >
+                                  <div className="h-20 w-16 shrink-0 overflow-hidden rounded-md border bg-secondary">
+                                    {product.images[0] ? (
+                                      <img
+                                        src={product.images[0]}
+                                        alt={product.name}
+                                        className="h-full w-full object-cover"
+                                        loading="lazy"
+                                      />
+                                    ) : (
+                                      <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                                        <ImageOff className="h-5 w-5" />
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-start gap-1.5">
+                                      <p className="truncate text-sm font-medium" title={product.name}>
+                                        {product.name}
+                                      </p>
+                                      {product.published === false && (
+                                        <Badge variant="outline" className="text-[9px]">
+                                          Borrador
+                                        </Badge>
+                                      )}
+                                      {isSoldOut(product) && (
+                                        <Badge variant="secondary" className="text-[9px]">
+                                          Agotado
+                                        </Badge>
+                                      )}
+                                      {!isSoldOut(product) && isLowStock(product) && (
+                                        <Badge
+                                          variant="accent"
+                                          className="text-[9px] text-amber-800"
+                                        >
+                                          Bajo stock
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+                                      {product.sku ?? "Sin SKU"}
+                                    </p>
+                                    <p className="mt-1 text-[11px] text-muted-foreground">
+                                      {categoryLabel(product.category)} · {formatCLP(product.price)}
+                                    </p>
+                                    {product.colors.length > 0 && (
+                                      <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                                        {product.colors.map((color) => (
+                                          <span
+                                            key={color.name}
+                                            title={color.name}
+                                            className="h-3 w-3 rounded-full border border-primary/20"
+                                            style={{ backgroundColor: color.hex }}
+                                          />
+                                        ))}
+                                      </div>
+                                    )}
+                                    <div className="mt-1.5 flex flex-wrap gap-1">
+                                      {product.sizes.length === 0 ? (
+                                        <span className="text-[10px] text-muted-foreground">
+                                          Sin tallas
+                                        </span>
+                                      ) : (
+                                        product.sizes.map((size) => {
+                                          const stock = sizeStock(product, size);
+                                          return (
+                                            <span
+                                              key={size}
+                                              className={`rounded border px-1 py-0.5 text-[10px] tabular-nums ${stockChipTone(stock)}`}
+                                            >
+                                              {size}{" "}
+                                              <span className="font-medium">{stock ?? "—"}</span>
+                                            </span>
+                                          );
+                                        })
+                                      )}
+                                    </div>
+                                    <p className="mt-1 text-[10px] text-muted-foreground">
+                                      {registered
+                                        ? `${units} ${
+                                            units === 1 ? "unidad registrada" : "unidades registradas"
+                                          }`
+                                        : "Sin stock registrado"}
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
