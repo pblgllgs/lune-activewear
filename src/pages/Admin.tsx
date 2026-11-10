@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import Swal from "sweetalert2";
 import {
   AlertCircle,
+  BarChart3,
   Boxes,
   ClipboardList,
   Eye,
@@ -48,6 +49,7 @@ import { AuthSettings } from "@/components/admin/AuthSettings";
 import { ContentManager } from "@/components/admin/ContentManager";
 import { InventoryPanel } from "@/components/admin/InventoryPanel";
 import { OrdersManager } from "@/components/admin/OrdersManager";
+import { SalesManager } from "@/components/admin/SalesManager";
 import { ProductPreview } from "@/components/admin/ProductPreview";
 import { ReviewsModeration } from "@/components/admin/ReviewsModeration";
 import { RichTextEditor } from "@/components/admin/RichTextEditor";
@@ -86,6 +88,7 @@ type Tab =
   | "inventario"
   | "proveedores"
   | "ordenes"
+  | "ventas"
   | "contenido"
   | "comentarios"
   | "ajustes";
@@ -1121,6 +1124,7 @@ const MENU: { tab: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { tab: "inventario", label: "Inventario", icon: Boxes },
   { tab: "proveedores", label: "Proveedores", icon: Truck },
   { tab: "ordenes", label: "Órdenes de compra", icon: ClipboardList },
+  { tab: "ventas", label: "Ventas", icon: BarChart3 },
   { tab: "comentarios", label: "Comentarios", icon: MessageSquare },
   { tab: "contenido", label: "Contenido", icon: ImagePlus },
   { tab: "ajustes", label: "Ajustes", icon: Settings },
@@ -1369,9 +1373,11 @@ export default function Admin() {
                       ? "Proveedores"
                       : tab === "ordenes"
                         ? "Órdenes de compra"
-                        : tab === "ajustes"
-                          ? "Ajustes"
-                          : "Catálogo"}
+                        : tab === "ventas"
+                          ? "Ventas"
+                          : tab === "ajustes"
+                            ? "Ajustes"
+                            : "Catálogo"}
             </h1>
           </div>
           {firebaseAuth.currentUser?.email && (
@@ -1476,6 +1482,7 @@ export default function Admin() {
 
         {tab === "proveedores" && <SuppliersManager products={products} />}
         {tab === "ordenes" && <OrdersManager />}
+        {tab === "ventas" && <SalesManager />}
 
         {tab === "productos" && (
           <>
