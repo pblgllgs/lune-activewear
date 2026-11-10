@@ -103,7 +103,19 @@ export default function ProductDetail() {
     getProducts().then((all) => setRelated(all.filter((p) => p.id !== id)));
   }, [id]);
 
-  const images = useMemo(() => product?.images ?? [], [product]);
+  /**
+   * Fotos del color seleccionado. Si el color no tiene fotos asignadas se usan
+   * las que no tienen color (productos antiguos) y, en último caso, todas.
+   */
+  const images = useMemo(() => {
+    if (!product) return [];
+    const mapped = product.imageColors ?? {};
+    const assigned = product.images.filter((url) => mapped[url] === color);
+    if (assigned.length > 0) return assigned;
+    const unassigned = product.images.filter((url) => !mapped[url]);
+    if (unassigned.length > 0) return unassigned;
+    return product.images;
+  }, [product, color]);
 
   if (loading) {
     return (
@@ -334,7 +346,10 @@ export default function ProductDetail() {
                   <button
                     key={c.name}
                     type="button"
-                    onClick={() => setColor(c.name)}
+                    onClick={() => {
+                      setColor(c.name);
+                      setIndex(0);
+                    }}
                     className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition ${
                       color === c.name ? "border-primary" : "border-transparent"
                     }`}

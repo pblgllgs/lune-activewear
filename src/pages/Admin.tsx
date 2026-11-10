@@ -314,6 +314,8 @@ interface DraftImage {
   id: string;
   url: string;
   file?: File;
+  /** Nombre del color al que se asocia la foto. Vacío = sin color. */
+  color?: string;
 }
 
 function ProductForm({ editing }: { editing: Product | null }) {
@@ -345,7 +347,17 @@ function ProductForm({ editing }: { editing: Product | null }) {
     editing?.colors?.length ? editing.colors : [{ name: "Chocolate", hex: "#49372D" }]
   );
   const [images, setImages] = useState<DraftImage[]>(
-    editing ? editing.images.map((url) => ({ id: url, url })) : []
+    editing
+      ? editing.images.map((url) => {
+          const color = editing.imageColors?.[url] ?? "";
+          return {
+            id: url,
+            url,
+            // Si el color guardado ya no existe, se deja sin asignar.
+            color: editing.colors?.some((c) => c.name === color) ? color : "",
+          };
+        })
+      : []
   );
   const [sizeGuide, setSizeGuide] = useState<SizeGuideRow[]>(() =>
     editing ? resolveSizeGuide(editing) : defaultSizeGuide()
@@ -390,13 +402,37 @@ function ProductForm({ editing }: { editing: Product | null }) {
       )
     );
 
-  const updateColor = (index: number, patch: Partial<ProductColor>) =>
-    setColors((current) => current.map((c, i) => (i === index ? { ...c, ...patch } : c)));
+  const namedColors = colors.filter((c) => c.name.trim());
+  /** Color por defecto para fotos nuevas: el primero de la lista. */
+  const defaultImageColor = namedColors[0]?.name ?? "";
 
-  const removeColor = (index: number) =>
+  const updateColor = (index: number, patch: Partial<ProductColor>) => {
+    const target = colors[index];
+    if (target && patch.name !== undefined && patch.name !== target.name) {
+      // Mantiene la asociación de las fotos cuando se renombra el color.
+      setImages((current) =>
+        current.map((image) =>
+          image.color === target.name ? { ...image, color: patch.name } : image
+        )
+      );
+    }
+    setColors((current) => current.map((c, i) => (i === index ? { ...c, ...patch } : c)));
+  };
+
+  const removeColor = (index: number) => {
+    const target = colors[index];
+    if (target) {
+      setImages((current) =>
+        current.map((image) => (image.color === target.name ? { ...image, color: "" } : image))
+      );
+    }
     setColors((current) => current.filter((_, i) => i !== index));
+  };
 
   const addColor = () => setColors((current) => [...current, { name: "", hex: "#B9A99C" }]);
+
+  const updateImageColor = (id: string, color: string) =>
+    setImages((current) => current.map((image) => (image.id === id ? { ...image, color } : image)));
 
   const handlePickFiles = (files: File[]) => {
     if (!files.length) return;
@@ -404,6 +440,7 @@ function ProductForm({ editing }: { editing: Product | null }) {
       id: `f${Math.random().toString(36).slice(2)}`,
       url: URL.createObjectURL(file),
       file,
+      color: defaultImageColor,
     }));
     setImages((current) => [...current, ...drafts]);
   };
@@ -428,7 +465,7 @@ function ProductForm({ editing }: { editing: Product | null }) {
       const existing = new Set(current.map((i) => i.url));
       const next = urls
         .filter((u) => !existing.has(u))
-        .map((url) => ({ id: url, url }));
+        .map((url) => ({ id: url, url, color: defaultImageColor }));
       return [...current, ...next];
     });
     setUrlInput("");
@@ -452,14 +489,19 @@ function ProductForm({ editing }: { editing: Product | null }) {
     setStatus("Subiendo imágenes…");
 
     try {
-      const urls: string[] = [];
+      const uploaded: { url: string; color?: string }[] = [];
       for (const image of images) {
-        if (image.file) {
-          urls.push(await uploadToR2(image.file, `products/${slug}`));
-        } else {
-          urls.push(image.url);
-        }
+        const url = image.file
+          ? await uploadToR2(image.file, `products/${slug}`)
+          : image.url;
+        uploaded.push({ url, color: image.color?.trim() || undefined });
       }
+      const urls = uploaded.map((image) => image.url);
+      const imageColors = Object.fromEntries(
+        uploaded
+          .filter((image) => image.color)
+          .map((image) => [image.url, image.color as string])
+      );
 
       const payload = {
         name,
@@ -485,6 +527,7 @@ function ProductForm({ editing }: { editing: Product | null }) {
         })),
         colors: colors.filter((c) => c.name.trim()),
         images: urls,
+        imageColors,
         featured: form.featured,
         isNew: form.isNew,
         published: publishIntentRef.current,
@@ -567,6 +610,11 @@ function ProductForm({ editing }: { editing: Product | null }) {
       sizeGuide,
       colors: colors.filter((color) => color.name.trim()),
       images: images.map((image) => image.url),
+      imageColors: Object.fromEntries(
+        images
+          .filter((image) => image.color?.trim())
+          .map((image) => [image.url, image.color!.trim()])
+      ),
       featured: form.featured,
       isNew: form.isNew,
       published: publishIntentRef.current,
@@ -894,28 +942,68 @@ function ProductForm({ editing }: { editing: Product | null }) {
               </div>
             </div>
 
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              Asigna cada foto a un color: en la ficha, al elegir ese color se cargan solo sus
+              fotos. Las fotos sin color se usan como respaldo si un color no tiene imágenes.
+            </p>
+            {namedColors.length === 0 && (
+              <p className="mt-1 text-[11px] text-amber-700">
+                Agrega al menos un color para poder asociar las fotos.
+              </p>
+            )}
+
             {images.length > 0 && (
-              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                 {images.map((image) => (
-                  <div key={image.id} className="group relative">
-                    <img
-                      src={image.url}
-                      alt=""
-                      className="h-24 w-full rounded-md border object-cover"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeImage(image.id)}
-                      className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-white shadow"
-                      aria-label="Quitar imagen"
+                  <div key={image.id} className="space-y-2 rounded-lg border p-2">
+                    <div className="relative">
+                      <img
+                        src={image.url}
+                        alt=""
+                        className="h-28 w-full rounded-md border object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeImage(image.id)}
+                        className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-white shadow"
+                        aria-label="Quitar imagen"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                      {image.file && (
+                        <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1 text-[9px] text-white">
+                          nueva
+                        </span>
+                      )}
+                    </div>
+                    <Select
+                      value={image.color || "__none__"}
+                      onValueChange={(value) =>
+                        updateImageColor(image.id, value === "__none__" ? "" : value)
+                      }
+                      disabled={namedColors.length === 0}
                     >
-                      <X className="h-3 w-3" />
-                    </button>
-                    {image.file && (
-                      <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1 text-[9px] text-white">
-                        nueva
-                      </span>
-                    )}
+                      <SelectTrigger
+                        className="h-8 text-[11px]"
+                        aria-label="Color asociado a la foto"
+                      >
+                        <SelectValue placeholder="Sin color" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Sin color</SelectItem>
+                        {namedColors.map((color) => (
+                          <SelectItem key={color.name} value={color.name}>
+                            <span className="flex items-center gap-2">
+                              <span
+                                className="h-3 w-3 rounded-full border border-primary/20"
+                                style={{ backgroundColor: color.hex }}
+                              />
+                              {color.name}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 ))}
               </div>

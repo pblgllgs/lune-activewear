@@ -212,6 +212,14 @@ export const DEMO_PRODUCTS: Product[] = DEMO_BASE.map((product) => ({
   stockBySize: Object.fromEntries(product.sizes.map((size) => [size, 5])),
 }));
 
+function normalizeImageColors(value: unknown): Record<string, string> | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const entries = Object.entries(value as Record<string, unknown>)
+    .map(([url, color]) => [url, typeof color === "string" ? color.trim() : ""] as const)
+    .filter(([url, color]) => Boolean(url) && Boolean(color));
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
 function normalizeStock(value: unknown): Record<string, number> | undefined {
   if (!value || typeof value !== "object") return undefined;
   const entries = Object.entries(value as Record<string, unknown>)
@@ -237,6 +245,7 @@ export function normalizeProduct(id: string, data: Record<string, unknown>): Pro
     stockBySize: normalizeStock(data.stockBySize),
     colors: Array.isArray(data.colors) ? (data.colors as Product["colors"]) : [],
     images: Array.isArray(data.images) ? (data.images as string[]) : [],
+    imageColors: normalizeImageColors(data.imageColors),
     featured: Boolean(data.featured),
     isNew: Boolean(data.isNew),
     // Sin el campo se considera publicado (catálogo anterior a los borradores).

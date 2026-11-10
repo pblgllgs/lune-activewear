@@ -31,6 +31,12 @@ export interface Product {
   stockBySize?: Record<string, number>;
   colors: ProductColor[];
   images: string[];
+  /**
+   * Color asociado a cada foto, por URL (`url → nombre del color`).
+   * Si una URL no aparece, la foto se considera sin color y se usa como
+   * respaldo para cualquier color (compatibilidad con productos antiguos).
+   */
+  imageColors?: Record<string, string>;
   featured?: boolean;
   isNew?: boolean;
   /**

@@ -68,6 +68,13 @@ export function buildPreviewIssues(product: Product): PreviewIssue[] {
   if (product.colors.length === 0) {
     issues.push({ level: "info", text: "Sin colores: la ficha mostrará «Único»." });
   }
+  const unassignedImages = product.images.filter((url) => !product.imageColors?.[url]);
+  if (product.images.length > 0 && product.colors.length > 0 && unassignedImages.length > 0) {
+    issues.push({
+      level: "info",
+      text: `${unassignedImages.length} foto(s) sin color: se usan como respaldo en los colores que no tengan fotos.`,
+    });
+  }
   if (product.description.trim().length > 160) {
     issues.push({
       level: "info",
@@ -299,7 +306,11 @@ function DetailPreview({ product }: { product: Product }) {
   const size = product.sizes.find((s) => !isSizeSoldOut(product, s)) ?? product.sizes[0] ?? "";
   const color = product.colors[0]?.name ?? "Único";
   const currentStock = size ? sizeStock(product, size) : null;
-  const images = product.images.length ? product.images : [""];
+  const mapped = product.imageColors ?? {};
+  const assigned = product.images.filter((url) => mapped[url] === color);
+  const unassigned = product.images.filter((url) => !mapped[url]);
+  const colorImages = assigned.length ? assigned : unassigned.length ? unassigned : product.images;
+  const images = colorImages.length ? colorImages : [""];
 
   return (
     <div className="pointer-events-none">
