@@ -95,20 +95,22 @@ export function Navbar() {
               )}
             </Link>
             {user && (
-              <div className="invisible absolute right-0 top-full z-50 mt-1 min-w-[11rem] rounded-md border border-border bg-background p-1 opacity-0 shadow-md transition group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
-                <Link
-                  to={isAdmin ? "/admin" : "/cuenta"}
-                  className="block rounded-sm px-3 py-2 text-[11px] uppercase tracking-wider2 text-foreground/80 transition hover:bg-secondary hover:text-foreground"
-                >
-                  {isAdmin ? "Panel de administración" : "Mi cuenta"}
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => void signOutUser()}
-                  className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-[11px] uppercase tracking-wider2 text-foreground/80 transition hover:bg-secondary hover:text-foreground"
-                >
-                  <LogOut className="h-3.5 w-3.5" /> Cerrar sesión
-                </button>
+              <div className="invisible absolute right-0 top-full z-50 pt-1 opacity-0 transition group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
+                <div className="min-w-[11rem] rounded-md border border-border bg-background p-1 shadow-md">
+                  <Link
+                    to={isAdmin ? "/admin" : "/cuenta"}
+                    className="block rounded-sm px-3 py-2 text-[11px] uppercase tracking-wider2 text-foreground/80 transition hover:bg-secondary hover:text-foreground"
+                  >
+                    {isAdmin ? "Panel de administración" : "Mi cuenta"}
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => void signOutUser()}
+                    className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-[11px] uppercase tracking-wider2 text-foreground/80 transition hover:bg-secondary hover:text-foreground"
+                  >
+                    <LogOut className="h-3.5 w-3.5" /> Cerrar sesión
+                  </button>
+                </div>
               </div>
             )}
           </div>
