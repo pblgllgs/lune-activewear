@@ -8,7 +8,9 @@ import type { Product, SizeGuideRow } from "@/types/product";
 export const DEFAULT_SIZE_GUIDE: SizeGuideRow[] = [
   { size: "XS", bustMin: 80, bustMax: 84, waistMin: 60, waistMax: 64, hipMin: 86, hipMax: 90 },
   { size: "S", bustMin: 85, bustMax: 89, waistMin: 65, waistMax: 69, hipMin: 91, hipMax: 95 },
+  { size: "S/M", bustMin: 85, bustMax: 94, waistMin: 65, waistMax: 74, hipMin: 91, hipMax: 100 },
   { size: "M", bustMin: 90, bustMax: 94, waistMin: 70, waistMax: 74, hipMin: 96, hipMax: 100 },
+  { size: "M/L", bustMin: 90, bustMax: 99, waistMin: 70, waistMax: 79, hipMin: 96, hipMax: 105 },
   { size: "L", bustMin: 95, bustMax: 99, waistMin: 75, waistMax: 79, hipMin: 101, hipMax: 105 },
   { size: "XL", bustMin: 100, bustMax: 104, waistMin: 80, waistMax: 84, hipMin: 106, hipMax: 110 },
   { size: "XXL", bustMin: 105, bustMax: 109, waistMin: 85, waistMax: 89, hipMin: 111, hipMax: 115 },

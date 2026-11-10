@@ -47,6 +47,7 @@ import { deleteFromR2, isUploadConfigured, slugify, uploadToR2 } from "@/lib/upl
 import { normalizeProduct, seedDemoProducts } from "@/lib/catalog";
 import { defaultSizeGuide, resolveSizeGuide } from "@/lib/size-guide";
 import { generateSku } from "@/lib/sku";
+import { SIZE_OPTIONS } from "@/lib/sizes";
 import { LAST_UNITS_THRESHOLD, totalStock } from "@/lib/stock";
 import { CATEGORIES, categoryLabel } from "@/lib/categories";
 import { formatCLP } from "@/lib/utils";
@@ -73,10 +74,7 @@ const ADMIN_EMAILS = ((import.meta.env.VITE_ADMIN_EMAILS as string) || "")
   .map((e) => e.trim())
   .filter(Boolean);
 
-const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL", "Único"];
-
-/** Columnas editables de la guía de tallas: cada medida es un rango desde/hasta. */
-const SIZE_GUIDE_FIELDS = [
+/** Columnas editables de la guía de tallas: cada medida es un rango desde/hasta. */const SIZE_GUIDE_FIELDS = [
   { label: "Busto", min: "bustMin", max: "bustMax" },
   { label: "Cintura", min: "waistMin", max: "waistMax" },
   { label: "Cadera", min: "hipMin", max: "hipMax" },

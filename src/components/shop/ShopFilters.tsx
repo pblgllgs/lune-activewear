@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { SlidersHorizontal, X } from "lucide-react";
 import type { Product } from "@/types/product";
+import { SIZE_OPTIONS } from "@/lib/sizes";
 
 /** Tramos de precio de la tienda. `max` es inclusivo. */
 export const PRICE_RANGES = [
@@ -8,8 +9,6 @@ export const PRICE_RANGES = [
   { id: "15-18", label: "$15.000 – $18.000", min: 15000, max: 17999 },
   { id: "desde-18", label: "$18.000 o más", min: 18000, max: Number.POSITIVE_INFINITY },
 ];
-
-const SIZE_ORDER = ["XS", "S", "M", "L", "XL", "XXL", "Único"];
 
 interface ShopFiltersProps {
   products: Product[];
@@ -146,8 +145,8 @@ export function ShopFilters({
     });
 
     const sortedSizes = [...sizeSet].sort((a, b) => {
-      const ia = SIZE_ORDER.indexOf(a);
-      const ib = SIZE_ORDER.indexOf(b);
+      const ia = SIZE_OPTIONS.indexOf(a);
+      const ib = SIZE_OPTIONS.indexOf(b);
       return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
     });
 
