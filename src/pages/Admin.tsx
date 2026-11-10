@@ -28,6 +28,7 @@ import {
   Link2,
   LogOut,
   MessageSquare,
+  Minus,
   Package,
   Pencil,
   Plus,
@@ -44,7 +45,7 @@ import { ReviewsModeration } from "@/components/admin/ReviewsModeration";
 import { deleteFromR2, isUploadConfigured, slugify, uploadToR2 } from "@/lib/upload";
 import { normalizeProduct, seedDemoProducts } from "@/lib/catalog";
 import { defaultSizeGuide, resolveSizeGuide } from "@/lib/size-guide";
-import { totalStock } from "@/lib/stock";
+import { LAST_UNITS_THRESHOLD, totalStock } from "@/lib/stock";
 import { CATEGORIES, categoryLabel } from "@/lib/categories";
 import { formatCLP } from "@/lib/utils";
 import { useSeo } from "@/lib/seo";
@@ -78,6 +79,110 @@ const SIZE_GUIDE_FIELDS = [
   { label: "Cintura", min: "waistMin", max: "waistMax" },
   { label: "Cadera", min: "hipMin", max: "hipMax" },
 ] as const;
+
+/* ------------------------------ Stock por talla ------------------------------ */
+
+const MAX_STOCK = 9999;
+
+function clampStock(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(MAX_STOCK, Math.max(0, Math.floor(value)));
+}
+
+/**
+ * Input de stock por talla: solo dígitos, botones − / +, selección al enfocar,
+ * normaliza al salir (o con Enter) y deja vaciar el campo mientras se escribe.
+ */
+function StockInput({
+  size,
+  value,
+  onChange,
+}: {
+  size: string;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  const [text, setText] = useState(String(value));
+  const focused = useRef(false);
+
+  // Cambios externos (restaurar, cambiar de producto) solo si no se está editando.
+  useEffect(() => {
+    if (!focused.current) setText(String(value));
+  }, [value]);
+
+  const commit = (raw: string) => {
+    const next = clampStock(Number(raw) || 0);
+    setText(String(next));
+    onChange(next);
+  };
+
+  const step = (delta: number) => {
+    const next = clampStock(value + delta);
+    setText(String(next));
+    onChange(next);
+  };
+
+  return (
+    <div
+      className={`flex h-10 items-stretch overflow-hidden rounded-md border bg-background transition focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/20 ${
+        value === 0 ? "border-destructive/40" : ""
+      }`}
+    >
+      <button
+        type="button"
+        tabIndex={-1}
+        onClick={() => step(-1)}
+        disabled={value <= 0}
+        aria-label={`Restar una unidad a la talla ${size}`}
+        className="flex w-9 shrink-0 items-center justify-center text-muted-foreground transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-30"
+      >
+        <Minus className="h-3.5 w-3.5" />
+      </button>
+      <input
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        autoComplete="off"
+        value={text}
+        aria-label={`Cantidad disponible talla ${size}`}
+        onFocus={(e) => {
+          focused.current = true;
+          const target = e.currentTarget;
+          requestAnimationFrame(() => target.select());
+        }}
+        onChange={(e) => {
+          const raw = e.target.value.replace(/\D/g, "").slice(0, 4);
+          setText(raw);
+          // Mientras se escribe se deja el campo vacío; al salir se normaliza a 0.
+          if (raw !== "") onChange(clampStock(Number(raw)));
+        }}
+        onBlur={() => {
+          focused.current = false;
+          commit(text);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commit(text);
+            e.currentTarget.blur();
+          }
+        }}
+        className={`min-w-0 flex-1 border-x bg-transparent text-center text-sm tabular-nums outline-none ${
+          value === 0 ? "text-destructive" : ""
+        }`}
+      />
+      <button
+        type="button"
+        tabIndex={-1}
+        onClick={() => step(1)}
+        aria-label={`Sumar una unidad a la talla ${size}`}
+        className="flex w-9 shrink-0 items-center justify-center text-muted-foreground transition hover:bg-secondary"
+      >
+        <Plus className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
 
 /* ------------------------------ Sin configurar ------------------------------ */
 
@@ -264,11 +369,13 @@ function ProductForm({ editing }: { editing: Product | null }) {
     );
   };
 
-  const setStock = (size: string, value: string) =>
+  const setStock = (size: string, value: number) =>
     setStockBySize((current) => ({
       ...current,
-      [size]: Math.max(0, Math.floor(Number(value) || 0)),
+      [size]: clampStock(value),
     }));
+
+  const totalUnits = sizes.reduce((sum, size) => sum + (stockBySize[size] ?? 0), 0);
 
   const updateSizeGuide = (
     size: string,
@@ -591,20 +698,38 @@ function ProductForm({ editing }: { editing: Product | null }) {
             </div>
 
             {sizes.length > 0 && (
-              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                {SIZE_OPTIONS.filter((size) => sizes.includes(size)).map((size) => (
-                  <div key={size} className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Talla {size}</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      step={1}
-                      value={stockBySize[size] ?? 0}
-                      onChange={(e) => setStock(size, e.target.value)}
-                      aria-label={`Cantidad disponible talla ${size}`}
-                    />
-                  </div>
-                ))}
+              <div className="mt-4 space-y-3">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                  {SIZE_OPTIONS.filter((size) => sizes.includes(size)).map((size) => {
+                    const stock = stockBySize[size] ?? 0;
+                    return (
+                      <div key={size} className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-1">
+                          <Label className="text-xs text-muted-foreground">Talla {size}</Label>
+                          {stock === 0 ? (
+                            <span className="rounded-full bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-destructive">
+                              Agotada
+                            </span>
+                          ) : stock <= LAST_UNITS_THRESHOLD ? (
+                            <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700">
+                              Bajo
+                            </span>
+                          ) : null}
+                        </div>
+                        <StockInput
+                          size={size}
+                          value={stock}
+                          onChange={(value) => setStock(size, value)}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Total: <span className="font-medium text-foreground">{totalUnits}</span>{" "}
+                  {totalUnits === 1 ? "unidad" : "unidades"} en {sizes.length}{" "}
+                  {sizes.length === 1 ? "talla" : "tallas"}. Escribe la cantidad o usa − / +.
+                </p>
               </div>
             )}
           </div>
