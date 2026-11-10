@@ -174,27 +174,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Statement de marca */}
-      <section className="container">
-        <div className="rounded-2xl bg-accent px-6 py-16 text-center md:px-16 md:py-20">
-          <p className="text-[10px] uppercase tracking-brand text-primary/60 md:text-[11px]">
-            The Luné experience
-          </p>
-          <h2 className="mx-auto mt-4 max-w-2xl font-display text-3xl font-medium leading-tight tracking-tight md:text-5xl">
-            Confidence in every move.
-          </h2>
-          <p className="mx-auto mt-5 max-w-xl text-sm leading-relaxed text-primary/70 md:text-base">
-            Prendas para acompañarte dentro y fuera del gimnasio, con comodidad y estilo. Diseñadas
-            para sentirte segura en cada movimiento.
-          </p>
-          <Button asChild variant="outline" className="mt-8 border-primary/30">
-            <Link to="/nosotros">
-              Conoce nuestra historia <ArrowRight className="h-4 w-4" />
-            </Link>
-          </Button>
-        </div>
-      </section>
-
       {/* Beneficios */}
       <section className="py-16 md:py-24">
         <div className="container">
