@@ -252,6 +252,7 @@ export default function Shop() {
       <div className="mt-6 lg:grid lg:grid-cols-[220px_1fr] lg:items-start lg:gap-10">
         <ShopFilters
           products={products}
+          activeCategory={activeCategory}
           selectedSizes={selectedSizes}
           selectedColors={selectedColors}
           priceRange={priceRange}

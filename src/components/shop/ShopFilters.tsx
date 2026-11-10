@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { SlidersHorizontal, X } from "lucide-react";
 import type { Product } from "@/types/product";
+import { CATEGORIES, categoryLabel } from "@/lib/categories";
 import { SIZE_OPTIONS } from "@/lib/sizes";
 
 /** Tramos de precio de la tienda. `max` es inclusivo. */
@@ -12,6 +13,8 @@ export const PRICE_RANGES = [
 
 interface ShopFiltersProps {
   products: Product[];
+  /** Categoría activa (`todas` = sin filtro): define qué colores se muestran. */
+  activeCategory: string;
   selectedSizes: string[];
   selectedColors: string[];
   priceRange: string;
@@ -22,10 +25,19 @@ interface ShopFiltersProps {
   onClear: () => void;
 }
 
-interface FilterGroupsProps
-  extends Omit<ShopFiltersProps, "products" | "resultCount" | "onClear"> {
-  sizes: string[];
+interface ColorGroup {
+  id: string;
+  label: string;
   colors: { name: string; hex: string }[];
+}
+
+interface FilterGroupsProps
+  extends Omit<
+    ShopFiltersProps,
+    "products" | "activeCategory" | "resultCount" | "onClear"
+  > {
+  sizes: string[];
+  colorGroups: ColorGroup[];
 }
 
 const chipClass = (active: boolean) =>
@@ -37,7 +49,7 @@ const chipClass = (active: boolean) =>
 
 function FilterGroups({
   sizes,
-  colors,
+  colorGroups,
   selectedSizes,
   selectedColors,
   priceRange,
@@ -69,28 +81,39 @@ function FilterGroups({
         </section>
       )}
 
-      {colors.length > 0 && (
+      {colorGroups.length > 0 && (
         <section>
           <p className="text-[10px] uppercase tracking-wider2 text-muted-foreground">Color</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {colors.map((color) => {
-              const active = selectedColors.includes(color.name);
-              return (
-                <button
-                  key={color.name}
-                  type="button"
-                  onClick={() => onToggleColor(color.name)}
-                  aria-pressed={active}
-                  className={chipClass(active)}
-                >
-                  <span
-                    className="h-3 w-3 rounded-full border border-primary/20"
-                    style={{ backgroundColor: color.hex }}
-                  />
-                  {color.name}
-                </button>
-              );
-            })}
+          <div className="mt-2 space-y-3">
+            {colorGroups.map((group) => (
+              <div key={group.id}>
+                {colorGroups.length > 1 && (
+                  <p className="mb-1.5 text-[9px] uppercase tracking-wider2 text-muted-foreground/80">
+                    {group.label}
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  {group.colors.map((color) => {
+                    const active = selectedColors.includes(color.name);
+                    return (
+                      <button
+                        key={`${group.id}-${color.name}`}
+                        type="button"
+                        onClick={() => onToggleColor(color.name)}
+                        aria-pressed={active}
+                        className={chipClass(active)}
+                      >
+                        <span
+                          className="h-3 w-3 rounded-full border border-primary/20"
+                          style={{ backgroundColor: color.hex }}
+                        />
+                        {color.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         </section>
       )}
@@ -123,6 +146,7 @@ function FilterGroups({
  */
 export function ShopFilters({
   products,
+  activeCategory,
   selectedSizes,
   selectedColors,
   priceRange,
@@ -134,11 +158,13 @@ export function ShopFilters({
 }: ShopFiltersProps) {
   const [open, setOpen] = useState(false);
 
-  const { sizes, colors } = useMemo(() => {
+  const { sizes, colorGroups } = useMemo(() => {
     const sizeSet = new Set<string>();
-    const colorMap = new Map<string, string>();
+    const byCategory = new Map<string, Map<string, string>>();
     products.forEach((product) => {
       product.sizes.forEach((size) => sizeSet.add(size));
+      if (!byCategory.has(product.category)) byCategory.set(product.category, new Map());
+      const colorMap = byCategory.get(product.category)!;
       product.colors.forEach((color) => {
         if (color.name && !colorMap.has(color.name)) colorMap.set(color.name, color.hex);
       });
@@ -150,11 +176,27 @@ export function ShopFilters({
       return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
     });
 
-    return {
-      sizes: sortedSizes,
-      colors: [...colorMap.entries()].map(([name, hex]) => ({ name, hex })),
-    };
-  }, [products]);
+    // Orden de las categorías del sitio; cualquier categoría desconocida va al final.
+    const knownIds = CATEGORIES.map((category) => category.id);
+    const ids =
+      activeCategory === "todas"
+        ? [...byCategory.keys()].sort((a, b) => {
+            const ia = knownIds.indexOf(a);
+            const ib = knownIds.indexOf(b);
+            return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+          })
+        : [activeCategory];
+
+    const groups = ids
+      .map((id) => ({
+        id,
+        label: categoryLabel(id),
+        colors: [...(byCategory.get(id)?.entries() ?? [])].map(([name, hex]) => ({ name, hex })),
+      }))
+      .filter((group) => group.colors.length > 0);
+
+    return { sizes: sortedSizes, colorGroups: groups };
+  }, [products, activeCategory]);
 
   const activeCount =
     selectedSizes.length + selectedColors.length + (priceRange ? 1 : 0);
@@ -175,7 +217,7 @@ export function ShopFilters({
 
   const groupsProps = {
     sizes,
-    colors,
+    colorGroups,
     selectedSizes,
     selectedColors,
     priceRange,
