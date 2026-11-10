@@ -23,6 +23,49 @@
   }
 }
 
+@layer components {
+  /* Descripción enriquecida del producto (ficha, vista previa y editor). */
+  .rich-text > * + * {
+    @apply mt-3;
+  }
+
+  .rich-text p {
+    @apply m-0;
+  }
+
+  .rich-text h3 {
+    @apply font-display text-base font-medium text-foreground;
+  }
+
+  .rich-text h4 {
+    @apply font-display text-sm font-semibold text-foreground;
+  }
+
+  .rich-text ul {
+    @apply list-disc pl-5;
+  }
+
+  .rich-text ol {
+    @apply list-decimal pl-5;
+  }
+
+  .rich-text li + li {
+    @apply mt-1;
+  }
+
+  .rich-text strong {
+    @apply font-semibold text-foreground;
+  }
+
+  .rich-text a {
+    @apply underline underline-offset-2;
+  }
+
+  .rich-text blockquote {
+    @apply border-l-2 border-primary/30 pl-3 italic;
+  }
+}
+
 @layer base {
   :root {
     /* Paleta LUNÉ Activewear */

@@ -28,7 +28,6 @@ import {
   Hash,
   ImagePlus,
   LayoutDashboard,
-  Link2,
   LogOut,
   MessageSquare,
   Minus,
@@ -48,11 +47,13 @@ import { InventoryPanel } from "@/components/admin/InventoryPanel";
 import { OrdersManager } from "@/components/admin/OrdersManager";
 import { ProductPreview } from "@/components/admin/ProductPreview";
 import { ReviewsModeration } from "@/components/admin/ReviewsModeration";
+import { RichTextEditor } from "@/components/admin/RichTextEditor";
 import { SuppliersManager } from "@/components/admin/SuppliersManager";
 import { Pagination } from "@/components/ui/pagination";
 import { usePagination } from "@/lib/use-pagination";
 import { deleteFromR2, isUploadConfigured, slugify, uploadToR2 } from "@/lib/upload";
 import { normalizeProduct, seedDemoProducts } from "@/lib/catalog";
+import { richTextToPlainText, sanitizeRichText } from "@/lib/rich-text";
 import { defaultSizeGuide, resolveSizeGuide } from "@/lib/size-guide";
 import { generateSku } from "@/lib/sku";
 import { SIZE_OPTIONS } from "@/lib/sizes";
@@ -384,7 +385,6 @@ function ProductForm({
   const [sizeGuide, setSizeGuide] = useState<SizeGuideRow[]>(() =>
     editing ? resolveSizeGuide(editing) : defaultSizeGuide()
   );
-  const [urlInput, setUrlInput] = useState("");
   const [status, setStatus] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
   const publishIntentRef = useRef<boolean>(true);
@@ -474,30 +474,14 @@ function ProductForm({
       return current.filter((i) => i.id !== id);
     });
 
-  const addUrls = () => {
-    const urls = urlInput
-      .split(/[\n,]/)
-      .map((u) => u.trim())
-      .filter((u) => /^https?:\/\//.test(u));
-    if (!urls.length) {
-      setUrlInput("");
-      return;
-    }
-    setImages((current) => {
-      const existing = new Set(current.map((i) => i.url));
-      const next = urls
-        .filter((u) => !existing.has(u))
-        .map((url) => ({ id: url, url, color: defaultImageColor }));
-      return [...current, ...next];
-    });
-    setUrlInput("");
-    toast.success("Imágenes agregadas por URL.");
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const name = form.name.trim();
     if (!name) return;
+    if (richTextToPlainText(form.description).length === 0) {
+      toast.error("Escribe una descripción para el producto.");
+      return;
+    }
     if (sizes.length === 0) {
       toast.error("Selecciona al menos una talla.");
       return;
@@ -534,7 +518,7 @@ function ProductForm({
         category: form.category,
         price: Number(form.price) || 0,
         ...(form.compareAtPrice ? { compareAtPrice: Number(form.compareAtPrice) } : {}),
-        description: form.description,
+        description: sanitizeRichText(form.description),
         composition: form.composition,
         care: form.care,
         shipping: form.shipping,
@@ -757,8 +741,17 @@ function ProductForm({
             </div>
 
             <div className="space-y-2 sm:col-span-2">
-              <Label>Descripción *</Label>
-              <Textarea value={form.description} onChange={set("description")} required rows={3} />
+              <Label htmlFor="product-description">Descripción *</Label>
+              <RichTextEditor
+                id="product-description"
+                value={form.description}
+                onChange={(value) => setForm((current) => ({ ...current, description: value }))}
+                placeholder="Describe la prenda, su calce, su tela y para qué ocasión la usarías…"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Puedes usar negrita, cursiva, títulos, listas y enlaces. Se muestra en la ficha
+                del producto.
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -973,7 +966,7 @@ function ProductForm({
                   <p className="text-xs text-muted-foreground">
                     {isUploadConfigured()
                       ? "Se subirán a R2 al guardar el producto."
-                      : "R2 no está configurado: puedes pegar URLs de imágenes."}
+                      : "R2 no está configurado: las fotos no se podrán subir hasta configurarlo."}
                   </p>
                 </div>
                 <Button
@@ -982,17 +975,6 @@ function ProductForm({
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <ImagePlus className="h-4 w-4" /> Seleccionar archivos
-                </Button>
-              </div>
-
-              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                <Input
-                  value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
-                  placeholder="https://... (una URL por línea)"
-                />
-                <Button type="button" variant="outline" onClick={addUrls}>
-                  <Link2 className="h-4 w-4" /> Agregar URL
                 </Button>
               </div>
             </div>

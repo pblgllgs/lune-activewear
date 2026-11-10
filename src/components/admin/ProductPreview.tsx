@@ -20,6 +20,7 @@ import {
   totalStock,
 } from "@/lib/stock";
 import { discountPercent, formatCLP } from "@/lib/utils";
+import { richTextToDisplayHtml, richTextToPlainText } from "@/lib/rich-text";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ImageWithFallback } from "@/components/shop/ImageWithFallback";
@@ -59,7 +60,8 @@ export function buildPreviewIssues(product: Product): PreviewIssue[] {
       text: "Sin imágenes: se verá el placeholder de marca en la tienda y en la ficha.",
     });
   }
-  if (!product.description.trim()) {
+  const descriptionText = richTextToPlainText(product.description);
+  if (!descriptionText) {
     issues.push({
       level: "warning",
       text: "Sin descripción: es el texto que muestra Google y el que se copia al WhatsApp.",
@@ -75,10 +77,10 @@ export function buildPreviewIssues(product: Product): PreviewIssue[] {
       text: `${unassignedImages.length} foto(s) sin color: al seleccionarlas no se cambia el color de la ficha.`,
     });
   }
-  if (product.description.trim().length > 160) {
+  if (descriptionText.length > 160) {
     issues.push({
       level: "info",
-      text: `La descripción tiene ${product.description.trim().length} caracteres: en Google se recortan unos 155.`,
+      text: `La descripción tiene ${descriptionText.length} caracteres: en Google se recortan unos 155.`,
     });
   }
   if (product.sizes.length > 0 && totalStock(product) === 0) {
@@ -376,9 +378,14 @@ function DetailPreview({ product }: { product: Product }) {
             )}
           </div>
 
-          <p className="mt-5 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
-            {product.description.trim() || "Sin descripción."}
-          </p>
+          <div
+            className="rich-text mt-5 text-sm leading-relaxed text-muted-foreground"
+            dangerouslySetInnerHTML={{
+              __html:
+                richTextToDisplayHtml(product.description) ||
+                '<p class="text-muted-foreground">Sin descripción.</p>',
+            }}
+          />
 
           {product.colors.length > 0 && (
             <div className="mt-7">

@@ -56,6 +56,19 @@ const truncate = (text, max = 155) => {
   return clean.length > max ? `${clean.slice(0, max - 1).trimEnd()}…` : clean;
 };
 
+const stripHtml = (value) =>
+  String(value ?? "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\\[nr]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
 function setTitle(html, title) {
   return html.replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(title)}</title>`);
 }
@@ -289,7 +302,7 @@ for (const product of products) {
   const category = CATEGORY_LABELS[product.category] ?? product.category;
   const title = `${product.name} — ${category} | LUNÉ Activewear`;
   const description = truncate(
-    product.description ||
+    stripHtml(product.description) ||
       `${product.name} de LUNÉ Activewear. Ropa deportiva femenina diseñada en Chillán, Chile.`
   );
   const price = product.price

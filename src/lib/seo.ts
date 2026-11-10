@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import type { Product } from "@/types/product";
 import { categoryLabel } from "@/lib/categories";
 import { isSoldOut } from "@/lib/stock";
+import { richTextToPlainText } from "@/lib/rich-text";
 
 export const SITE_NAME = "LUNÉ Activewear";
 export const SITE_URL = (
@@ -148,7 +149,7 @@ export function productJsonLd(product: Product) {
     "@context": "https://schema.org",
     "@type": "Product",
     name: product.name,
-    description: product.description,
+    description: richTextToPlainText(product.description),
     image: product.images.length > 0 ? product.images.map((src) => absoluteUrl(src)) : undefined,
     sku: product.sku || product.id,
     category: categoryLabel(product.category),

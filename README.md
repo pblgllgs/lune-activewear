@@ -98,7 +98,21 @@ worker/          Cloudflare Worker para R2 (upload/serve/delete)
 - En Admin → Contenido las imágenes se agregan solo subiéndolas (sin campos de URL). Al
   subir una foto se detecta su orientación: vertical → `contain`, horizontal → `cover`;
   el ajuste y el encuadre se pueden cambiar por slide.
+- En el formulario de producto las fotos también se eligen solo con el selector de
+  archivos (múltiple); no hay entrada manual de URLs.
 - Las imágenes se guardan en R2 bajo `products/<slug>/` y `site/`.
+
+## Descripción enriquecida
+
+La descripción del producto se edita con un editor liviano
+(`src/components/admin/RichTextEditor.tsx`) que permite negrita, cursiva, subrayado,
+título, párrafo, listas, enlaces y quitar formato.
+
+- Se guarda HTML saneado con **DOMPurify** (`src/lib/rich-text.ts`) y se vuelve a sanear
+  al mostrarlo en la ficha y en la vista previa.
+- Las descripciones antiguas en texto plano se siguen viendo igual, con sus saltos de
+  línea.
+- El SEO (meta, JSON-LD y páginas estáticas) usa el texto plano de la descripción.
 
 ## Paginación
 

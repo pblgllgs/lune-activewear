@@ -26,6 +26,7 @@ import {
 } from "@/lib/stock";
 import { discountPercent, formatCLP } from "@/lib/utils";
 import { whatsappLink } from "@/lib/constants";
+import { richTextToDisplayHtml, richTextToPlainText } from "@/lib/rich-text";
 import { usePagination } from "@/lib/use-pagination";
 import { breadcrumbJsonLd, productJsonLd, truncate, useSeo } from "@/lib/seo";
 import { getApprovedReviews, submitReview, type Review } from "@/lib/reviews";
@@ -69,7 +70,7 @@ export default function ProductDetail() {
       ? `${product.name} — ${categoryLabel(product.category)} | LUNÉ Activewear`
       : "Producto | LUNÉ Activewear",
     description: product
-      ? truncate(product.description)
+      ? truncate(richTextToPlainText(product.description))
       : "Descubre la colección de ropa deportiva femenina LUNÉ Activewear, diseñada en Chillán, Chile.",
     path: `/producto/${id ?? ""}`,
     image: product?.images[0],
@@ -373,7 +374,10 @@ export default function ProductDetail() {
             )}
           </div>
 
-          <p className="mt-5 text-sm leading-relaxed text-muted-foreground">{product.description}</p>
+          <div
+            className="rich-text mt-5 text-sm leading-relaxed text-muted-foreground"
+            dangerouslySetInnerHTML={{ __html: richTextToDisplayHtml(product.description) }}
+          />
 
           {/* Color */}
           {product.colors.length > 0 && (

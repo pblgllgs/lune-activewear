@@ -204,6 +204,22 @@ export function truncate(value: string, max = 155) {
   return clean.length > max ? `${clean.slice(0, max - 1).trimEnd()}…` : clean;
 }
 
+/** Quita el HTML de la descripción enriquecida y decodifica entidades básicas. */
+export function stripHtml(value: string) {
+  const amp = String.fromCharCode(38);
+  return String(value ?? "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(new RegExp(`${amp}nbsp;`, "gi"), " ")
+    .replace(new RegExp(`${amp}amp;`, "gi"), amp)
+    .replace(new RegExp(`${amp}lt;`, "gi"), "<")
+    .replace(new RegExp(`${amp}gt;`, "gi"), ">")
+    .replace(new RegExp(`${amp}quot;`, "gi"), '"')
+    .replace(new RegExp(`${amp}#39;`, "gi"), "'")
+    .replace(/\\[nr]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function replaceTitle(html: string, title: string) {
   return html.replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(title)}</title>`);
 }
@@ -260,7 +276,7 @@ export function productJsonLd(product: ProductMeta, base: string) {
     "@context": "https://schema.org",
     "@type": "Product",
     name: product.name,
-    description: product.description,
+    description: stripHtml(product.description),
     image: product.images.map((image) => absolute(image, base)),
     sku: product.sku || product.id,
     category: categoryLabel(product.category),
@@ -304,7 +320,7 @@ export function injectProductMeta(html: string, product: ProductMeta, base: stri
   const label = categoryLabel(product.category);
   const title = `${product.name} — ${label} | ${SITE_NAME}`;
   const description = truncate(
-    product.description ||
+    stripHtml(product.description) ||
       `${product.name} de ${SITE_NAME}. Ropa deportiva femenina diseñada en Chillán, Chile.`
   );
   const canonical = `${base}/producto/${product.id}`;
