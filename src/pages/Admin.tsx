@@ -1125,11 +1125,16 @@ export default function Admin() {
   }, [isAdmin]);
 
   const stats = useMemo(() => {
-    const value = products.reduce((sum, p) => sum + (p.price || 0), 0);
+    const stock = products.reduce((sum, product) => sum + totalStock(product), 0);
+    // Valor del inventario: precio de cada prenda × unidades registradas.
+    const value = products.reduce(
+      (sum, product) => sum + (product.price || 0) * totalStock(product),
+      0
+    );
     return {
       count: products.length,
       featured: products.filter((p) => p.featured).length,
-      stock: products.reduce((sum, product) => sum + totalStock(product), 0),
+      stock,
       value,
     };
   }, [products]);
@@ -1278,7 +1283,7 @@ export default function Admin() {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-2xl">{formatCLP(stats.value)}</CardTitle>
-                  <CardDescription>Valor total del catálogo</CardDescription>
+                  <CardDescription>Valor del inventario (precio × unidades)</CardDescription>
                 </CardHeader>
               </Card>
             </div>
