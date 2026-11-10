@@ -43,8 +43,8 @@ function meta(html, kind, key) {
 /* ---------------------------------------------------------------- producto */
 {
   const response = await productoHandler({
-    request: new Request("https://lune-activewear.pages.dev/producto/calza-flare"),
-    params: { id: "calza-flare" },
+    request: new Request("https://lune-activewear.pages.dev/producto/calza-palazzo"),
+    params: { id: "calza-palazzo" },
     env,
     next: async () => new Response("STATIC", { status: 200 }),
   });
@@ -53,15 +53,15 @@ function meta(html, kind, key) {
   check("producto: status 200", response.status === 200, `status=${response.status}`);
   check(
     "producto: title propio (em dash)",
-    /<title>Calza Flare — Calzas \| LUNÉ Activewear<\/title>/.test(html),
+    /<title>CALZA PALAZZO — Calzas \| LUNÉ Activewear<\/title>/.test(html),
     html.match(/<title>(.*?)<\/title>/)?.[1]
   );
   check(
     "producto: canonical propio",
-    html.includes('<link rel="canonical" href="https://lune-activewear.pages.dev/producto/calza-flare" />')
+    html.includes('<link rel="canonical" href="https://lune-activewear.pages.dev/producto/calza-palazzo" />')
   );
   check("producto: og:type product", meta(html, "property", "og:type") === "product");
-  check("producto: og:title propio", meta(html, "property", "og:title") === "Calza Flare — Calzas | LUNÉ Activewear");
+  check("producto: og:title propio", meta(html, "property", "og:title") === "CALZA PALAZZO — Calzas | LUNÉ Activewear");
   check("producto: twitter:card", meta(html, "name", "twitter:card") === "summary_large_image");
   check("producto: description no vacía", (meta(html, "name", "description") ?? "").length > 20);
   check("producto: robots index", (meta(html, "name", "robots") ?? "").includes("index"));
@@ -74,17 +74,21 @@ function meta(html, kind, key) {
     const types = parsed.map((entry) => entry["@type"]);
     check("producto: JSON-LD Product + BreadcrumbList", types.includes("Product") && types.includes("BreadcrumbList"), types.join(","));
     const product = parsed.find((entry) => entry["@type"] === "Product");
-    check("producto: JSON-LD nombre real", product?.name === "Calza Flare", product?.name);
+    check("producto: JSON-LD nombre real", product?.name === "CALZA PALAZZO", product?.name);
     check("producto: JSON-LD precio", typeof product?.offers?.price === "number", String(product?.offers?.price));
     check("producto: JSON-LD currency CLP", product?.offers?.priceCurrency === "CLP");
-    check("producto: JSON-LD sku = id", product?.sku === "calza-flare");
-    check("producto: JSON-LD url canonical", product?.offers?.url === "https://lune-activewear.pages.dev/producto/calza-flare");
+    check(
+    "producto: JSON-LD sku presente",
+    typeof product?.sku === "string" && product.sku.length > 0,
+    product?.sku
+  );
+    check("producto: JSON-LD url canonical", product?.offers?.url === "https://lune-activewear.pages.dev/producto/calza-palazzo");
     check("producto: JSON-LD sin HTML roto", !/&(?!amp;|lt;|gt;|quot;|#)/.test(ld[1]));
   }
 
   check("producto: noscript con precio", /<strong>Precio:<\/strong>/.test(html));
   check("producto: noscript con tallas", /<strong>Tallas:<\/strong>/.test(html));
-  check("producto: noscript con h1 real", /<h1>Calza Flare<\/h1>/.test(html));
+  check("producto: noscript con h1 real", /<h1>CALZA PALAZZO<\/h1>/.test(html));
   check("producto: entidades HTML correctas", !html.includes("&amp;"));
 }
 
@@ -153,7 +157,7 @@ function meta(html, kind, key) {
   );
   check(
     "sitemap: incluye productos vivos",
-    locs.includes("https://lune-activewear.pages.dev/producto/calza-flare"),
+    locs.includes("https://lune-activewear.pages.dev/producto/calza-palazzo"),
     `${locs.length} urls`
   );
   check("sitemap: XML bien formado", xml.startsWith('<?xml version="1.0" encoding="UTF-8"?>'));

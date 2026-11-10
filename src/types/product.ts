@@ -16,6 +16,8 @@ export interface SizeGuideRow {
 
 export interface Product {
   id: string;
+  /** Código SKU generado automáticamente al crear el producto. No cambia al editar. */
+  sku?: string;
   name: string;
   category: string;
   price: number;

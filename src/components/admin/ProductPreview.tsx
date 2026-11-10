@@ -360,6 +360,11 @@ function DetailPreview({ product }: { product: Product }) {
           <h3 className="mt-2 font-display text-3xl font-medium tracking-tight">
             {product.name.trim() || "Nombre del producto"}
           </h3>
+          {product.sku && (
+            <p className="mt-1.5 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+              SKU {product.sku}
+            </p>
+          )}
 
           <div className="mt-4 flex items-center gap-3">
             <span className="font-display text-2xl">{formatCLP(product.price)}</span>

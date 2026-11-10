@@ -304,9 +304,16 @@ export default function ProductDetail() {
             {categoryLabel(product.category)}
           </p>
           <div className="mt-2 flex items-start justify-between gap-4">
-            <h1 className="font-display text-3xl font-medium tracking-tight md:text-4xl">
-              {product.name}
-            </h1>
+            <div className="min-w-0">
+              <h1 className="font-display text-3xl font-medium tracking-tight md:text-4xl">
+                {product.name}
+              </h1>
+              {product.sku && (
+                <p className="mt-1.5 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                  SKU {product.sku}
+                </p>
+              )}
+            </div>
             <button
               type="button"
               onClick={handleFavorite}

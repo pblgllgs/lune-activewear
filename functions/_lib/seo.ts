@@ -17,6 +17,8 @@ export interface EdgeEnv {
 
 export interface ProductMeta {
   id: string;
+  /** SKU generado al crear el producto; si falta se usa el ID. */
+  sku?: string;
   name: string;
   description: string;
   category: string;
@@ -88,6 +90,7 @@ export function normalizeDoc(id: string, fields: Record<string, unknown>): Produ
 
   return {
     id,
+    sku: str(fields.sku).trim().toUpperCase() || undefined,
     name: str(fields.name),
     description: str(fields.description),
     category: str(fields.category),
@@ -259,7 +262,7 @@ export function productJsonLd(product: ProductMeta, base: string) {
     name: product.name,
     description: product.description,
     image: product.images.map((image) => absolute(image, base)),
-    sku: product.id,
+    sku: product.sku || product.id,
     category: categoryLabel(product.category),
     brand: { "@type": "Brand", name: SITE_NAME },
     color: product.colors.join(", ") || undefined,

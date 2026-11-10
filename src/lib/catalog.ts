@@ -232,6 +232,10 @@ function normalizeStock(value: unknown): Record<string, number> | undefined {
 export function normalizeProduct(id: string, data: Record<string, unknown>): Product {
   return {
     id,
+    sku:
+      typeof data.sku === "string" && data.sku.trim()
+        ? data.sku.trim().toUpperCase()
+        : undefined,
     name: String(data.name ?? "Producto"),
     category: String(data.category ?? "otros"),
     price: Number(data.price ?? 0),

@@ -150,7 +150,7 @@ export function productJsonLd(product: Product) {
     name: product.name,
     description: product.description,
     image: product.images.length > 0 ? product.images.map((src) => absoluteUrl(src)) : undefined,
-    sku: product.id,
+    sku: product.sku || product.id,
     category: categoryLabel(product.category),
     brand: { "@type": "Brand", name: SITE_NAME },
     color: product.colors.map((color) => color.name).join(", ") || undefined,

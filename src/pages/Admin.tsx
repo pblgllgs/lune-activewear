@@ -23,6 +23,7 @@ import {
   AlertCircle,
   Eye,
   EyeOff,
+  Hash,
   ImagePlus,
   LayoutDashboard,
   Link2,
@@ -45,6 +46,7 @@ import { ReviewsModeration } from "@/components/admin/ReviewsModeration";
 import { deleteFromR2, isUploadConfigured, slugify, uploadToR2 } from "@/lib/upload";
 import { normalizeProduct, seedDemoProducts } from "@/lib/catalog";
 import { defaultSizeGuide, resolveSizeGuide } from "@/lib/size-guide";
+import { generateSku } from "@/lib/sku";
 import { LAST_UNITS_THRESHOLD, totalStock } from "@/lib/stock";
 import { CATEGORIES, categoryLabel } from "@/lib/categories";
 import { formatCLP } from "@/lib/utils";
@@ -318,7 +320,13 @@ interface DraftImage {
   color?: string;
 }
 
-function ProductForm({ editing }: { editing: Product | null }) {
+function ProductForm({
+  editing,
+  takenSkus,
+}: {
+  editing: Product | null;
+  takenSkus: string[];
+}) {
   const [form, setForm] = useState(() => ({
     name: editing?.name ?? "",
     category: editing?.category ?? CATEGORIES[0].id,
@@ -502,9 +510,13 @@ function ProductForm({ editing }: { editing: Product | null }) {
           .filter((image) => image.color)
           .map((image) => [image.url, image.color as string])
       );
+      // El SKU se fija al crear y no cambia al editar; si un producto antiguo
+      // no lo tiene, se genera en su primer guardado.
+      const sku = editing?.sku?.trim() || generateSku(form.category, takenSkus);
 
       const payload = {
         name,
+        sku,
         category: form.category,
         price: Number(form.price) || 0,
         ...(form.compareAtPrice ? { compareAtPrice: Number(form.compareAtPrice) } : {}),
@@ -595,6 +607,7 @@ function ProductForm({ editing }: { editing: Product | null }) {
     const slug = slugify(form.name);
     return {
       id: editing?.id ?? (slug || "producto"),
+      sku: editing?.sku,
       name: form.name.trim(),
       category: form.category,
       price: Number(form.price) || 0,
@@ -641,6 +654,30 @@ function ProductForm({ editing }: { editing: Product | null }) {
               Completa la información de la prenda. Las imágenes se suben a Cloudflare R2 al guardar
               {pendingFiles > 0 ? ` (${pendingFiles} pendiente${pendingFiles === 1 ? "" : "s"})` : ""}.
             </CardDescription>
+            <p className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+              {editing?.sku ? (
+                <>
+                  <span>
+                    SKU:{" "}
+                    <span className="font-mono font-medium tracking-wide text-foreground">
+                      {editing.sku}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    className="underline underline-offset-2 transition hover:text-foreground"
+                    onClick={() => {
+                      void navigator.clipboard?.writeText(editing.sku ?? "");
+                      toast.success("SKU copiado.");
+                    }}
+                  >
+                    Copiar
+                  </button>
+                </>
+              ) : (
+                <span>El SKU se genera automáticamente al guardar.</span>
+              )}
+            </p>
           </div>
           <Button
             type="button"
@@ -1093,6 +1130,7 @@ export default function Admin() {
   const [products, setProducts] = useState<Product[]>([]);
   const [editing, setEditing] = useState<Product | null>(null);
   const [seeding, setSeeding] = useState(false);
+  const [fillingSkus, setFillingSkus] = useState(false);
 
   useSeo({
     title: "Administración | LUNÉ Activewear",
@@ -1124,6 +1162,39 @@ export default function Admin() {
     });
   }, [isAdmin]);
 
+  /**
+   * Migración única: los productos creados antes del SKU reciben uno al abrir el
+   * panel admin. El ref evita reintentos si alguna escritura falla.
+   */
+  const skuBackfillStarted = useRef(false);
+  useEffect(() => {
+    if (!isAdmin || !db || skuBackfillStarted.current) return;
+    const missing = products.filter((product) => !product.sku);
+    if (missing.length === 0) return;
+    skuBackfillStarted.current = true;
+    const taken = new Set(
+      products.map((product) => product.sku).filter((sku): sku is string => Boolean(sku))
+    );
+    void (async () => {
+      let created = 0;
+      for (const product of missing) {
+        try {
+          const sku = generateSku(product.category, taken);
+          taken.add(sku);
+          await updateDoc(doc(db, "products", product.id), { sku });
+          created += 1;
+        } catch {
+          /* best effort: se puede reintentar con el botón del dashboard */
+        }
+      }
+      if (created > 0) {
+        toast.success(
+          created === 1 ? "SKU generado para 1 producto." : `SKUs generados para ${created} productos.`
+        );
+      }
+    })();
+  }, [isAdmin, products]);
+
   const stats = useMemo(() => {
     const stock = products.reduce((sum, product) => sum + totalStock(product), 0);
     // Valor del inventario: precio de cada prenda × unidades registradas.
@@ -1139,6 +1210,12 @@ export default function Admin() {
     };
   }, [products]);
 
+  const takenSkus = useMemo(
+    () => products.map((p) => p.sku).filter((sku): sku is string => Boolean(sku)),
+    [products]
+  );
+  const missingSkus = products.filter((p) => !p.sku).length;
+
   if (!isFirebaseConfigured || !auth) return <SetupNotice />;
 
   if (isAdmin === null) {
@@ -1153,6 +1230,30 @@ export default function Admin() {
     if (!db) return;
     await updateDoc(doc(db, "products", product.id), { featured: !product.featured });
     toast.success(product.featured ? "Quitado de destacados." : "Marcado como destacado.");
+  };
+
+  /** Genera y guarda el SKU de los productos creados antes de esta función. */
+  const fillMissingSkus = async () => {
+    if (!db) return;
+    const missing = products.filter((product) => !product.sku);
+    if (missing.length === 0) return;
+    setFillingSkus(true);
+    try {
+      const taken = new Set(takenSkus);
+      for (const product of missing) {
+        const sku = generateSku(product.category, taken);
+        taken.add(sku);
+        await updateDoc(doc(db, "products", product.id), { sku });
+      }
+      toast.success(
+        missing.length === 1 ? "SKU generado." : `${missing.length} SKUs generados.`
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Error desconocido";
+      toast.error(message);
+    } finally {
+      setFillingSkus(false);
+    }
   };
 
   const remove = async (product: Product) => {    if (!db) return;
@@ -1320,12 +1421,20 @@ export default function Admin() {
                 <Button variant="outline" onClick={() => setTab("productos")}>
                   <Package className="h-4 w-4" /> Gestionar catálogo
                 </Button>
+                {missingSkus > 0 && (
+                  <Button variant="outline" onClick={fillMissingSkus} disabled={fillingSkus}>
+                    <Hash className="h-4 w-4" />
+                    {fillingSkus
+                      ? "Generando SKUs…"
+                      : `Generar SKUs faltantes (${missingSkus})`}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           </>
         )}
 
-        {tab === "nuevo" && <ProductForm editing={editing} />}
+        {tab === "nuevo" && <ProductForm editing={editing} takenSkus={takenSkus} />}
 
         {tab === "productos" && (
           <>
@@ -1334,7 +1443,7 @@ export default function Admin() {
                 <Button variant="outline" size="sm" onClick={() => setEditing(null)}>
                   ← Volver a la lista
                 </Button>
-                <ProductForm editing={editing} />
+                <ProductForm editing={editing} takenSkus={takenSkus} />
               </div>
             ) : products.length === 0 ? (
               <Card>
@@ -1362,6 +1471,19 @@ export default function Admin() {
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="truncate font-display font-medium">{product.name}</p>
+                          {product.sku ? (
+                            <Badge
+                              variant="outline"
+                              className="font-mono text-[10px] tracking-wide"
+                              title="Código SKU"
+                            >
+                              {product.sku}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                              Sin SKU
+                            </Badge>
+                          )}
                           {product.published === false && (
                             <Badge variant="outline">
                               <EyeOff className="h-3 w-3" /> Borrador
