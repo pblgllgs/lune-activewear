@@ -95,7 +95,14 @@ export default function ProductDetail() {
       .then((found) => {
         setProduct(found);
         setSize(found ? firstAvailableSize(found) : "Único");
-        setColor(found?.colors[0]?.name ?? "Único");
+        // El color inicial sigue a la primera foto si tiene uno asignado.
+        const firstUrl = found?.images[0];
+        const firstColor = firstUrl ? found?.imageColors?.[firstUrl] : undefined;
+        const validFirstColor =
+          firstColor && found?.colors.some((c) => c.name === firstColor)
+            ? firstColor
+            : undefined;
+        setColor(validFirstColor ?? found?.colors[0]?.name ?? "Único");
       })
       .finally(() => setLoading(false));
 
@@ -104,18 +111,10 @@ export default function ProductDetail() {
   }, [id]);
 
   /**
-   * Fotos del color seleccionado. Si el color no tiene fotos asignadas se usan
-   * las que no tienen color (productos antiguos) y, en último caso, todas.
+   * El carrusel muestra todas las fotos del producto. Al elegir una foto se
+   * selecciona automáticamente el color asociado (si lo tiene).
    */
-  const images = useMemo(() => {
-    if (!product) return [];
-    const mapped = product.imageColors ?? {};
-    const assigned = product.images.filter((url) => mapped[url] === color);
-    if (assigned.length > 0) return assigned;
-    const unassigned = product.images.filter((url) => !mapped[url]);
-    if (unassigned.length > 0) return unassigned;
-    return product.images;
-  }, [product, color]);
+  const images = useMemo(() => product?.images ?? [], [product]);
 
   if (loading) {
     return (
@@ -148,8 +147,22 @@ export default function ProductDetail() {
   const soldOutSizes = product.sizes.filter((s) => isSizeSoldOut(product, s));
   const favorite = isFavorite(product.id);
 
-  const prev = () => setIndex((i) => (i - 1 + images.length) % images.length);
-  const next = () => setIndex((i) => (i + 1) % images.length);
+  /** Color asociado a una foto, solo si existe en los colores del producto. */
+  const colorForImage = (url: string | undefined) => {
+    if (!url) return undefined;
+    const name = product.imageColors?.[url];
+    return name && product.colors.some((c) => c.name === name) ? name : undefined;
+  };
+
+  /** Selecciona una foto y, si tiene color asignado, lo activa. */
+  const selectImage = (nextIndex: number) => {
+    setIndex(nextIndex);
+    const name = colorForImage(images[nextIndex]);
+    if (name) setColor(name);
+  };
+
+  const prev = () => selectImage((index - 1 + images.length) % images.length);
+  const next = () => selectImage((index + 1) % images.length);
 
   const handleAdd = () => {
     if (currentStock === 0) {
@@ -285,7 +298,7 @@ export default function ProductDetail() {
                 <button
                   key={image}
                   type="button"
-                  onClick={() => setIndex(i)}
+                  onClick={() => selectImage(i)}
                   className={`h-20 w-16 shrink-0 overflow-hidden rounded-md border-2 transition ${
                     i === index ? "border-primary" : "border-transparent opacity-70 hover:opacity-100"
                   }`}
@@ -355,7 +368,11 @@ export default function ProductDetail() {
                     type="button"
                     onClick={() => {
                       setColor(c.name);
-                      setIndex(0);
+                      // Salta a la primera foto de ese color, si tiene.
+                      const first = images.findIndex(
+                        (url) => product.imageColors?.[url] === c.name
+                      );
+                      if (first >= 0) setIndex(first);
                     }}
                     className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition ${
                       color === c.name ? "border-primary" : "border-transparent"

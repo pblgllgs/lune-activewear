@@ -72,7 +72,7 @@ export function buildPreviewIssues(product: Product): PreviewIssue[] {
   if (product.images.length > 0 && product.colors.length > 0 && unassignedImages.length > 0) {
     issues.push({
       level: "info",
-      text: `${unassignedImages.length} foto(s) sin color: se usan como respaldo en los colores que no tengan fotos.`,
+      text: `${unassignedImages.length} foto(s) sin color: al seleccionarlas no se cambia el color de la ficha.`,
     });
   }
   if (product.description.trim().length > 160) {
@@ -306,11 +306,7 @@ function DetailPreview({ product }: { product: Product }) {
   const size = product.sizes.find((s) => !isSizeSoldOut(product, s)) ?? product.sizes[0] ?? "";
   const color = product.colors[0]?.name ?? "Único";
   const currentStock = size ? sizeStock(product, size) : null;
-  const mapped = product.imageColors ?? {};
-  const assigned = product.images.filter((url) => mapped[url] === color);
-  const unassigned = product.images.filter((url) => !mapped[url]);
-  const colorImages = assigned.length ? assigned : unassigned.length ? unassigned : product.images;
-  const images = colorImages.length ? colorImages : [""];
+  const images = product.images.length ? product.images : [""];
 
   return (
     <div className="pointer-events-none">
