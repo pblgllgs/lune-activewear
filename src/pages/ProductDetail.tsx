@@ -17,7 +17,9 @@ import { getProduct, getProducts } from "@/lib/catalog";
 import { categoryLabel } from "@/lib/categories";
 import { resolveSizeGuide } from "@/lib/size-guide";
 import {
+  firstAvailableColor,
   firstAvailableSize,
+  isColorSoldOut,
   isSizeSoldOut,
   isSoldOut,
   LAST_UNITS_THRESHOLD,
@@ -101,14 +103,19 @@ export default function ProductDetail() {
       .then((found) => {
         setProduct(found);
         setSize(found ? firstAvailableSize(found) : "Único");
-        // El color inicial sigue a la primera foto si tiene uno asignado.
+        // El color inicial sigue a la primera foto si tiene uno asignado; si está agotado, usa el primero disponible.
         const firstUrl = found?.images[0];
         const firstColor = firstUrl ? found?.imageColors?.[firstUrl]?.trim() : undefined;
         const validFirstColor =
           firstColor && found?.colors.some((c) => c.name.trim() === firstColor)
             ? found.colors.find((c) => c.name.trim() === firstColor)?.name
             : undefined;
-        setColor(validFirstColor ?? found?.colors[0]?.name ?? "Único");
+        const initialColor = found
+          ? (validFirstColor && !isColorSoldOut(found, validFirstColor) && validFirstColor) ||
+            firstAvailableColor(found)
+          : "Único";
+        setColor(initialColor ?? found?.colors[0]?.name ?? "Único");
+        setSize(found ? firstAvailableSize(found, initialColor) : "Único");
       })
       .finally(() => setLoading(false));
 
@@ -149,8 +156,8 @@ export default function ProductDetail() {
   const suggestions = sameCategory.length > 0 ? sameCategory : related.slice(0, 4);
   const currentImage = images[index] ?? images[0];
   const soldOut = isSoldOut(product);
-  const currentStock = sizeStock(product, size);
-  const soldOutSizes = product.sizes.filter((s) => isSizeSoldOut(product, s));
+  const currentStock = sizeStock(product, size, color);
+  const soldOutSizes = product.sizes.filter((s) => isSizeSoldOut(product, s, color));
   const favorite = isFavorite(product.id);
 
   /** Color asociado a una foto, solo si existe en los colores del producto. */
@@ -165,7 +172,28 @@ export default function ProductDetail() {
   const selectImage = (nextIndex: number) => {
     setIndex(nextIndex);
     const name = colorForImage(images[nextIndex]);
-    if (name) setColor(name);
+    if (name) {
+      setColor(name);
+      if (isSizeSoldOut(product, size, name)) {
+        setSize(firstAvailableSize(product, name));
+        setQty(1);
+      }
+    }
+  };
+
+  const selectColor = (name: string) => {
+    setColor(name);
+    const first = images.findIndex(
+      (url) => product.imageColors?.[url]?.trim() === name.trim()
+    );
+    if (first >= 0) setIndex(first);
+    if (isSizeSoldOut(product, size, name)) {
+      setSize(firstAvailableSize(product, name));
+      setQty(1);
+    } else {
+      const max = sizeStock(product, size, name);
+      if (typeof max === "number" && qty > max) setQty(Math.max(1, max));
+    }
   };
 
   const prev = () => selectImage((index - 1 + images.length) % images.length);
@@ -173,7 +201,7 @@ export default function ProductDetail() {
 
   const handleAdd = () => {
     if (currentStock === 0) {
-      toast.error("Esa talla está agotada.");
+      toast.error(`Esa combinación (${color}, talla ${size}) está agotada.`);
       return;
     }
     addItem({
@@ -391,19 +419,12 @@ export default function ProductDetail() {
                   <button
                     key={c.name}
                     type="button"
-                    onClick={() => {
-                      setColor(c.name);
-                      // Salta a la primera foto de ese color, si tiene.
-                      const first = images.findIndex(
-                        (url) => product.imageColors?.[url]?.trim() === c.name.trim()
-                      );
-                      if (first >= 0) setIndex(first);
-                    }}
+                    onClick={() => selectColor(c.name)}
                     className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition ${
                       color === c.name ? "border-primary" : "border-transparent"
-                    }`}
-                    aria-label={`Color ${c.name}`}
-                    title={c.name}
+                    } ${isColorSoldOut(product, c.name) ? "opacity-40" : ""}`}
+                    aria-label={`Color ${c.name}${isColorSoldOut(product, c.name) ? " (agotado)" : ""}`}
+                    title={isColorSoldOut(product, c.name) ? `${c.name} (agotado)` : c.name}
                   >
                     <span
                       className="h-6 w-6 rounded-full border border-primary/15"
@@ -430,10 +451,11 @@ export default function ProductDetail() {
                     type="button"
                     onClick={() => {
                       setSize(s);
-                      setQty(1);
+                      const max = sizeStock(product, s, color);
+                      setQty((q) => (typeof max === "number" ? Math.min(Math.max(1, q), max) : Math.max(1, q)));
                     }}
                     disabled={out}
-                    title={out ? "Talla agotada" : undefined}
+                    title={out ? `Talla agotada en ${color}` : undefined}
                     className={`min-w-11 rounded-md border px-3 py-2 text-xs transition ${
                       out
                         ? "cursor-not-allowed border-input text-muted-foreground/50 line-through"
@@ -448,7 +470,9 @@ export default function ProductDetail() {
               })}
             </div>
             {currentStock === 0 && (
-              <p className="mt-2 text-xs text-destructive">Esta talla está agotada.</p>
+              <p className="mt-2 text-xs text-destructive">
+                Esta talla está agotada en {color}.
+              </p>
             )}
             {currentStock !== null && currentStock > 0 && currentStock <= LOW_STOCK_THRESHOLD && (
               <p
@@ -459,14 +483,22 @@ export default function ProductDetail() {
                 }`}
               >
                 {currentStock <= LAST_UNITS_THRESHOLD ? "Últimas" : "Quedan"} {currentStock} unidad
-                {currentStock === 1 ? "" : "es"} en talla {size}.
+                {currentStock === 1 ? "" : "es"} en talla {size} · {color}.
               </p>
+            )}
+            {currentStock !== null && currentStock > LOW_STOCK_THRESHOLD && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                {currentStock} unidades disponibles en talla {size} · {color}.
+              </p>
+            )}
+            {currentStock === null && (
+              <p className="mt-2 text-xs text-muted-foreground">Disponible en talla {size} · {color}.</p>
             )}
 
             {soldOutSizes.length > 0 && (
               <div className="mt-4 rounded-lg border border-dashed border-primary/20 p-3">
                 <p className="text-[10px] uppercase tracking-wider2 text-muted-foreground">
-                  ¿Tu talla está agotada?
+                  ¿Tu talla está agotada en {color}?
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {soldOutSizes.map((soldOutSize) => (
@@ -515,7 +547,7 @@ export default function ProductDetail() {
               disabled={currentStock === 0}
             >
               <ShoppingBag className="h-4 w-4" />
-              {currentStock === 0 ? "Talla agotada" : "Agregar al carrito"}
+              {currentStock === 0 ? "Agotado en este color" : "Agregar al carrito"}
             </Button>
           </div>
 

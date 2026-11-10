@@ -29,7 +29,15 @@ export interface Product {
   sizes: string[];
   /** Medidas de la guía de tallas. Si falta, se usan los valores por defecto. */
   sizeGuide?: SizeGuideRow[];
-  /** Unidades disponibles por talla. Si falta una talla, se considera sin límite. */
+  /**
+   * Stock por variante (color → talla → unidades).
+   * Es la fuente principal de inventario. Si falta una combinación, se considera sin límite.
+   */
+  stockByVariant?: Record<string, Record<string, number>>;
+  /**
+   * @deprecated Stock por talla (legado, compartido entre colores).
+   * Se mantiene por compatibilidad; al normalizar se convierte a `stockByVariant`.
+   */
   stockBySize?: Record<string, number>;
   colors: ProductColor[];
   images: string[];

@@ -206,11 +206,22 @@ const DEMO_BASE: Product[] = [
   },
 ];
 
-/** El catálogo de ejemplo parte con 5 unidades por talla. */
-export const DEMO_PRODUCTS: Product[] = DEMO_BASE.map((product) => ({
-  ...product,
-  stockBySize: Object.fromEntries(product.sizes.map((size) => [size, 5])),
-}));
+/** El catálogo de ejemplo parte con 5 unidades por color y talla. */
+export const DEMO_PRODUCTS: Product[] = DEMO_BASE.map((product) => {
+  const colorNames =
+    product.colors.map((c) => c.name.trim()).filter(Boolean).length > 0
+      ? product.colors.map((c) => c.name.trim()).filter(Boolean)
+      : ["Único"];
+  return {
+    ...product,
+    stockByVariant: Object.fromEntries(
+      colorNames.map((color) => [
+        color,
+        Object.fromEntries(product.sizes.map((size) => [size, 5])),
+      ])
+    ),
+  };
+});
 
 function normalizeImageColors(value: unknown): Record<string, string> | undefined {
   if (!value || typeof value !== "object") return undefined;
@@ -220,16 +231,73 @@ function normalizeImageColors(value: unknown): Record<string, string> | undefine
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
-function normalizeStock(value: unknown): Record<string, number> | undefined {
+function cleanQty(value: unknown): number | null {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.max(0, Math.floor(number)) : null;
+}
+
+function normalizeLegacyStock(value: unknown): Record<string, number> | undefined {
   if (!value || typeof value !== "object") return undefined;
   const entries = Object.entries(value as Record<string, unknown>)
-    .map(([size, qty]) => [size, Number(qty)] as const)
-    .filter(([, qty]) => Number.isFinite(qty))
-    .map(([size, qty]) => [size, Math.max(0, Math.floor(qty))] as const);
+    .map(([size, qty]) => [size, cleanQty(qty)] as const)
+    .filter((entry): entry is readonly [string, number] => entry[1] !== null);
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
+function normalizeVariantStock(
+  value: unknown
+): Record<string, Record<string, number>> | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const byColor: Record<string, Record<string, number>> = {};
+  for (const [rawColor, sizesValue] of Object.entries(value as Record<string, unknown>)) {
+    const color = rawColor.trim();
+    if (!color || !sizesValue || typeof sizesValue !== "object") continue;
+    const bySize: Record<string, number> = {};
+    for (const [size, qty] of Object.entries(sizesValue as Record<string, unknown>)) {
+      const clean = cleanQty(qty);
+      if (clean !== null) bySize[size] = clean;
+    }
+    if (Object.keys(bySize).length > 0) byColor[color] = bySize;
+  }
+  return Object.keys(byColor).length > 0 ? byColor : undefined;
+}
+
+function expandLegacyStock(
+  stockBySize: Record<string, number> | undefined,
+  colors: { name: string }[],
+  sizes: string[]
+): Record<string, Record<string, number>> | undefined {
+  if (!stockBySize || Object.keys(stockBySize).length === 0) return undefined;
+  const colorNames =
+    colors.map((c) => c.name.trim()).filter(Boolean).length > 0
+      ? colors.map((c) => c.name.trim()).filter(Boolean)
+      : ["Único"];
+  const sizeKeys = sizes.length > 0 ? sizes : Object.keys(stockBySize);
+  const out: Record<string, Record<string, number>> = {};
+  for (const color of colorNames) {
+    const bySize: Record<string, number> = {};
+    for (const size of sizeKeys) {
+      if (stockBySize[size] !== undefined) bySize[size] = stockBySize[size];
+    }
+    if (Object.keys(bySize).length > 0) out[color] = bySize;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 export function normalizeProduct(id: string, data: Record<string, unknown>): Product {
+  const sizes = Array.isArray(data.sizes) ? (data.sizes as string[]) : [];
+  const colors = Array.isArray(data.colors)
+    ? (data.colors as Product["colors"])
+        .map((color) => ({
+          name: String(color?.name ?? "").trim(),
+          hex: String(color?.hex ?? ""),
+        }))
+        .filter((color) => color.name)
+    : [];
+  const legacyStock = normalizeLegacyStock(data.stockBySize);
+  const stockByVariant =
+    normalizeVariantStock(data.stockByVariant) ?? expandLegacyStock(legacyStock, colors, sizes);
+
   return {
     id,
     sku:
@@ -244,17 +312,11 @@ export function normalizeProduct(id: string, data: Record<string, unknown>): Pro
     composition: data.composition ? String(data.composition) : undefined,
     care: data.care ? String(data.care) : undefined,
     shipping: data.shipping ? String(data.shipping) : undefined,
-    sizes: Array.isArray(data.sizes) ? (data.sizes as string[]) : [],
+    sizes,
     sizeGuide: normalizeSizeGuide(data.sizeGuide),
-    stockBySize: normalizeStock(data.stockBySize),
-    colors: Array.isArray(data.colors)
-      ? (data.colors as Product["colors"])
-          .map((color) => ({
-            name: String(color?.name ?? "").trim(),
-            hex: String(color?.hex ?? ""),
-          }))
-          .filter((color) => color.name)
-      : [],
+    stockByVariant,
+    stockBySize: legacyStock,
+    colors,
     images: Array.isArray(data.images) ? (data.images as string[]) : [],
     imageColors: normalizeImageColors(data.imageColors),
     featured: Boolean(data.featured),

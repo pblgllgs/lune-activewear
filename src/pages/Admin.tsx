@@ -66,6 +66,7 @@ import { LAST_UNITS_THRESHOLD, totalStock } from "@/lib/stock";
 import { CATEGORIES, categoryLabel } from "@/lib/categories";
 import { formatCLP } from "@/lib/utils";
 import { useSeo } from "@/lib/seo";
+import { stockColors, variantStock } from "@/lib/stock";
 import type { Product, ProductColor, SizeGuideRow } from "@/types/product";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -361,15 +362,50 @@ function ProductForm({
   const [sizes, setSizes] = useState<string[]>(
     editing?.sizes?.length ? editing.sizes : ["S", "M", "L"]
   );
-  const [stockBySize, setStockBySize] = useState<Record<string, number>>(() => {
-    const initialSizes = editing?.sizes?.length ? editing.sizes : ["S", "M", "L"];
-    return Object.fromEntries(
-      initialSizes.map((size) => [size, editing?.stockBySize?.[size] ?? 5])
-    );
-  });
   const [colors, setColors] = useState<ProductColor[]>(
     editing?.colors?.length ? editing.colors : [{ name: "Chocolate", hex: "#49372D" }]
   );
+
+  const effectiveColorNames = (cols: ProductColor[]) => {
+    const names = cols.map((c) => c.name.trim()).filter(Boolean);
+    return names.length > 0 ? names : ["Único"];
+  };
+
+  const buildStockMatrix = (
+    colorNames: string[],
+    sizeList: string[],
+    source?: Record<string, Record<string, number>> | null,
+    legacy?: Record<string, number> | null
+  ) => {
+    const out: Record<string, Record<string, number>> = {};
+    for (const color of colorNames) {
+      const bySize: Record<string, number> = {};
+      for (const size of sizeList) {
+        const fromVariant = source?.[color]?.[size];
+        const fromLegacy = legacy?.[size];
+        const value =
+          typeof fromVariant === "number" && Number.isFinite(fromVariant)
+            ? Math.max(0, Math.floor(fromVariant))
+            : typeof fromLegacy === "number" && Number.isFinite(fromLegacy)
+              ? Math.max(0, Math.floor(fromLegacy))
+              : 5;
+        bySize[size] = value;
+      }
+      out[color] = bySize;
+    }
+    return out;
+  };
+
+  const [stockByVariant, setStockByVariant] = useState<Record<string, Record<string, number>>>(() => {
+    const initialSizes = editing?.sizes?.length ? editing.sizes : ["S", "M", "L"];
+    const initialColors = editing?.colors?.length ? editing.colors : [{ name: "Chocolate", hex: "#49372D" }];
+    return buildStockMatrix(
+      effectiveColorNames(initialColors),
+      initialSizes,
+      editing?.stockByVariant ?? null,
+      editing?.stockBySize ?? null
+    );
+  });
   const [images, setImages] = useState<DraftImage[]>(
     editing
       ? editing.images.map((url) => {
@@ -395,22 +431,29 @@ function ProductForm({
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => setForm({ ...form, [key]: e.target.value });
 
-  const toggleSize = (size: string) => {
-    setSizes((current) =>
-      current.includes(size) ? current.filter((s) => s !== size) : [...current, size]
-    );
-    setStockBySize((current) =>
-      current[size] === undefined ? { ...current, [size]: 5 } : current
-    );
+  const syncStock = (nextColorNames: string[], nextSizes: string[]) => {
+    setStockByVariant((current) => buildStockMatrix(nextColorNames, nextSizes, current, null));
   };
 
-  const setStock = (size: string, value: number) =>
-    setStockBySize((current) => ({
+  const toggleSize = (size: string) => {
+    setSizes((current) => {
+      const next = current.includes(size) ? current.filter((s) => s !== size) : [...current, size];
+      syncStock(effectiveColorNames(colors), next);
+      return next;
+    });
+  };
+
+  const setVariantStock = (color: string, size: string, value: number) =>
+    setStockByVariant((current) => ({
       ...current,
-      [size]: clampStock(value),
+      [color]: { ...current[color], [size]: clampStock(value) },
     }));
 
-  const totalUnits = sizes.reduce((sum, size) => sum + (stockBySize[size] ?? 0), 0);
+  const totalUnits = effectiveColorNames(colors).reduce(
+    (sum, color) =>
+      sum + sizes.reduce((s, size) => s + (stockByVariant[color]?.[size] ?? 0), 0),
+    0
+  );
 
   const updateSizeGuide = (
     size: string,
@@ -431,28 +474,57 @@ function ProductForm({
 
   const updateColor = (index: number, patch: Partial<ProductColor>) => {
     const target = colors[index];
-    if (target && patch.name !== undefined && patch.name !== target.name) {
+    if (!target) return;
+    const nextColors = colors.map((c, i) => (i === index ? { ...c, ...patch } : c));
+    if (patch.name !== undefined && patch.name !== target.name) {
       // Mantiene la asociación de las fotos cuando se renombra el color.
       setImages((current) =>
         current.map((image) =>
-          image.color === target.name ? { ...image, color: patch.name } : image
+          image.color === target.name ? { ...image, color: patch.name ?? "" } : image
         )
       );
+      const oldName = target.name.trim() || "Único";
+      const newName = (patch.name ?? "").trim() || "Único";
+      setStockByVariant((current) => {
+        const next = { ...current };
+        if (oldName !== newName && next[oldName]) {
+          next[newName] = { ...next[newName], ...next[oldName] };
+          delete next[oldName];
+        }
+        return buildStockMatrix(effectiveColorNames(nextColors), sizes, next, null);
+      });
+    } else {
+      setStockByVariant((current) =>
+        buildStockMatrix(effectiveColorNames(nextColors), sizes, current, null)
+      );
     }
-    setColors((current) => current.map((c, i) => (i === index ? { ...c, ...patch } : c)));
+    setColors(nextColors);
   };
 
   const removeColor = (index: number) => {
     const target = colors[index];
+    const nextColors = colors.filter((_, i) => i !== index);
     if (target) {
       setImages((current) =>
         current.map((image) => (image.color === target.name ? { ...image, color: "" } : image))
       );
+      const removed = target.name.trim() || "Único";
+      setStockByVariant((current) => {
+        const next = { ...current };
+        delete next[removed];
+        return buildStockMatrix(effectiveColorNames(nextColors), sizes, next, null);
+      });
     }
-    setColors((current) => current.filter((_, i) => i !== index));
+    setColors(nextColors);
   };
 
-  const addColor = () => setColors((current) => [...current, { name: "", hex: "#B9A99C" }]);
+  const addColor = () => {
+    const nextColors = [...colors, { name: "", hex: "#B9A99C" }];
+    setColors(nextColors);
+    setStockByVariant((current) =>
+      buildStockMatrix(effectiveColorNames(nextColors), sizes, current, null)
+    );
+  };
 
   const updateImageColor = (id: string, color: string) =>
     setImages((current) => current.map((image) => (image.id === id ? { ...image, color } : image)));
@@ -524,9 +596,7 @@ function ProductForm({
         care: form.care,
         shipping: form.shipping,
         sizes,
-        stockBySize: Object.fromEntries(
-          sizes.map((size) => [size, Math.max(0, Math.floor(stockBySize[size] ?? 0))])
-        ),
+        stockByVariant: buildStockMatrix(effectiveColorNames(colors), sizes, stockByVariant, null),
         sizeGuide: sizeGuide.map((row) => ({
           size: row.size,
           bustMin: Math.max(0, Math.floor(row.bustMin || 0)),
@@ -576,8 +646,11 @@ function ProductForm({
         toast.success("Producto publicado correctamente.");
         setImages([]);
         setColors([{ name: "Chocolate", hex: "#49372D" }]);
-        setSizes(["S", "M", "L"]);
-        setStockBySize({ S: 5, M: 5, L: 5 });
+        const resetSizes = ["S", "M", "L"];
+        const resetColors = [{ name: "Chocolate", hex: "#49372D" }];
+        setSizes(resetSizes);
+        setColors(resetColors);
+        setStockByVariant(buildStockMatrix(effectiveColorNames(resetColors), resetSizes, null, null));
         setSizeGuide(defaultSizeGuide());
         setForm({
           name: "",
@@ -618,9 +691,7 @@ function ProductForm({
       care: form.care,
       shipping: form.shipping,
       sizes,
-      stockBySize: Object.fromEntries(
-        sizes.map((size) => [size, Math.max(0, Math.floor(stockBySize[size] ?? 0))])
-      ),
+      stockByVariant: buildStockMatrix(effectiveColorNames(colors), sizes, stockByVariant, null),
       sizeGuide,
       colors: colors
         .map((color) => ({ ...color, name: color.name.trim() }))
@@ -639,7 +710,7 @@ function ProductForm({
     editing,
     form,
     sizes,
-    stockBySize,
+    stockByVariant,
     sizeGuide,
     colors,
     images,
@@ -795,37 +866,61 @@ function ProductForm({
             </div>
 
             {sizes.length > 0 && (
-              <div className="mt-4 space-y-3">
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                  {SIZE_OPTIONS.filter((size) => sizes.includes(size)).map((size) => {
-                    const stock = stockBySize[size] ?? 0;
-                    return (
-                      <div key={size} className="space-y-1.5">
-                        <div className="flex items-center justify-between gap-1">
-                          <Label className="text-xs text-muted-foreground">Talla {size}</Label>
-                          {stock === 0 ? (
-                            <span className="rounded-full bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-destructive">
-                              Agotada
-                            </span>
-                          ) : stock <= LAST_UNITS_THRESHOLD ? (
-                            <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700">
-                              Bajo
-                            </span>
-                          ) : null}
+              <div className="mt-4 space-y-5">
+                {effectiveColorNames(colors).map((colorName) => {
+                  const colorMeta = colors.find((c) => c.name.trim() === colorName);
+                  const colorTotal = sizes.reduce(
+                    (sum, size) => sum + (stockByVariant[colorName]?.[size] ?? 0),
+                    0
+                  );
+                  return (
+                    <div key={colorName} className="rounded-lg border p-3">
+                      <div className="mb-3 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="h-4 w-4 rounded-full border border-primary/15"
+                            style={{ backgroundColor: colorMeta?.hex || "#e5e5e5" }}
+                          />
+                          <p className="text-sm font-medium">{colorName}</p>
                         </div>
-                        <StockInput
-                          size={size}
-                          value={stock}
-                          onChange={(value) => setStock(size, value)}
-                        />
+                        <span className="text-xs text-muted-foreground">
+                          {colorTotal} {colorTotal === 1 ? "unidad" : "unidades"}
+                        </span>
                       </div>
-                    );
-                  })}
-                </div>
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                        {SIZE_OPTIONS.filter((size) => sizes.includes(size)).map((size) => {
+                          const stock = stockByVariant[colorName]?.[size] ?? 0;
+                          return (
+                            <div key={`${colorName}-${size}`} className="space-y-1.5">
+                              <div className="flex items-center justify-between gap-1">
+                                <Label className="text-xs text-muted-foreground">Talla {size}</Label>
+                                {stock === 0 ? (
+                                  <span className="rounded-full bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-destructive">
+                                    Agotada
+                                  </span>
+                                ) : stock <= LAST_UNITS_THRESHOLD ? (
+                                  <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700">
+                                    Bajo
+                                  </span>
+                                ) : null}
+                              </div>
+                              <StockInput
+                                size={size}
+                                value={stock}
+                                onChange={(value) => setVariantStock(colorName, size, value)}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
                 <p className="text-[11px] text-muted-foreground">
                   Total: <span className="font-medium text-foreground">{totalUnits}</span>{" "}
-                  {totalUnits === 1 ? "unidad" : "unidades"} en {sizes.length}{" "}
-                  {sizes.length === 1 ? "talla" : "tallas"}. Escribe la cantidad o usa − / +.
+                  {totalUnits === 1 ? "unidad" : "unidades"} en {effectiveColorNames(colors).length}{" "}
+                  {effectiveColorNames(colors).length === 1 ? "color" : "colores"} y {sizes.length}{" "}
+                  {sizes.length === 1 ? "talla" : "tallas"}. Stock por color y talla.
                 </p>
               </div>
             )}
@@ -1548,13 +1643,21 @@ export default function Admin() {
                           {categoryLabel(product.category)} · {formatCLP(product.price)} ·{" "}
                           {product.sizes.join(" / ") || "sin tallas"} · {product.images.length} imágenes
                         </p>
-                        <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                        <p className="mt-1 text-[10px] text-muted-foreground">
                           Stock:{" "}
-                          {product.sizes.length > 0
-                            ? product.sizes
-                                .map((size) => `${size} ${product.stockBySize?.[size] ?? "—"}`)
-                                .join(" · ")
-                            : "sin tallas"}
+                          {product.sizes.length === 0
+                            ? "-"
+                            : product.sizes
+                                .map((size) => {
+                                  const colors = stockColors(product);
+                                  const values = colors
+                                    .map((c) => variantStock(product, size, c))
+                                    .filter((v) => v !== null);
+                                  const v =
+                                    values.length > 0 ? values.reduce((a, b) => a + b, 0) : null;
+                                  return `${size} ${v ?? "—"}`;
+                                })
+                                .join(" · ")}
                         </p>
                       </div>
                       <div className="flex shrink-0 gap-1">

@@ -243,17 +243,28 @@ export async function updateOrder(orderId: string, input: UpdateOrderInput): Pro
 type StockProduct = {
   ref: DocumentReference;
   name: string;
+  /** Stock por variante (color → talla). */
+  stockByVariant: Record<string, Record<string, number>> | null;
+  /** Legado: stock por talla compartido entre colores. */
   stockBySize: Record<string, number> | null;
 };
 
-/** Agrupa cantidades por producto y talla (varios colores del mismo producto suman). */
-function groupRequested(items: OrderItem[]): Map<string, Map<string, number>> {
-  const requested = new Map<string, Map<string, number>>();
+function normColor(color: string | undefined): string {
+  const c = (color ?? "").trim();
+  return c || "Único";
+}
+
+/** Agrupa cantidades por producto, color y talla. */
+function groupRequested(items: OrderItem[]): Map<string, Map<string, Map<string, number>>> {
+  const requested = new Map<string, Map<string, Map<string, number>>>();
   for (const item of items) {
     if (!item.productId || item.qty <= 0) continue;
-    const bySize = requested.get(item.productId) ?? new Map<string, number>();
+    const byColor = requested.get(item.productId) ?? new Map<string, Map<string, number>>();
+    const color = normColor(item.color);
+    const bySize = byColor.get(color) ?? new Map<string, number>();
     bySize.set(item.size, (bySize.get(item.size) ?? 0) + item.qty);
-    requested.set(item.productId, bySize);
+    byColor.set(color, bySize);
+    requested.set(item.productId, byColor);
   }
   return requested;
 }
@@ -262,7 +273,7 @@ function groupRequested(items: OrderItem[]): Map<string, Map<string, number>> {
 async function readProducts(
   firestore: Firestore,
   transaction: Transaction,
-  requested: Map<string, Map<string, number>>,
+  requested: Map<string, Map<string, Map<string, number>>>,
   requireExisting: boolean
 ): Promise<StockProduct[]> {
   const products: StockProduct[] = [];
@@ -276,10 +287,21 @@ async function readProducts(
       continue;
     }
     const data = productSnap.data();
+    const rawVariant = data.stockByVariant;
     const rawStock = data.stockBySize;
+    const stockByVariant =
+      rawVariant && typeof rawVariant === "object"
+        ? Object.fromEntries(
+            Object.entries(rawVariant as Record<string, unknown>).map(([color, sizes]) => [
+              color,
+              sizes && typeof sizes === "object" ? (sizes as Record<string, number>) : {},
+            ])
+          )
+        : null;
     products.push({
       ref: productRef,
       name: str(data.name) || productId,
+      stockByVariant,
       stockBySize:
         rawStock && typeof rawStock === "object"
           ? (rawStock as Record<string, number>)
@@ -289,16 +311,38 @@ async function readProducts(
   return products;
 }
 
-function validateStock(products: StockProduct[], requested: Map<string, Map<string, number>>) {
+function getCurrentStock(
+  product: StockProduct,
+  color: string,
+  size: string
+): number | null | undefined {
+  const v = product.stockByVariant?.[color]?.[size];
+  if (typeof v === "number" && Number.isFinite(v)) return Math.floor(v);
+  // Legado
+  const l = product.stockBySize?.[size];
+  if (typeof l === "number" && Number.isFinite(l)) return Math.floor(l);
+  if (product.stockByVariant || product.stockBySize) return undefined; // registrado pero sin esta variante
+  return null; // sin info => ilimitado
+}
+
+function validateStock(
+  products: StockProduct[],
+  requested: Map<string, Map<string, Map<string, number>>>
+) {
   for (const product of products) {
-    const bySize = requested.get(product.ref.id);
-    if (!product.stockBySize || !bySize) continue;
-    for (const [size, qty] of bySize) {
-      const current = product.stockBySize[size];
-      if (typeof current === "number" && Number.isFinite(current) && current < qty) {
-        throw new Error(
-          `Stock insuficiente de ${product.name} talla ${size}: quedan ${current} y la orden pide ${qty}.`
-        );
+    const byColor = requested.get(product.ref.id);
+    if (!byColor) continue;
+    if (!product.stockByVariant && !product.stockBySize) continue;
+    for (const [color, bySize] of byColor) {
+      for (const [size, qty] of bySize) {
+        const current = getCurrentStock(product, color, size);
+        if (current === null) continue; // sin límite
+        if (current === undefined) continue; // variante no registrada explícitamente
+        if (current < qty) {
+          throw new Error(
+            `Stock insuficiente de ${product.name} (${color}, talla ${size}): quedan ${current} y la orden pide ${qty}.`
+          );
+        }
       }
     }
   }
@@ -307,27 +351,57 @@ function validateStock(products: StockProduct[], requested: Map<string, Map<stri
 function writeStock(
   transaction: Transaction,
   products: StockProduct[],
-  requested: Map<string, Map<string, number>>,
+  requested: Map<string, Map<string, Map<string, number>>>,
   mode: "deduct" | "restore",
   now: string
 ) {
   for (const product of products) {
-    const bySize = requested.get(product.ref.id);
-    if (!product.stockBySize || !bySize) continue;
-    const nextStock = { ...product.stockBySize };
-    let changed = false;
-    for (const [size, qty] of bySize) {
-      const current = nextStock[size];
-      if (typeof current === "number" && Number.isFinite(current)) {
-        nextStock[size] =
-          mode === "deduct"
-            ? Math.max(0, Math.floor(current) - qty)
-            : Math.min(9999, Math.floor(current) + qty);
-        changed = true;
+    const byColor = requested.get(product.ref.id);
+    if (!byColor) continue;
+
+    if (product.stockByVariant) {
+      const nextVariant: Record<string, Record<string, number>> = {};
+      for (const [c, sizes] of Object.entries(product.stockByVariant)) {
+        nextVariant[c] = { ...sizes };
       }
+      let changed = false;
+      for (const [color, bySize] of byColor) {
+        if (!nextVariant[color]) nextVariant[color] = {};
+        for (const [size, qty] of bySize) {
+          const current = nextVariant[color][size];
+          if (typeof current === "number" && Number.isFinite(current)) {
+            nextVariant[color][size] =
+              mode === "deduct"
+                ? Math.max(0, Math.floor(current) - qty)
+                : Math.min(9999, Math.floor(current) + qty);
+            changed = true;
+          }
+        }
+      }
+      if (changed) {
+        transaction.update(product.ref, { stockByVariant: nextVariant, updatedAt: now });
+      }
+      continue;
     }
-    if (changed) {
-      transaction.update(product.ref, { stockBySize: nextStock, updatedAt: now });
+
+    if (product.stockBySize) {
+      const nextStock = { ...product.stockBySize };
+      let changed = false;
+      for (const [, bySize] of byColor) {
+        for (const [size, qty] of bySize) {
+          const current = nextStock[size];
+          if (typeof current === "number" && Number.isFinite(current)) {
+            nextStock[size] =
+              mode === "deduct"
+                ? Math.max(0, Math.floor(current) - qty)
+                : Math.min(9999, Math.floor(current) + qty);
+            changed = true;
+          }
+        }
+      }
+      if (changed) {
+        transaction.update(product.ref, { stockBySize: nextStock, updatedAt: now });
+      }
     }
   }
 }

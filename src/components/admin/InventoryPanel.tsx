@@ -14,16 +14,26 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CATEGORIES, categoryLabel } from "@/lib/categories";
-import { LAST_UNITS_THRESHOLD, isLowStock, isSoldOut, sizeStock, totalStock } from "@/lib/stock";
+import {
+  LAST_UNITS_THRESHOLD,
+  isLowStock,
+  isSoldOut,
+  stockColors,
+  totalStock,
+  variantStock,
+} from "@/lib/stock";
 import { usePagination } from "@/lib/use-pagination";
 import { formatCLP } from "@/lib/utils";
 import type { Product } from "@/types/product";
 
 type StatusFilter = "todos" | "publicados" | "borradores" | "agotados" | "bajo";
 
-/** ¿El producto tiene unidades registradas? (null/ausente = sin información). */
+/** ¿El producto tiene unidades registradas? (ausente = sin información/límite). */
 function hasStockInfo(product: Product): boolean {
-  return Boolean(product.stockBySize && Object.keys(product.stockBySize).length > 0);
+  return Boolean(
+    (product.stockByVariant && Object.keys(product.stockByVariant).length > 0) ||
+      (product.stockBySize && Object.keys(product.stockBySize).length > 0)
+  );
 }
 
 function stockTone(stock: number | null): string {
@@ -31,6 +41,19 @@ function stockTone(stock: number | null): string {
   if (stock === 0) return "border-destructive/30 bg-destructive/10 text-destructive";
   if (stock <= LAST_UNITS_THRESHOLD) return "border-amber-500/30 bg-amber-500/10 text-amber-700";
   return "border-primary/10 bg-secondary text-foreground";
+}
+
+function stockSummary(product: Product): string {
+  if (product.sizes.length === 0) return "Sin tallas";
+  const colors = stockColors(product);
+  return colors
+    .map((color) => {
+      const parts = product.sizes
+        .map((size) => `${size}: ${variantStock(product, size, color) ?? "—"}`)
+        .join(" · ");
+      return colors.length > 1 ? `${color}: ${parts}` : parts;
+    })
+    .join(" | ");
 }
 
 export function InventoryPanel({
@@ -92,7 +115,7 @@ export function InventoryPanel({
       "Categoría",
       "Estado",
       "Colores",
-      "Stock por talla",
+      "Stock por color y talla",
       "Unidades",
       "Precio",
       "Valor",
@@ -103,9 +126,7 @@ export function InventoryPanel({
       categoryLabel(product.category),
       product.published === false ? "Borrador" : "Publicado",
       product.colors.map((color) => color.name).join(" / "),
-      product.sizes
-        .map((size) => `${size}: ${sizeStock(product, size) ?? "—"}`)
-        .join(" · "),
+      stockSummary(product),
       hasStockInfo(product) ? totalStock(product) : "",
       product.price,
       hasStockInfo(product) ? product.price * totalStock(product) : "",
@@ -161,7 +182,6 @@ export function InventoryPanel({
         creator: "LUNÉ Activewear",
       });
 
-      // Cabecera de marca.
       doc.setFillColor(73, 55, 45);
       doc.rect(0, 0, pageWidth, 20, "F");
       doc.setTextColor(255, 255, 255);
@@ -174,7 +194,6 @@ export function InventoryPanel({
       doc.setFontSize(8);
       doc.text(generatedAt, pageWidth - margin, 9, { align: "right" });
 
-      // Resumen de filtros y métricas.
       doc.setTextColor(120, 105, 95);
       doc.setFontSize(8);
       doc.text(`Filtros: ${filterSummary}`, margin, 27);
@@ -227,11 +246,7 @@ export function InventoryPanel({
           categoryLabel(product.category),
           state,
           product.colors.map((color) => color.name).join(", ") || "-",
-          product.sizes.length > 0
-            ? product.sizes
-                .map((size) => `${size}: ${sizeStock(product, size) ?? "-"}`)
-                .join(" · ")
-            : "Sin tallas",
+          stockSummary(product),
           registered ? String(units) : "-",
           formatCLP(product.price),
           registered ? formatCLP(product.price * units) : "-",
@@ -247,7 +262,7 @@ export function InventoryPanel({
             "Categoría",
             "Estado",
             "Colores",
-            "Stock por talla",
+            "Stock por color y talla",
             "Unidades",
             "Precio",
             "Valor",
@@ -275,19 +290,18 @@ export function InventoryPanel({
         },
         alternateRowStyles: { fillColor: [248, 244, 239] },
         columnStyles: {
-          0: { cellWidth: 50, fontStyle: "bold" },
-          1: { cellWidth: 27, font: "courier" },
-          2: { cellWidth: 20 },
-          3: { cellWidth: 20 },
-          4: { cellWidth: 38 },
-          5: { cellWidth: 50 },
-          6: { cellWidth: 15, halign: "right" },
-          7: { cellWidth: 21, halign: "right" },
-          8: { cellWidth: 22, halign: "right" },
+          0: { cellWidth: 45, fontStyle: "bold" },
+          1: { cellWidth: 24, font: "courier" },
+          2: { cellWidth: 18 },
+          3: { cellWidth: 18 },
+          4: { cellWidth: 30 },
+          5: { cellWidth: 62 },
+          6: { cellWidth: 14, halign: "right" },
+          7: { cellWidth: 20, halign: "right" },
+          8: { cellWidth: 20, halign: "right" },
         },
       });
 
-      // Pie de página con numeración.
       const pageCount = doc.getNumberOfPages();
       for (let page = 1; page <= pageCount; page += 1) {
         doc.setPage(page);
@@ -349,9 +363,7 @@ export function InventoryPanel({
           <CardHeader>
             <CardTitle className="text-3xl">
               {totals.soldOut}
-              <span className="ml-1 text-base font-normal text-muted-foreground">
-                / {totals.low}
-              </span>
+              <span className="ml-1 text-base font-normal text-muted-foreground">/ {totals.low}</span>
             </CardTitle>
             <CardDescription>Agotados / bajo stock</CardDescription>
           </CardHeader>
@@ -363,7 +375,7 @@ export function InventoryPanel({
           <div>
             <CardTitle className="text-lg">Inventario detallado</CardTitle>
             <CardDescription>
-              Stock por talla, unidades totales y valor de cada producto.
+              Stock por color y talla, unidades totales y valor de cada producto.
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -374,7 +386,7 @@ export function InventoryPanel({
               disabled={filtered.length === 0 || pdfBusy}
             >
               <FileDown className="h-4 w-4" />
-              {pdfBusy ? "Generando…" : "Exportar PDF"}
+              {pdfBusy ? "Generando..." : "Exportar PDF"}
             </Button>
             <Button variant="outline" size="sm" onClick={exportCsv} disabled={filtered.length === 0}>
               <Download className="h-4 w-4" /> Exportar CSV
@@ -439,7 +451,7 @@ export function InventoryPanel({
                       Colores
                     </th>
                     <th scope="col" className="px-3 py-2 font-medium">
-                      Stock por talla
+                      Stock por color y talla
                     </th>
                     <th scope="col" className="px-3 py-2 text-right font-medium">
                       Unidades
@@ -460,6 +472,7 @@ export function InventoryPanel({
                   {pagination.pageItems.map((product) => {
                     const registered = hasStockInfo(product);
                     const units = totalStock(product);
+                    const colors = stockColors(product);
                     return (
                       <tr key={product.id} className="border-t align-top">
                         <td className="px-3 py-3">
@@ -486,7 +499,7 @@ export function InventoryPanel({
                         </td>
                         <td className="px-3 py-3">
                           {product.colors.length === 0 ? (
-                            <span className="text-xs text-muted-foreground">—</span>
+                            <span className="text-xs text-muted-foreground">-</span>
                           ) : (
                             <div className="flex max-w-[10rem] flex-wrap items-center gap-1">
                               {product.colors.slice(0, 6).map((color) => (
@@ -509,59 +522,64 @@ export function InventoryPanel({
                           {product.sizes.length === 0 ? (
                             <span className="text-xs text-muted-foreground">Sin tallas</span>
                           ) : (
-                            <div className="flex max-w-[20rem] flex-wrap gap-1">
-                              {product.sizes.map((size) => {
-                                const stock = sizeStock(product, size);
-                                return (
-                                  <span
-                                    key={size}
-                                    className={`rounded-md border px-1.5 py-0.5 text-[11px] tabular-nums ${stockTone(stock)}`}
-                                  >
-                                    {size}{" "}
-                                    <span className="font-medium">{stock ?? "—"}</span>
-                                  </span>
-                                );
-                              })}
+                            <div className="max-w-[22rem] space-y-2">
+                              {colors.map((colorName) => (
+                                <div key={colorName}>
+                                  {colors.length > 1 && (
+                                    <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                      {colorName}
+                                    </p>
+                                  )}
+                                  <div className="flex flex-wrap gap-1">
+                                    {product.sizes.map((size) => {
+                                      const stock = variantStock(product, size, colorName);
+                                      return (
+                                        <span
+                                          key={`${colorName}-${size}`}
+                                          className={`rounded-md border px-1.5 py-0.5 text-[11px] tabular-nums ${stockTone(stock)}`}
+                                        >
+                                          {size} <span className="font-medium">{stock ?? "-"}</span>
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              ))}
                             </div>
                           )}
                         </td>
-                        <td className="px-3 py-3 text-right tabular-nums">
-                          {registered ? units : "—"}
-                        </td>
-                        <td className="px-3 py-3 text-right tabular-nums">
-                          {formatCLP(product.price)}
-                        </td>
                         <td className="px-3 py-3 text-right font-medium tabular-nums">
-                          {registered ? formatCLP(product.price * units) : "—"}
+                          {registered ? units : <span className="text-muted-foreground">—</span>}
+                        </td>
+                        <td className="px-3 py-3 text-right tabular-nums">{formatCLP(product.price)}</td>
+                        <td className="px-3 py-3 text-right font-medium tabular-nums">
+                          {registered ? (
+                            formatCLP(product.price * units)
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </td>
                         <td className="px-3 py-3">
-                          <div className="flex flex-wrap gap-1">
-                            {product.published === false && (
-                              <Badge variant="outline">Borrador</Badge>
+                          <div className="flex flex-col gap-1">
+                            {product.published === false ? (
+                              <Badge variant="secondary">Borrador</Badge>
+                            ) : (
+                              <Badge>Publicado</Badge>
                             )}
-                            {isSoldOut(product) && <Badge variant="secondary">Agotado</Badge>}
-                            {isLowStock(product) && (
-                              <Badge variant="accent" className="text-amber-800">
-                                Bajo
+                            {isSoldOut(product) ? (
+                              <Badge variant="outline" className="border-destructive/30 text-destructive">
+                                Agotado
                               </Badge>
-                            )}
-                            {product.published !== false &&
-                              !isSoldOut(product) &&
-                              !isLowStock(product) && (
-                                <Badge variant="outline" className="text-muted-foreground">
-                                  Disponible
-                                </Badge>
-                              )}
+                            ) : isLowStock(product) ? (
+                              <Badge variant="outline" className="border-amber-500/30 text-amber-700">
+                                Bajo stock
+                              </Badge>
+                            ) : null}
                           </div>
                         </td>
                         <td className="px-3 py-3 text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            title="Editar producto y stock"
-                            onClick={() => onEdit(product)}
-                          >
-                            <Pencil className="h-4 w-4" />
+                          <Button variant="ghost" size="sm" onClick={() => onEdit(product)}>
+                            <Pencil className="h-3.5 w-3.5" /> Editar
                           </Button>
                         </td>
                       </tr>
@@ -574,17 +592,16 @@ export function InventoryPanel({
 
           <Pagination
             page={pagination.page}
-            pageSize={pagination.pageSize}
-            total={pagination.total}
             totalPages={pagination.totalPages}
+            total={pagination.total}
+            pageSize={pagination.pageSize}
             onPageChange={pagination.setPage}
-            onPageSizeChange={pagination.setPageSize}
             itemLabel="productos"
           />
 
           <p className="text-[11px] text-muted-foreground">
-            «—» significa que el producto no tiene stock registrado: la tienda lo considera
-            disponible sin límite. Los valores usan el precio de venta × unidades registradas.
+            «—» = sin stock registrado: disponible sin límite. «Agotado/Bajo stock» se calculan con
+            el total de unidades registradas por color y talla.
           </p>
         </CardContent>
       </Card>

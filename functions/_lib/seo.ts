@@ -79,13 +79,26 @@ const map = (field: unknown): Record<string, unknown> =>
 /** Convierte un documento de Firestore (REST) en los datos que usa el edge. */
 export function normalizeDoc(id: string, fields: Record<string, unknown>): ProductMeta {
   const sizes = arr(fields.sizes).map((value) => str(value));
-  const stock = map(fields.stockBySize);
-  const soldOut =
-    sizes.length > 0 &&
-    sizes.every((size) => {
-      const entry = stock[size];
-      return entry ? num(entry) === 0 : false;
-    });
+  const legacyStock = map(fields.stockBySize);
+  const variantStock = map(fields.stockByVariant);
+  const variantColors = Object.keys(variantStock);
+  let soldOut = false;
+  if (sizes.length > 0) {
+    if (variantColors.length > 0) {
+      soldOut = sizes.every((size) =>
+        variantColors.every((color) => {
+          const bySize = map(variantStock[color]);
+          const entry = bySize[size];
+          return entry ? num(entry) === 0 : false;
+        })
+      );
+    } else {
+      soldOut = sizes.every((size) => {
+        const entry = legacyStock[size];
+        return entry ? num(entry) === 0 : false;
+      });
+    }
+  }
   const publishedField = fields.published as { booleanValue?: boolean } | undefined;
 
   return {
