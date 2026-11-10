@@ -24,6 +24,7 @@ import {
 import { categoryLabel } from "@/lib/categories";
 import { isLowStock, isSoldOut, sizeStock, totalStock } from "@/lib/stock";
 import { formatCLP } from "@/lib/utils";
+import { SupplierPurchases } from "@/components/admin/SupplierPurchases";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -484,6 +485,7 @@ export function SuppliersManager({ products }: { products: Product[] }) {
                             })}
                           </div>
                         )}
+                        <SupplierPurchases supplier={supplier} products={products} />
                       </div>
                     )}
                   </div>
