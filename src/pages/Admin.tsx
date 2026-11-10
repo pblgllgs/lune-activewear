@@ -1317,8 +1317,15 @@ export default function Admin() {
         <div className="flex flex-col gap-1 rounded-xl border bg-card p-3 md:sticky md:top-24">
           <div className="mb-2 flex items-center justify-between px-2">
             <span className="text-[10px] uppercase tracking-brand text-muted-foreground">Panel</span>
-            <Button variant="ghost" size="icon" onClick={() => signOut(firebaseAuth)} title="Cerrar sesión">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-1.5 px-2 normal-case tracking-normal text-muted-foreground hover:text-foreground"
+              onClick={() => firebaseAuth && void signOut(firebaseAuth)}
+              title="Cerrar sesión"
+            >
               <LogOut className="h-4 w-4" />
+              <span className="text-xs">Cerrar sesión</span>
             </Button>
           </div>
           {MENU.map((item) => (

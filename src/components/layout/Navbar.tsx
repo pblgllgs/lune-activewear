@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, Heart, Search, ShoppingBag, UserRound, X } from "lucide-react";
+import { LogOut, Menu, Heart, Search, ShoppingBag, UserRound, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { isAdminEmail } from "@/lib/admin";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
 import { CATEGORIES } from "@/lib/categories";
@@ -30,11 +31,12 @@ function Wordmark() {
 export function Navbar() {
   const [open, setOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const { displayName } = useAuth();
+  const { user, displayName, signOutUser } = useAuth();
   const { count, openCart } = useCart();
   const { count: wishlistCount } = useWishlist();
   const location = useLocation();
   const firstName = displayName.trim().split(/\s+/)[0] ?? "";
+  const isAdmin = isAdminEmail(user?.email);
 
   useEffect(() => {
     setOpen(false);
@@ -71,18 +73,45 @@ export function Navbar() {
         <Wordmark />
 
         <div className="flex items-center justify-end gap-1">
-          <Link
-            to="/cuenta"
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-2 transition hover:bg-secondary"
-            aria-label={firstName ? `Mi cuenta — Bienvenida, ${firstName}` : "Mi cuenta"}
-          >
-            <UserRound className="h-5 w-5 shrink-0" />
-            {firstName && (
-              <span className="hidden whitespace-nowrap text-[11px] uppercase tracking-wider2 lg:inline">
-                Bienvenida, {firstName}
-              </span>
+          <div className="group relative">
+            <Link
+              to={isAdmin ? "/admin" : "/cuenta"}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-2 transition hover:bg-secondary"
+              aria-label={
+                user
+                  ? isAdmin
+                    ? "Panel de administración"
+                    : firstName
+                      ? `Mi cuenta — Bienvenida, ${firstName}`
+                      : "Mi cuenta"
+                  : "Mi cuenta"
+              }
+            >
+              <UserRound className="h-5 w-5 shrink-0" />
+              {firstName && (
+                <span className="hidden whitespace-nowrap text-[11px] uppercase tracking-wider2 lg:inline">
+                  Bienvenida, {firstName}
+                </span>
+              )}
+            </Link>
+            {user && (
+              <div className="invisible absolute right-0 top-full z-50 mt-1 min-w-[11rem] rounded-md border border-border bg-background p-1 opacity-0 shadow-md transition group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
+                <Link
+                  to={isAdmin ? "/admin" : "/cuenta"}
+                  className="block rounded-sm px-3 py-2 text-[11px] uppercase tracking-wider2 text-foreground/80 transition hover:bg-secondary hover:text-foreground"
+                >
+                  {isAdmin ? "Panel de administración" : "Mi cuenta"}
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => void signOutUser()}
+                  className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-[11px] uppercase tracking-wider2 text-foreground/80 transition hover:bg-secondary hover:text-foreground"
+                >
+                  <LogOut className="h-3.5 w-3.5" /> Cerrar sesión
+                </button>
+              </div>
             )}
-          </Link>
+          </div>
           <button
             type="button"
             onClick={() => setSearchOpen(true)}
@@ -151,21 +180,40 @@ export function Navbar() {
             </div>
 
             <Link
-              to="/cuenta"
+              to={isAdmin ? "/admin" : "/cuenta"}
               onClick={() => setOpen(false)}
               className="mt-4 flex items-center gap-2 px-2 py-2 text-[11px] uppercase tracking-wider2 text-muted-foreground"
             >
               <UserRound className="h-4 w-4" />
-              {firstName ? `Bienvenida, ${firstName}` : "Mi cuenta"}
+              {user
+                ? isAdmin
+                  ? "Panel de administración"
+                  : firstName
+                    ? `Bienvenida, ${firstName}`
+                    : "Mi cuenta"
+                : "Mi cuenta"}
             </Link>
 
-            <Link
-              to="/admin"
-              onClick={() => setOpen(false)}
-              className="mt-1 px-2 py-2 text-[11px] uppercase tracking-wider2 text-muted-foreground"
-            >
-              Administración
-            </Link>
+            {user ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  void signOutUser();
+                }}
+                className="mt-1 flex items-center gap-2 px-2 py-2 text-left text-[11px] uppercase tracking-wider2 text-muted-foreground"
+              >
+                <LogOut className="h-4 w-4" /> Cerrar sesión
+              </button>
+            ) : (
+              <Link
+                to="/admin"
+                onClick={() => setOpen(false)}
+                className="mt-1 px-2 py-2 text-[11px] uppercase tracking-wider2 text-muted-foreground"
+              >
+                Administración
+              </Link>
+            )}
           </div>
         </div>
       )}
