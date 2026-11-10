@@ -78,7 +78,7 @@ worker/          Cloudflare Worker para R2 (upload/serve/delete)
 | `/categoria/<id>` | Categoría con URL propia e indexable (`calzas`, `petos`, `shorts`, `poleras`) |
 | `/producto/:id` | Ficha de producto con guía de tallas, stock y WhatsApp |
 | `/favoritos` | Wishlist del dispositivo (`noindex`) |
-| `/cuenta` | Acceso de clientas con enlace al correo y «Mis pedidos» (`noindex`) |
+| `/cuenta` | Acceso de clientas con enlace al correo, nombre y «Mis pedidos» (`noindex`) |
 | `/privacidad` | Política de datos (Ley 21.719) y cookies |
 | `/nosotros` | Historia de la marca |
 | `/admin` | Panel de administración (`noindex`) |
@@ -109,6 +109,9 @@ worker/          Cloudflare Worker para R2 (upload/serve/delete)
   existe, se asume activo.
 - Colección `orders`: además de los datos de la clienta, cada orden guarda
   `customerEmail` (minúsculas) y `userId` (si hay sesión) para «Mis pedidos».
+- Nombre de la clienta: en el primer inicio de sesión `/cuenta` pide «¿Cómo quieres que te
+  llamemos?» y lo guarda en Firebase Auth (`displayName`). La navbar saluda «Bienvenida,
+  {nombre}» y «Mis pedidos» aparece recién cuando hay nombre.
 
 ## Descripción enriquecida
 

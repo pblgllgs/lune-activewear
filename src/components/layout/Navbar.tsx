@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Menu, Heart, Search, ShoppingBag, UserRound, X } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
 import { CATEGORIES } from "@/lib/categories";
@@ -29,9 +30,11 @@ function Wordmark() {
 export function Navbar() {
   const [open, setOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const { displayName } = useAuth();
   const { count, openCart } = useCart();
   const { count: wishlistCount } = useWishlist();
   const location = useLocation();
+  const firstName = displayName.trim().split(/\s+/)[0] ?? "";
 
   useEffect(() => {
     setOpen(false);
@@ -70,10 +73,15 @@ export function Navbar() {
         <div className="flex items-center justify-end gap-1">
           <Link
             to="/cuenta"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-md transition hover:bg-secondary"
-            aria-label="Mi cuenta"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-2 transition hover:bg-secondary"
+            aria-label={firstName ? `Mi cuenta — Bienvenida, ${firstName}` : "Mi cuenta"}
           >
-            <UserRound className="h-5 w-5" />
+            <UserRound className="h-5 w-5 shrink-0" />
+            {firstName && (
+              <span className="hidden whitespace-nowrap text-[11px] uppercase tracking-wider2 lg:inline">
+                Bienvenida, {firstName}
+              </span>
+            )}
           </Link>
           <button
             type="button"
@@ -147,7 +155,8 @@ export function Navbar() {
               onClick={() => setOpen(false)}
               className="mt-4 flex items-center gap-2 px-2 py-2 text-[11px] uppercase tracking-wider2 text-muted-foreground"
             >
-              <UserRound className="h-4 w-4" /> Mi cuenta
+              <UserRound className="h-4 w-4" />
+              {firstName ? `Bienvenida, ${firstName}` : "Mi cuenta"}
             </Link>
 
             <Link

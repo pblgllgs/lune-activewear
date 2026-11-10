@@ -150,7 +150,7 @@ function MyOrders({ email, userId }: { email: string; userId?: string }) {
 }
 
 export default function Account() {
-  const { user, loading, signOutUser } = useAuth();
+  const { user, displayName, loading, signOutUser, updateDisplayName } = useAuth();
   const [magicEnabled, setMagicEnabled] = useState(true);
   const [email, setEmail] = useState("");
   const [linkEmail, setLinkEmail] = useState("");
@@ -160,6 +160,9 @@ export default function Account() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [cooldown, setCooldown] = useState(false);
+  const [nameInput, setNameInput] = useState("");
+  const [nameError, setNameError] = useState("");
+  const [savingName, setSavingName] = useState(false);
 
   useSeo({
     title: "Mi cuenta | LUNÉ Activewear",
@@ -237,6 +240,25 @@ export default function Account() {
     toast.success("Sesión cerrada.");
   };
 
+  const saveName = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setNameError("");
+    const clean = nameInput.trim().replace(/\s+/g, " ");
+    if (clean.length < 2) {
+      setNameError("Escribe al menos 2 caracteres.");
+      return;
+    }
+    setSavingName(true);
+    try {
+      await updateDisplayName(clean);
+      toast.success(`¡Bienvenida, ${clean}!`);
+    } catch {
+      setNameError("No pudimos guardar tu nombre. Intenta de nuevo.");
+    } finally {
+      setSavingName(false);
+    }
+  };
+
   return (
     <div className="container max-w-3xl py-12 md:py-16">
       <header>
@@ -246,9 +268,23 @@ export default function Account() {
         <h1 className="mt-3 font-display text-4xl font-medium tracking-tight md:text-5xl">
           Mi cuenta
         </h1>
-        <p className="mt-4 max-w-xl text-sm leading-relaxed text-muted-foreground">
-          Entra con tu correo para ver tus pedidos, su estado y su detalle.
-        </p>
+        {!loading && (
+          <p className="mt-4 max-w-xl text-sm leading-relaxed text-muted-foreground">
+            {user ? (
+              displayName ? (
+                <>
+                  Bienvenida,{" "}
+                  <span className="font-medium text-foreground">{displayName}</span>. Aquí
+                  puedes revisar tus pedidos, su estado y su detalle.
+                </>
+              ) : (
+                "Cuéntanos cómo quieres que te llamemos para empezar."
+              )
+            ) : (
+              "Entra con tu correo para ver tus pedidos, su estado y su detalle."
+            )}
+          </p>
+        )}
       </header>
 
       {!isFirebaseConfigured ? (
@@ -259,6 +295,37 @@ export default function Account() {
         <p className="py-16 text-center text-sm text-muted-foreground">Cargando…</p>
       ) : user && !pendingLink ? (
         <div className="mt-8 space-y-6">
+          {!displayName && (
+            <Card className="border-primary/25 bg-secondary/30">
+              <CardHeader>
+                <CardTitle className="text-xl">¿Cómo quieres que te llamemos?</CardTitle>
+                <CardDescription>
+                  Así te saludamos en tu cuenta. Solo necesitamos un nombre.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={saveName} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="display-name">Tu nombre</Label>
+                    <Input
+                      id="display-name"
+                      value={nameInput}
+                      onChange={(event) => setNameInput(event.target.value)}
+                      placeholder="Ej: Camila"
+                      autoComplete="given-name"
+                      maxLength={60}
+                      required
+                    />
+                  </div>
+                  {nameError && <p className="text-sm text-destructive">{nameError}</p>}
+                  <Button className="w-full" disabled={savingName}>
+                    {savingName ? "Guardando…" : "Guardar y continuar"}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
               <div className="flex items-center gap-3">
@@ -278,14 +345,16 @@ export default function Account() {
             </CardContent>
           </Card>
 
-          <section>
-            <h2 className="flex items-center gap-2 font-display text-xl">
-              <Package className="h-4 w-4" /> Mis pedidos
-            </h2>
-            <div className="mt-3">
-              {user.email ? <MyOrders email={user.email} userId={user.uid} /> : null}
-            </div>
-          </section>
+          {displayName ? (
+            <section>
+              <h2 className="flex items-center gap-2 font-display text-xl">
+                <Package className="h-4 w-4" /> Mis pedidos
+              </h2>
+              <div className="mt-3">
+                {user.email ? <MyOrders email={user.email} userId={user.uid} /> : null}
+              </div>
+            </section>
+          ) : null}
         </div>
       ) : (
         <Card className="mt-8">
