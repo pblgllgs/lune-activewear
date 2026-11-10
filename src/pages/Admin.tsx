@@ -22,6 +22,7 @@ import Swal from "sweetalert2";
 import {
   AlertCircle,
   Boxes,
+  ClipboardList,
   Eye,
   EyeOff,
   Hash,
@@ -44,6 +45,7 @@ import {
 import { auth, db, isFirebaseConfigured } from "@/lib/firebase";
 import { ContentManager } from "@/components/admin/ContentManager";
 import { InventoryPanel } from "@/components/admin/InventoryPanel";
+import { OrdersManager } from "@/components/admin/OrdersManager";
 import { ProductPreview } from "@/components/admin/ProductPreview";
 import { ReviewsModeration } from "@/components/admin/ReviewsModeration";
 import { SuppliersManager } from "@/components/admin/SuppliersManager";
@@ -77,6 +79,7 @@ type Tab =
   | "productos"
   | "inventario"
   | "proveedores"
+  | "ordenes"
   | "contenido"
   | "comentarios";
 
@@ -1135,6 +1138,7 @@ const MENU: { tab: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { tab: "productos", label: "Productos", icon: Package },
   { tab: "inventario", label: "Inventario", icon: Boxes },
   { tab: "proveedores", label: "Proveedores", icon: Truck },
+  { tab: "ordenes", label: "Órdenes de compra", icon: ClipboardList },
   { tab: "comentarios", label: "Comentarios", icon: MessageSquare },
   { tab: "contenido", label: "Contenido", icon: ImagePlus },
 ];
@@ -1371,7 +1375,9 @@ export default function Admin() {
                     ? "Inventario"
                     : tab === "proveedores"
                       ? "Proveedores"
-                      : "Catálogo"}
+                      : tab === "ordenes"
+                        ? "Órdenes de compra"
+                        : "Catálogo"}
             </h1>
           </div>
           {firebaseAuth.currentUser?.email && (
@@ -1446,6 +1452,9 @@ export default function Admin() {
                 <Button variant="outline" onClick={() => setTab("proveedores")}>
                   <Truck className="h-4 w-4" /> Proveedores
                 </Button>
+                <Button variant="outline" onClick={() => setTab("ordenes")}>
+                  <ClipboardList className="h-4 w-4" /> Órdenes de compra
+                </Button>
                 {missingSkus > 0 && (
                   <Button variant="outline" onClick={fillMissingSkus} disabled={fillingSkus}>
                     <Hash className="h-4 w-4" />
@@ -1472,6 +1481,7 @@ export default function Admin() {
         )}
 
         {tab === "proveedores" && <SuppliersManager products={products} />}
+        {tab === "ordenes" && <OrdersManager />}
 
         {tab === "productos" && (
           <>
