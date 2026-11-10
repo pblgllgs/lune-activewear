@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { LogOut, Mail, Package, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
@@ -13,6 +13,7 @@ import {
   storedMagicEmail,
 } from "@/lib/auth";
 import { getMyOrders } from "@/lib/orders";
+import { isAdminEmail } from "@/lib/admin";
 import { usePagination } from "@/lib/use-pagination";
 import { useSeo } from "@/lib/seo";
 import { formatCLP } from "@/lib/utils";
@@ -151,6 +152,8 @@ function MyOrders({ email, userId }: { email: string; userId?: string }) {
 
 export default function Account() {
   const { user, displayName, loading, signOutUser, updateDisplayName } = useAuth();
+  const navigate = useNavigate();
+  const adminSession = isAdminEmail(user?.email);
   const [magicEnabled, setMagicEnabled] = useState(true);
   const [email, setEmail] = useState("");
   const [linkEmail, setLinkEmail] = useState("");
@@ -181,6 +184,11 @@ export default function Account() {
       cancelled = true;
     };
   }, []);
+
+  // Un admin que entra por aquí va directo a su panel.
+  useEffect(() => {
+    if (!loading && adminSession) navigate("/admin", { replace: true });
+  }, [loading, adminSession, navigate]);
 
   // Enlace mágico recién abierto: se pide confirmar el correo si hace falta.
   useEffect(() => {
@@ -270,7 +278,9 @@ export default function Account() {
         </h1>
         {!loading && (
           <p className="mt-4 max-w-xl text-sm leading-relaxed text-muted-foreground">
-            {user ? (
+            {adminSession ? (
+              "Te llevamos al panel de administración."
+            ) : user ? (
               displayName ? (
                 <>
                   Bienvenida,{" "}
@@ -293,6 +303,10 @@ export default function Account() {
         </p>
       ) : loading ? (
         <p className="py-16 text-center text-sm text-muted-foreground">Cargando…</p>
+      ) : adminSession ? (
+        <p className="py-16 text-center text-sm text-muted-foreground">
+          Abriendo el panel de administración…
+        </p>
       ) : user && !pendingLink ? (
         <div className="mt-8 space-y-6">
           {!displayName && (

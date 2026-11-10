@@ -43,6 +43,7 @@ import {
   X,
 } from "lucide-react";
 import { auth, db, isFirebaseConfigured } from "@/lib/firebase";
+import { isAdminEmail } from "@/lib/admin";
 import { AuthSettings } from "@/components/admin/AuthSettings";
 import { ContentManager } from "@/components/admin/ContentManager";
 import { InventoryPanel } from "@/components/admin/InventoryPanel";
@@ -89,13 +90,7 @@ type Tab =
   | "comentarios"
   | "ajustes";
 
-const ADMIN_EMAILS = ((import.meta.env.VITE_ADMIN_EMAILS as string) || "")
-  .split(",")
-  .map((e) => e.trim())
-  .filter(Boolean);
-
-/** Columnas editables de la guía de tallas: cada medida es un rango desde/hasta. */const SIZE_GUIDE_FIELDS = [
-  { label: "Busto", min: "bustMin", max: "bustMax" },
+/** Columnas editables de la guía de tallas: cada medida es un rango desde/hasta. */const SIZE_GUIDE_FIELDS = [  { label: "Busto", min: "bustMin", max: "bustMax" },
   { label: "Cintura", min: "waistMin", max: "waistMax" },
   { label: "Cadera", min: "hipMin", max: "hipMax" },
 ] as const;
@@ -1150,9 +1145,9 @@ export default function Admin() {
     const currentAuth = auth;
     if (!currentAuth) return;
     return onAuthStateChanged(currentAuth, (user) => {
-      const allowed = Boolean(user?.email && ADMIN_EMAILS.includes(user.email));
+      const allowed = isAdminEmail(user?.email);
       setIsAdmin(allowed);
-      if (user?.email && !ADMIN_EMAILS.includes(user.email)) {
+      if (user?.email && !allowed) {
         void signOut(currentAuth);
       }
     });
