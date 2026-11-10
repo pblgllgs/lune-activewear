@@ -45,3 +45,11 @@ export interface CreateOrderInput {
   coupon?: string;
   notes?: string;
 }
+
+export interface UpdateOrderInput {
+  customer: OrderCustomer;
+  /** Solo se aplica cuando la orden está pendiente. */
+  items?: OrderItem[];
+  coupon?: string;
+  notes?: string;
+}
