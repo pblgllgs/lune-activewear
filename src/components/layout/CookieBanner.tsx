@@ -44,7 +44,7 @@ export function CookieBanner() {
 
   return (
     <div
-      className="fixed inset-x-4 bottom-20 z-50 sm:inset-x-auto sm:bottom-5 sm:left-5 sm:w-[22rem]"
+      className="fixed inset-x-4 bottom-20 z-50 sm:inset-x-auto sm:bottom-5 sm:right-5 sm:w-[22rem]"
       role="dialog"
       aria-live="polite"
       aria-label="Aviso de cookies"

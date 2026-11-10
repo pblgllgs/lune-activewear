@@ -7,7 +7,7 @@ export function WhatsAppFloat() {
       target="_blank"
       rel="noreferrer"
       aria-label="Escríbenos por WhatsApp"
-      className="fixed bottom-5 right-5 z-40 flex items-center justify-center rounded-full bg-whatsapp text-whatsapp-foreground shadow-lg shadow-whatsapp/30 ring-1 ring-black/5 transition hover:scale-105 hover:bg-whatsapp-dark"
+      className="fixed bottom-5 left-5 z-40 flex items-center justify-center rounded-full bg-whatsapp text-whatsapp-foreground shadow-lg shadow-whatsapp/30 ring-1 ring-black/5 transition hover:scale-105 hover:bg-whatsapp-dark"
       style={{ height: "3.25rem", width: "3.25rem" }}
     >
       <svg viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6">
