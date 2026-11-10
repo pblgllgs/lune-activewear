@@ -23,6 +23,8 @@ import {
   AlertCircle,
   BarChart3,
   Boxes,
+  ChevronLeft,
+  ChevronRight,
   ClipboardList,
   Eye,
   EyeOff,
@@ -545,6 +547,16 @@ function ProductForm({
       const image = current.find((i) => i.id === id);
       if (image?.file) URL.revokeObjectURL(image.url);
       return current.filter((i) => i.id !== id);
+    });
+
+  const moveImage = (index: number, direction: -1 | 1) =>
+    setImages((current) => {
+      const nextIndex = index + direction;
+      if (nextIndex < 0 || nextIndex >= current.length) return current;
+      const copy = [...current];
+      const [item] = copy.splice(index, 1);
+      copy.splice(nextIndex, 0, item);
+      return copy;
     });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1087,7 +1099,7 @@ function ProductForm({
 
             {images.length > 0 && (
               <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                {images.map((image) => (
+                {images.map((image, index) => (
                   <div key={image.id} className="space-y-2 rounded-lg border p-2">
                     <div className="relative">
                       <img
@@ -1103,11 +1115,51 @@ function ProductForm({
                       >
                         <X className="h-3 w-3" />
                       </button>
+                      {index === 0 ? (
+                        <span className="absolute left-1 top-1 rounded bg-primary px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-primary-foreground">
+                          Principal
+                        </span>
+                      ) : (
+                        <span className="absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[9px] text-white">
+                          {index + 1}
+                        </span>
+                      )}
                       {image.file && (
                         <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1 text-[9px] text-white">
                           nueva
                         </span>
                       )}
+                    </div>
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-[10px] text-muted-foreground">
+                        {index === 0 ? "Foto principal" : `Posición ${index + 1}`}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => moveImage(index, -1)}
+                          disabled={index === 0}
+                          aria-label="Mover imagen a la izquierda"
+                          title="Mover antes"
+                        >
+                          <ChevronLeft className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => moveImage(index, 1)}
+                          disabled={index === images.length - 1}
+                          aria-label="Mover imagen a la derecha"
+                          title="Mover después"
+                        >
+                          <ChevronRight className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
                     <Select
                       value={image.color || "__none__"}
