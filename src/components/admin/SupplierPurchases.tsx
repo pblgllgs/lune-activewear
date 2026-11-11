@@ -300,8 +300,8 @@ export function SupplierPurchases({
             </Button>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-[200px_1fr] sm:items-end">
-            <div className="space-y-1.5">
+          <div className="grid gap-3">
+            <div className="space-y-1.5 sm:max-w-xs">
               <Label htmlFor={`purchase-date-${supplier.id}`}>Fecha</Label>
               <Input
                 id={`purchase-date-${supplier.id}`}
