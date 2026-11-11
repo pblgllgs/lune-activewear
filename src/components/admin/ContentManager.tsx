@@ -316,6 +316,7 @@ export function ContentManager() {
   const [aboutDrafts, setAboutDrafts] = useState<Record<AboutSlotKey, DraftImage>>(() =>
     toAboutDrafts(DEFAULT_SITE_CONTENT)
   );
+  const [guidesEnabled, setGuidesEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -326,6 +327,7 @@ export function ContentManager() {
         if (!active) return;
         setHeroDrafts(toHeroDrafts(content));
         setAboutDrafts(toAboutDrafts(content));
+        setGuidesEnabled(content.guidesEnabled !== false);
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -373,6 +375,7 @@ export function ContentManager() {
           aboutDrafts.aboutImageTwo,
           DEFAULT_SITE_CONTENT.aboutImageTwo
         ),
+        guidesEnabled,
       };
 
       await setDoc(

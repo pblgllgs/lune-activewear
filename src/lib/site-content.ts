@@ -21,6 +21,8 @@ export interface SiteContent {
   heroSlides: HeroSlide[];
   aboutImageOne: string;
   aboutImageTwo: string;
+  /** Muestra u oculta el enlace "Guías" en el navbar público. */
+  guidesEnabled: boolean;
   updatedAt?: string;
 }
 
@@ -64,6 +66,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     "site/about-2.jpg",
     "https://images.pexels.com/photos/4498157/pexels-photo-4498157.jpeg?auto=compress&cs=tinysrgb&w=1000"
   ),
+  guidesEnabled: true,
 };
 
 const text = (value: unknown, fallback: string) =>
@@ -121,6 +124,7 @@ export async function getSiteContent(): Promise<SiteContent> {
       heroSlides,
       aboutImageOne: text(data.aboutImageOne, DEFAULT_SITE_CONTENT.aboutImageOne),
       aboutImageTwo: text(data.aboutImageTwo, DEFAULT_SITE_CONTENT.aboutImageTwo),
+      guidesEnabled: typeof data.guidesEnabled === "boolean" ? data.guidesEnabled : true,
       updatedAt: data.updatedAt ? String(data.updatedAt) : undefined,
     };
   } catch (error) {

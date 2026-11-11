@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { doc, setDoc } from "firebase/firestore";
 import { BookOpen, Eye, EyeOff, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import Swal from "sweetalert2";
@@ -9,7 +10,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { db } from "@/lib/firebase";
 import { deleteGuide, saveGuide, slugifyGuide, subscribeGuides } from "@/lib/guides";
+import { getSiteContent } from "@/lib/site-content";
 import { usePagination } from "@/lib/use-pagination";
 import { isUploadConfigured, uploadToR2 } from "@/lib/upload";
 import type { Guide } from "@/types/guide";
@@ -40,8 +43,14 @@ export function GuidesManager() {
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string>("");
   const [saving, setSaving] = useState(false);
+  const [guidesVisible, setGuidesVisible] = useState(true);
+  const [savingVisibility, setSavingVisibility] = useState(false);
 
   useEffect(() => subscribeGuides(setGuides, true), []);
+
+  useEffect(() => {
+    getSiteContent().then((content) => setGuidesVisible(content.guidesEnabled));
+  }, []);
 
   useEffect(() => {
     if (!coverFile) {
@@ -145,11 +154,52 @@ export function GuidesManager() {
     }
   };
 
+  const toggleGuidesVisibility = async () => {
+    if (!db) {
+      toast.error("Firebase no está configurado.");
+      return;
+    }
+    const next = !guidesVisible;
+    try {
+      setSavingVisibility(true);
+      await setDoc(doc(db, "settings", "site"), { guidesEnabled: next }, { merge: true });
+      setGuidesVisible(next);
+      toast.success(next ? "Guías visibles en el menú." : "Guías ocultas del menú.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo actualizar la visibilidad.");
+    } finally {
+      setSavingVisibility(false);
+    }
+  };
+
   const showForm = creating || Boolean(editing);
   const slugPreview = slugifyGuide(form.slug || form.title);
 
   return (
     <div className="space-y-4">
+      <Card>
+        <CardHeader className="gap-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+          <div>
+            <CardTitle className="text-base">Visibilidad en el sitio</CardTitle>
+            <CardDescription>
+              Muestra u oculta el enlace “Guías” en el menú de navegación.
+            </CardDescription>
+          </div>
+          <Button
+            type="button"
+            variant={guidesVisible ? "outline" : "secondary"}
+            onClick={() => void toggleGuidesVisibility()}
+            disabled={savingVisibility}
+          >
+            {guidesVisible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+            {savingVisibility
+              ? "Guardando…"
+              : guidesVisible
+                ? "Visible en el menú"
+                : "Oculta del menú"}
+          </Button>
+        </CardHeader>
+      </Card>
       {showForm ? (
         <Card>
           <CardHeader>

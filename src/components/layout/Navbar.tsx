@@ -6,9 +6,10 @@ import { isAdminEmail } from "@/lib/admin";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
 import { CATEGORIES } from "@/lib/categories";
+import { getSiteContent } from "@/lib/site-content";
 import { SearchDialog } from "@/components/shop/SearchDialog";
 
-const links = [
+const baseLinks = [
   { label: "Inicio", to: "/" },
   { label: "Tienda", to: "/tienda" },
   { label: "Guías", to: "/guias" },
@@ -33,18 +34,32 @@ export function Navbar() {
   const [open, setOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [guidesEnabled, setGuidesEnabled] = useState(true);
   const { user, displayName, signOutUser } = useAuth();
   const { count, openCart } = useCart();
   const { count: wishlistCount } = useWishlist();
   const location = useLocation();
   const firstName = displayName.trim().split(/\s+/)[0] ?? "";
   const isAdmin = isAdminEmail(user?.email);
+  const links = guidesEnabled ? baseLinks : baseLinks.filter((link) => link.to !== "/guias");
 
   useEffect(() => {
     setOpen(false);
     setSearchOpen(false);
     setAccountMenuOpen(false);
   }, [location.pathname, location.hash]);
+
+  useEffect(() => {
+    let active = true;
+    getSiteContent()
+      .then((content) => {
+        if (active) setGuidesEnabled(content.guidesEnabled !== false);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <>
