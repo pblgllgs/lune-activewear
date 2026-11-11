@@ -84,8 +84,7 @@ export default function Home() {
               Sporty · Feminine · Modern
             </p>
             <p className="mt-6 max-w-sm text-sm leading-relaxed text-muted-foreground md:text-base">
-              Ropa deportiva femenina diseñada para acompañarte dentro y fuera del gimnasio, con
-              comodidad y estilo.
+              
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Button asChild size="lg">

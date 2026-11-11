@@ -63,8 +63,7 @@ export function Footer() {
               </span>
             </Link>
             <p className="mt-5 max-w-xs text-sm leading-relaxed text-primary-foreground/70">
-              Ropa deportiva femenina diseñada en Chillán, Chile. Prendas para acompañarte dentro y
-              fuera del gimnasio, con comodidad y estilo.
+              
             </p>
             <div className="mt-6 flex gap-2">
               <a
