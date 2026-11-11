@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { db } from "@/lib/firebase";
 import { deleteGuide, saveGuide, slugifyGuide, subscribeGuides } from "@/lib/guides";
@@ -154,18 +155,22 @@ export function GuidesManager() {
     }
   };
 
-  const toggleGuidesVisibility = async () => {
+  const toggleGuidesVisibility = async (next: boolean) => {
     if (!db) {
       toast.error("Firebase no está configurado.");
       return;
     }
-    const next = !guidesVisible;
+    const previous = guidesVisible;
+    setGuidesVisible(next);
     try {
       setSavingVisibility(true);
       await setDoc(doc(db, "settings", "site"), { guidesEnabled: next }, { merge: true });
-      setGuidesVisible(next);
+      try {
+        localStorage.setItem("lune:guidesEnabled", String(next));
+      } catch {}
       toast.success(next ? "Guías visibles en el menú." : "Guías ocultas del menú.");
     } catch (error) {
+      setGuidesVisible(previous);
       toast.error(error instanceof Error ? error.message : "No se pudo actualizar la visibilidad.");
     } finally {
       setSavingVisibility(false);
@@ -185,19 +190,22 @@ export function GuidesManager() {
               Muestra u oculta el enlace “Guías” en el menú de navegación.
             </CardDescription>
           </div>
-          <Button
-            type="button"
-            variant={guidesVisible ? "outline" : "secondary"}
-            onClick={() => void toggleGuidesVisibility()}
-            disabled={savingVisibility}
-          >
-            {guidesVisible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-            {savingVisibility
-              ? "Guardando…"
-              : guidesVisible
-                ? "Visible en el menú"
-                : "Oculta del menú"}
-          </Button>
+          <div className="flex items-center gap-3">
+            <Label htmlFor="guides-visible" className="text-sm font-normal text-foreground">
+              {savingVisibility
+                ? "Guardando…"
+                : guidesVisible
+                  ? "Visible en el menú"
+                  : "Oculta del menú"}
+            </Label>
+            <Switch
+              id="guides-visible"
+              checked={guidesVisible}
+              onCheckedChange={(checked) => void toggleGuidesVisibility(checked)}
+              disabled={savingVisibility}
+              aria-label="Mostrar u ocultar Guías en el menú"
+            />
+          </div>
         </CardHeader>
       </Card>
       {showForm ? (

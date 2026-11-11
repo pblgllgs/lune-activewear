@@ -34,7 +34,14 @@ export function Navbar() {
   const [open, setOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
-  const [guidesEnabled, setGuidesEnabled] = useState(true);
+  const [guidesEnabled, setGuidesEnabled] = useState<boolean>(() => {
+    try {
+      const cached = localStorage.getItem("lune:guidesEnabled");
+      return cached === null ? true : cached === "true";
+    } catch {
+      return true;
+    }
+  });
   const { user, displayName, signOutUser } = useAuth();
   const { count, openCart } = useCart();
   const { count: wishlistCount } = useWishlist();
@@ -53,7 +60,12 @@ export function Navbar() {
     let active = true;
     getSiteContent()
       .then((content) => {
-        if (active) setGuidesEnabled(content.guidesEnabled !== false);
+        if (!active) return;
+        const enabled = content.guidesEnabled !== false;
+        setGuidesEnabled(enabled);
+        try {
+          localStorage.setItem("lune:guidesEnabled", String(enabled));
+        } catch {}
       })
       .catch(() => {});
     return () => {
