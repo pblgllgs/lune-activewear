@@ -755,11 +755,6 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
                         <p className="mt-1 text-xs text-muted-foreground">
                           {formatDateTime(order.createdAt)} · {order.customer.name || "Sin nombre"}
                         </p>
-                        {order.notes && (
-                          <p className="mt-1 line-clamp-2 text-xs text-foreground/80">
-                            <span className="text-muted-foreground">Notas:</span> {order.notes}
-                          </p>
-                        )}
                       </div>
                       <div className="text-right">
                         <p className="font-display text-lg">{formatCLP(order.subtotal)}</p>
