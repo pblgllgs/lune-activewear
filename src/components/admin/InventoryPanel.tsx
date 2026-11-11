@@ -438,35 +438,32 @@ export function InventoryPanel({
               No hay productos que coincidan con los filtros.
             </p>
           ) : (
-            <div className="overflow-x-auto rounded-lg border">
-              <table className="w-full min-w-[980px] border-collapse text-left text-sm">
+            <div className="rounded-lg border">
+              <table className="w-full table-auto border-collapse text-left text-sm">
                 <thead className="bg-secondary/60 text-[10px] uppercase tracking-wider2 text-muted-foreground">
                   <tr>
-                    <th scope="col" className="px-3 py-2 font-medium">
+                    <th scope="col" className="px-2 py-2 font-medium sm:px-3">
                       Producto
                     </th>
-                    <th scope="col" className="px-3 py-2 font-medium">
+                    <th scope="col" className="hidden px-2 py-2 font-medium md:table-cell">
                       Categoría
                     </th>
-                    <th scope="col" className="px-3 py-2 font-medium">
-                      Colores
-                    </th>
-                    <th scope="col" className="px-3 py-2 font-medium">
+                    <th scope="col" className="px-2 py-2 font-medium sm:px-3">
                       Stock
                     </th>
-                    <th scope="col" className="px-3 py-2 text-right font-medium">
-                      Unidades
+                    <th scope="col" className="px-2 py-2 text-right font-medium">
+                      Uds.
                     </th>
-                    <th scope="col" className="px-3 py-2 text-right font-medium">
+                    <th scope="col" className="hidden px-2 py-2 text-right font-medium lg:table-cell">
                       Precio
                     </th>
-                    <th scope="col" className="px-3 py-2 text-right font-medium">
+                    <th scope="col" className="hidden px-2 py-2 text-right font-medium lg:table-cell">
                       Valor
                     </th>
-                    <th scope="col" className="px-3 py-2 font-medium">
+                    <th scope="col" className="px-2 py-2 font-medium sm:px-3">
                       Estado
                     </th>
-                    <th scope="col" className="px-3 py-2" />
+                    <th scope="col" className="px-2 py-2" />
                   </tr>
                 </thead>
                 <tbody>
@@ -485,9 +482,9 @@ export function InventoryPanel({
                             if (sizeCount > 0) setExpandedId(expanded ? null : product.id);
                           }}
                         >
-                          <td className="px-3 py-3">
-                            <div className="flex items-center gap-2.5">
-                              <div className="h-12 w-10 shrink-0 overflow-hidden rounded-md border bg-secondary">
+                          <td className="px-2 py-3 sm:px-3">
+                            <div className="flex items-center gap-2">
+                              <div className="h-11 w-9 shrink-0 overflow-hidden rounded-md border bg-secondary sm:h-12 sm:w-10">
                                 {product.images[0] ? (
                                   <img
                                     src={product.images[0]}
@@ -497,44 +494,43 @@ export function InventoryPanel({
                                 ) : null}
                               </div>
                               <div className="min-w-0">
-                                <p className="max-w-[16rem] truncate font-medium">{product.name}</p>
+                                <p className="max-w-[11rem] truncate font-medium sm:max-w-[14rem] lg:max-w-[18rem]">{product.name}</p>
                                 <p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
                                   {product.sku ?? "Sin SKU"}
                                 </p>
+                                <p className="mt-0.5 text-[11px] text-muted-foreground md:hidden">
+                                  {categoryLabel(product.category)}
+                                </p>
+                                {product.colors.length > 0 && (
+                                  <div className="mt-1 flex flex-wrap items-center gap-1">
+                                    {product.colors.slice(0, 5).map((color) => (
+                                      <span
+                                        key={color.name}
+                                        title={color.name}
+                                        className="h-3 w-3 rounded-full border border-primary/20"
+                                        style={{ backgroundColor: color.hex }}
+                                      />
+                                    ))}
+                                    {product.colors.length > 5 && (
+                                      <span className="text-[10px] text-muted-foreground">
+                                        +{product.colors.length - 5}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </td>
-                          <td className="px-3 py-3 text-muted-foreground">
+                          <td className="hidden px-2 py-3 text-muted-foreground md:table-cell">
                             {categoryLabel(product.category)}
                           </td>
-                          <td className="px-3 py-3">
-                            {product.colors.length === 0 ? (
-                              <span className="text-xs text-muted-foreground">-</span>
-                            ) : (
-                              <div className="flex max-w-[10rem] flex-wrap items-center gap-1">
-                                {product.colors.slice(0, 6).map((color) => (
-                                  <span
-                                    key={color.name}
-                                    title={color.name}
-                                    className="h-3.5 w-3.5 rounded-full border border-primary/20"
-                                    style={{ backgroundColor: color.hex }}
-                                  />
-                                ))}
-                                {product.colors.length > 6 && (
-                                  <span className="text-[10px] text-muted-foreground">
-                                    +{product.colors.length - 6}
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-3 py-3">
+                          <td className="px-2 py-3 sm:px-3">
                             {sizeCount === 0 ? (
                               <span className="text-xs text-muted-foreground">Sin tallas</span>
                             ) : (
                               <button
                                 type="button"
-                                className="flex w-full items-center justify-between gap-2 rounded-md border bg-background px-2.5 py-2 text-left transition hover:border-primary/30 hover:bg-secondary/40"
+                                className="flex w-full max-w-[13rem] items-center justify-between gap-2 rounded-md border bg-background px-2 py-1.5 text-left transition hover:border-primary/30 hover:bg-secondary/40"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setExpandedId(expanded ? null : product.id);
@@ -549,46 +545,59 @@ export function InventoryPanel({
                                     {colorCount} {colorCount === 1 ? "color" : "colores"} · {sizeCount} {sizeCount === 1 ? "talla" : "tallas"}
                                   </p>
                                 </div>
-                                <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider2 text-muted-foreground">
-                                  {expanded ? "Ocultar" : "Ver"}
+                                <span className="inline-flex shrink-0 items-center gap-0.5 text-[10px] uppercase tracking-wider2 text-muted-foreground">
                                   {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                                 </span>
                               </button>
                             )}
                           </td>
-                          <td className="px-3 py-3 text-right font-medium tabular-nums">
+                          <td className="px-2 py-3 text-right font-medium tabular-nums">
                             {registered ? units : <span className="text-muted-foreground">—</span>}
                           </td>
-                          <td className="px-3 py-3 text-right tabular-nums">{formatCLP(product.price)}</td>
-                          <td className="px-3 py-3 text-right font-medium tabular-nums">
+                          <td className="hidden px-2 py-3 text-right tabular-nums lg:table-cell">{formatCLP(product.price)}</td>
+                          <td className="hidden px-2 py-3 text-right font-medium tabular-nums lg:table-cell">
                             {registered ? (
                               formatCLP(product.price * units)
                             ) : (
                               <span className="text-muted-foreground">—</span>
                             )}
                           </td>
-                          <td className="px-3 py-3">
+                          <td className="px-2 py-3 sm:px-3">
                             <div className="flex flex-col gap-1">
                               {product.published === false ? (
-                                <Badge variant="secondary">Borrador</Badge>
+                                <Badge variant="secondary" className="w-fit">Borrador</Badge>
                               ) : (
-                                <Badge>Publicado</Badge>
+                                <Badge className="w-fit">Publicado</Badge>
                               )}
                               {isSoldOut(product) ? (
-                                <Badge variant="outline" className="border-destructive/30 text-destructive">
+                                <Badge variant="outline" className="w-fit border-destructive/30 text-destructive">
                                   Agotado
                                 </Badge>
                               ) : isLowStock(product) ? (
-                                <Badge variant="outline" className="border-amber-500/30 text-amber-700">
+                                <Badge variant="outline" className="w-fit border-amber-500/30 text-amber-700">
                                   Bajo stock
                                 </Badge>
                               ) : null}
                             </div>
                           </td>
-                          <td className="px-3 py-3 text-right">
+                          <td className="px-2 py-3 text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 sm:hidden"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onEdit(product);
+                              }}
+                              aria-label="Editar"
+                              title="Editar"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"
+                              className="hidden sm:inline-flex"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 onEdit(product);
@@ -600,12 +609,17 @@ export function InventoryPanel({
                         </tr>
                         {expanded && sizeCount > 0 && (
                           <tr className="border-t bg-secondary/10">
-                            <td colSpan={9} className="px-3 py-3">
+                            <td colSpan={8} className="px-2 py-3 sm:px-3">
                               <div className="rounded-lg border bg-card p-3">
-                                <p className="mb-2 text-[10px] uppercase tracking-wider2 text-muted-foreground">
-                                  Stock por color y talla
-                                </p>
-                                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                                  <p className="text-[10px] uppercase tracking-wider2 text-muted-foreground">
+                                    Stock por color y talla
+                                  </p>
+                                  <p className="text-[11px] text-muted-foreground lg:hidden">
+                                    {formatCLP(product.price)} · Valor {registered ? formatCLP(product.price * units) : "—"}
+                                  </p>
+                                </div>
+                                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                                   {colors.map((colorName) => {
                                     const colorTotal = product.sizes.reduce((sum, size) => {
                                       const v = variantStock(product, size, colorName);
