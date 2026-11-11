@@ -1,7 +1,18 @@
-import { Fragment, useMemo, useState } from "react";
-import { Boxes, ChevronDown, ChevronUp, Download, FileDown, Pencil, Search } from "lucide-react";
+import { useMemo, useState } from "react";
+import {
+  Boxes,
+  ChevronDown,
+  ChevronRight,
+  Download,
+  Eye,
+  FileDown,
+  FilePenLine,
+  PackageMinus,
+  PackageX,
+  Pencil,
+  Search,
+} from "lucide-react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -67,7 +78,16 @@ export function InventoryPanel({
   const [category, setCategory] = useState("todas");
   const [status, setStatus] = useState<StatusFilter>("todos");
   const [pdfBusy, setPdfBusy] = useState(false);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set());
+
+  const toggleProductColors = (productId: string) => {
+    setExpandedProducts((prev) => {
+      const next = new Set(prev);
+      if (next.has(productId)) next.delete(productId);
+      else next.add(productId);
+      return next;
+    });
+  };
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -376,7 +396,7 @@ export function InventoryPanel({
           <div>
             <CardTitle className="text-lg">Inventario detallado</CardTitle>
             <CardDescription>
-              Resumen de stock por producto. Haz clic en un producto o en «Ver» para desplegar el detalle por color y talla.
+              Stock por producto con detalle compacto por color y talla.
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -433,37 +453,50 @@ export function InventoryPanel({
             </Select>
           </div>
 
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-muted-foreground">
+            <span className="font-medium text-foreground">Estado:</span>
+            <span className="inline-flex items-center gap-1" title="Publicado (visible en tienda)">
+              <Eye className="h-3.5 w-3.5 text-emerald-600" /> Publicado
+            </span>
+            <span className="inline-flex items-center gap-1" title="Borrador (no publicado)">
+              <FilePenLine className="h-3.5 w-3.5 text-muted-foreground" /> Borrador
+            </span>
+            <span className="inline-flex items-center gap-1" title="Agotado (sin stock)">
+              <PackageX className="h-3.5 w-3.5 text-destructive" /> Agotado
+            </span>
+            <span className="inline-flex items-center gap-1" title="Bajo stock (pocas unidades)">
+              <PackageMinus className="h-3.5 w-3.5 text-amber-600" /> Bajo stock
+            </span>
+          </div>
+
           {filtered.length === 0 ? (
             <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
               No hay productos que coincidan con los filtros.
             </p>
           ) : (
-            <div className="rounded-lg border">
-              <table className="w-full table-auto border-collapse text-left text-sm">
+            <div className="overflow-hidden rounded-lg border">
+              <table className="w-full table-fixed border-collapse text-left text-sm">
                 <thead className="bg-secondary/60 text-[10px] uppercase tracking-wider2 text-muted-foreground">
                   <tr>
-                    <th scope="col" className="px-2 py-2 font-medium sm:px-3">
-                      Producto
+                    <th scope="col" className="w-[52%] px-2 py-2 font-medium sm:px-3 md:w-[46%] lg:w-[44%]">
+                      Producto / stock
                     </th>
-                    <th scope="col" className="hidden px-2 py-2 font-medium md:table-cell">
+                    <th scope="col" className="hidden w-[14%] px-2 py-2 font-medium md:table-cell">
                       Categoría
                     </th>
-                    <th scope="col" className="px-2 py-2 font-medium sm:px-3">
-                      Stock
-                    </th>
-                    <th scope="col" className="px-2 py-2 text-right font-medium">
+                    <th scope="col" className="w-[12%] px-2 py-2 text-right font-medium sm:w-[10%]">
                       Uds.
                     </th>
-                    <th scope="col" className="hidden px-2 py-2 text-right font-medium lg:table-cell">
+                    <th scope="col" className="hidden w-[10%] px-2 py-2 text-right font-medium lg:table-cell">
                       Precio
                     </th>
-                    <th scope="col" className="hidden px-2 py-2 text-right font-medium lg:table-cell">
+                    <th scope="col" className="hidden w-[10%] px-2 py-2 text-right font-medium lg:table-cell">
                       Valor
                     </th>
-                    <th scope="col" className="px-2 py-2 font-medium sm:px-3">
+                    <th scope="col" className="w-[22%] px-2 py-2 font-medium sm:w-[18%] sm:px-3 md:w-[16%]">
                       Estado
                     </th>
-                    <th scope="col" className="px-2 py-2" />
+                    <th scope="col" className="w-[10%] px-2 py-2 sm:w-[8%]" />
                   </tr>
                 </thead>
                 <tbody>
@@ -471,188 +504,182 @@ export function InventoryPanel({
                     const registered = hasStockInfo(product);
                     const units = totalStock(product);
                     const colors = stockColors(product);
-                    const expanded = expandedId === product.id;
-                    const colorCount = colors.length;
                     const sizeCount = product.sizes.length;
                     return (
-                      <Fragment key={product.id}>
-                        <tr
-                          className={`border-t align-top transition-colors ${expanded ? "bg-secondary/20" : "hover:bg-secondary/10"} ${sizeCount > 0 ? "cursor-pointer" : ""}`}
-                          onClick={() => {
-                            if (sizeCount > 0) setExpandedId(expanded ? null : product.id);
-                          }}
-                        >
-                          <td className="px-2 py-3 sm:px-3">
-                            <div className="flex items-center gap-2">
-                              <div className="h-11 w-9 shrink-0 overflow-hidden rounded-md border bg-secondary sm:h-12 sm:w-10">
-                                {product.images[0] ? (
-                                  <img
-                                    src={product.images[0]}
-                                    alt=""
-                                    className="h-full w-full object-cover"
-                                  />
-                                ) : null}
-                              </div>
-                              <div className="min-w-0">
-                                <p className="max-w-[11rem] truncate font-medium sm:max-w-[14rem] lg:max-w-[18rem]">{product.name}</p>
-                                <p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-                                  {product.sku ?? "Sin SKU"}
-                                </p>
-                                <p className="mt-0.5 text-[11px] text-muted-foreground md:hidden">
-                                  {categoryLabel(product.category)}
-                                </p>
-                                {product.colors.length > 0 && (
-                                  <div className="mt-1 flex flex-wrap items-center gap-1">
-                                    {product.colors.slice(0, 5).map((color) => (
-                                      <span
-                                        key={color.name}
-                                        title={color.name}
-                                        className="h-3 w-3 rounded-full border border-primary/20"
-                                        style={{ backgroundColor: color.hex }}
-                                      />
-                                    ))}
-                                    {product.colors.length > 5 && (
-                                      <span className="text-[10px] text-muted-foreground">
-                                        +{product.colors.length - 5}
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="hidden px-2 py-3 text-muted-foreground md:table-cell">
-                            {categoryLabel(product.category)}
-                          </td>
-                          <td className="px-2 py-3 sm:px-3">
-                            {sizeCount === 0 ? (
-                              <span className="text-xs text-muted-foreground">Sin tallas</span>
-                            ) : (
-                              <button
-                                type="button"
-                                className="flex w-full max-w-[13rem] items-center justify-between gap-2 rounded-md border bg-background px-2 py-1.5 text-left transition hover:border-primary/30 hover:bg-secondary/40"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setExpandedId(expanded ? null : product.id);
-                                }}
-                                aria-expanded={expanded}
-                              >
-                                <div className="min-w-0">
-                                  <p className="text-xs font-medium text-foreground">
-                                    {registered ? `${units} uds` : "Sin registro"}
-                                  </p>
-                                  <p className="text-[10px] text-muted-foreground">
-                                    {colorCount} {colorCount === 1 ? "color" : "colores"} · {sizeCount} {sizeCount === 1 ? "talla" : "tallas"}
-                                  </p>
-                                </div>
-                                <span className="inline-flex shrink-0 items-center gap-0.5 text-[10px] uppercase tracking-wider2 text-muted-foreground">
-                                  {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                                </span>
-                              </button>
-                            )}
-                          </td>
-                          <td className="px-2 py-3 text-right font-medium tabular-nums">
-                            {registered ? units : <span className="text-muted-foreground">—</span>}
-                          </td>
-                          <td className="hidden px-2 py-3 text-right tabular-nums lg:table-cell">{formatCLP(product.price)}</td>
-                          <td className="hidden px-2 py-3 text-right font-medium tabular-nums lg:table-cell">
-                            {registered ? (
-                              formatCLP(product.price * units)
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
-                          </td>
-                          <td className="px-2 py-3 sm:px-3">
-                            <div className="flex flex-col gap-1">
-                              {product.published === false ? (
-                                <Badge variant="secondary" className="w-fit">Borrador</Badge>
-                              ) : (
-                                <Badge className="w-fit">Publicado</Badge>
-                              )}
-                              {isSoldOut(product) ? (
-                                <Badge variant="outline" className="w-fit border-destructive/30 text-destructive">
-                                  Agotado
-                                </Badge>
-                              ) : isLowStock(product) ? (
-                                <Badge variant="outline" className="w-fit border-amber-500/30 text-amber-700">
-                                  Bajo stock
-                                </Badge>
+                      <tr
+                        key={product.id}
+                        className={`border-t align-top transition-colors hover:bg-secondary/10 ${sizeCount > 0 ? "cursor-pointer" : ""}`}
+                        onClick={() => {
+                          if (sizeCount > 0) toggleProductColors(product.id);
+                        }}
+                      >
+                        <td className="px-2 py-3 sm:px-3">
+                          <div className="flex min-w-0 items-start gap-2">
+                            <div className="h-10 w-8 shrink-0 overflow-hidden rounded-md border bg-secondary sm:h-11 sm:w-9">
+                              {product.images[0] ? (
+                                <img
+                                  src={product.images[0]}
+                                  alt=""
+                                  className="h-full w-full object-cover"
+                                />
                               ) : null}
                             </div>
-                          </td>
-                          <td className="px-2 py-3 text-right">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 sm:hidden"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onEdit(product);
-                              }}
-                              aria-label="Editar"
-                              title="Editar"
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="hidden sm:inline-flex"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onEdit(product);
-                              }}
-                            >
-                              <Pencil className="h-3.5 w-3.5" /> Editar
-                            </Button>
-                          </td>
-                        </tr>
-                        {expanded && sizeCount > 0 && (
-                          <tr className="border-t bg-secondary/10">
-                            <td colSpan={8} className="px-2 py-3 sm:px-3">
-                              <div className="rounded-lg border bg-card p-3">
-                                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                                  <p className="text-[10px] uppercase tracking-wider2 text-muted-foreground">
-                                    Stock por color y talla
-                                  </p>
-                                  <p className="text-[11px] text-muted-foreground lg:hidden">
-                                    {formatCLP(product.price)} · Valor {registered ? formatCLP(product.price * units) : "—"}
-                                  </p>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate font-medium" title={product.name}>{product.name}</p>
+                              <p className="truncate font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+                                {product.sku ?? "Sin SKU"}
+                              </p>
+                              <p className="mt-0.5 truncate text-[11px] text-muted-foreground md:hidden">
+                                {categoryLabel(product.category)}
+                              </p>
+                              {product.colors.length > 0 && (
+                                <div className="mt-1 flex flex-wrap items-center gap-1">
+                                  {product.colors.slice(0, 5).map((color) => (
+                                    <span
+                                      key={color.name}
+                                      title={color.name}
+                                      className="h-2.5 w-2.5 rounded-full border border-primary/20"
+                                      style={{ backgroundColor: color.hex }}
+                                    />
+                                  ))}
+                                  {product.colors.length > 5 && (
+                                    <span className="text-[10px] text-muted-foreground">
+                                      +{product.colors.length - 5}
+                                    </span>
+                                  )}
                                 </div>
-                                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                                  {colors.map((colorName) => {
-                                    const colorTotal = product.sizes.reduce((sum, size) => {
-                                      const v = variantStock(product, size, colorName);
-                                      return sum + (v ?? 0);
-                                    }, 0);
+                              )}
+                              {sizeCount === 0 ? (
+                                <p className="mt-1 text-[11px] text-muted-foreground">Sin tallas</p>
+                              ) : (
+                                <div className="mt-1.5">
+                                  {(() => {
+                                    const isOpen = expandedProducts.has(product.id);
                                     return (
-                                      <div key={colorName} className="rounded-md border bg-secondary/20 p-2.5">
-                                        <div className="mb-2 flex items-center justify-between gap-2">
-                                          <p className="text-xs font-medium">{colorName}</p>
-                                          <span className="text-[11px] text-muted-foreground">{colorTotal} uds</span>
-                                        </div>
-                                        <div className="flex flex-wrap gap-1">
-                                          {product.sizes.map((size) => {
-                                            const stock = variantStock(product, size, colorName);
-                                            return (
-                                              <span
-                                                key={`${colorName}-${size}`}
-                                                className={`rounded-md border px-1.5 py-0.5 text-[11px] tabular-nums ${stockTone(stock)}`}
-                                              >
-                                                {size} <span className="font-medium">{stock ?? "-"}</span>
-                                              </span>
-                                            );
-                                          })}
-                                        </div>
-                                      </div>
+                                      <>
+                                        <button
+                                          type="button"
+                                          className="inline-flex max-w-full items-center gap-1 rounded border bg-background px-1.5 py-0.5 text-left text-[10px] text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleProductColors(product.id);
+                                          }}
+                                          aria-expanded={isOpen}
+                                        >
+                                          {isOpen ? (
+                                            <ChevronDown className="h-3 w-3 shrink-0" />
+                                          ) : (
+                                            <ChevronRight className="h-3 w-3 shrink-0" />
+                                          )}
+                                          <span className="truncate">
+                                            {colors.length} {colors.length === 1 ? "color" : "colores"} · {units} uds
+                                          </span>
+                                        </button>
+                                        {isOpen && (
+                                          <div className="mt-1 space-y-1">
+                                            {colors.map((colorName) => {
+                                              const hex = product.colors.find((c) => c.name === colorName)?.hex;
+                                              const colorTotal = product.sizes.reduce((sum, size) => {
+                                                const v = variantStock(product, size, colorName);
+                                                return sum + (v ?? 0);
+                                              }, 0);
+                                              return (
+                                                <div key={colorName} className="min-w-0">
+                                                  <div className="mb-0.5 flex min-w-0 items-center gap-1">
+                                                    {hex ? (
+                                                      <span
+                                                        className="h-2.5 w-2.5 shrink-0 rounded-full border border-primary/20"
+                                                        style={{ backgroundColor: hex }}
+                                                        aria-hidden
+                                                      />
+                                                    ) : null}
+                                                    <span className="truncate text-[10px] font-medium text-foreground" title={colorName}>
+                                                      {colorName}
+                                                    </span>
+                                                    <span className="shrink-0 text-[10px] text-muted-foreground">
+                                                      ({colorTotal} uds)
+                                                    </span>
+                                                  </div>
+                                                  <div className="ml-3.5 flex min-w-0 flex-wrap gap-0.5">
+                                                    {product.sizes.map((size) => {
+                                                      const stock = variantStock(product, size, colorName);
+                                                      return (
+                                                        <span
+                                                          key={`${colorName}-${size}`}
+                                                          className={`inline-flex items-center gap-0.5 rounded border px-1 py-px text-[10px] leading-4 tabular-nums ${stockTone(stock)}`}
+                                                          title={`${colorName} ${size}: ${stock ?? "—"}`}
+                                                        >
+                                                          {size}
+                                                          <span className="font-semibold">{stock ?? "-"}</span>
+                                                        </span>
+                                                      );
+                                                    })}
+                                                  </div>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        )}
+                                      </>
                                     );
-                                  })}
+                                  })()}
                                 </div>
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </Fragment>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="hidden px-2 py-3 text-muted-foreground md:table-cell">
+                          <span className="block truncate">{categoryLabel(product.category)}</span>
+                        </td>
+                        <td className="px-2 py-3 text-right font-medium tabular-nums">
+                          {registered ? units : <span className="text-muted-foreground">—</span>}
+                        </td>
+                        <td className="hidden px-2 py-3 text-right tabular-nums lg:table-cell">{formatCLP(product.price)}</td>
+                        <td className="hidden px-2 py-3 text-right font-medium tabular-nums lg:table-cell">
+                          {registered ? (
+                            formatCLP(product.price * units)
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </td>
+                        <td className="px-2 py-3 sm:px-3">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {product.published === false ? (
+                              <span title="Borrador (no publicado)" aria-label="Borrador" className="inline-flex text-muted-foreground">
+                                <FilePenLine className="h-4 w-4" />
+                              </span>
+                            ) : (
+                              <span title="Publicado (visible en tienda)" aria-label="Publicado" className="inline-flex text-emerald-600">
+                                <Eye className="h-4 w-4" />
+                              </span>
+                            )}
+                            {isSoldOut(product) ? (
+                              <span title="Agotado (sin stock)" aria-label="Agotado" className="inline-flex text-destructive">
+                                <PackageX className="h-4 w-4" />
+                              </span>
+                            ) : isLowStock(product) ? (
+                              <span title="Bajo stock (pocas unidades)" aria-label="Bajo stock" className="inline-flex text-amber-600">
+                                <PackageMinus className="h-4 w-4" />
+                              </span>
+                            ) : null}
+                          </div>
+                        </td>
+                        <td className="px-2 py-3 text-right">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEdit(product);
+                            }}
+                            aria-label={`Editar ${product.name}`}
+                            title="Editar"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        </td>
+                      </tr>
                     );
                   })}
                 </tbody>
@@ -670,7 +697,7 @@ export function InventoryPanel({
           />
 
           <p className="text-[11px] text-muted-foreground">
-            «—» = sin stock registrado: disponible sin límite. Haz clic en un producto para ver el stock por color y talla.
+            «—» = sin stock registrado: disponible sin límite. Haz clic en un producto para ver u ocultar el stock por color y talla.
           </p>
         </CardContent>
       </Card>

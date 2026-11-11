@@ -1650,104 +1650,122 @@ export default function Admin() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-3">
-                {productPagination.pageItems.map((product) => (
-                  <Card key={product.id} className={product.published === false ? "opacity-70" : ""}>
-                    <CardContent className="flex items-center gap-3 p-3 sm:gap-4 sm:p-4">
-                      <div className="h-16 w-14 shrink-0 overflow-hidden rounded-md border bg-secondary">
-                        {product.images[0] ? (
-                          <img
-                            src={product.images[0]}
-                            alt={product.name}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : null}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="truncate font-display font-medium">{product.name}</p>
-                          {product.sku ? (
-                            <Badge
-                              variant="outline"
-                              className="font-mono text-[10px] tracking-wide"
-                              title="Código SKU"
-                            >
-                              {product.sku}
-                            </Badge>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {productPagination.pageItems.map((product) => {
+                    const units = totalStock(product);
+                    const stockLabel =
+                      product.sizes.length === 0
+                        ? "Sin tallas"
+                        : product.sizes
+                            .map((size) => {
+                              const colors = stockColors(product);
+                              const values = colors
+                                .map((c) => variantStock(product, size, c))
+                                .filter((v): v is number => v !== null);
+                              const v = values.length > 0 ? values.reduce((a, b) => a + b, 0) : null;
+                              return `${size} ${v ?? "—"}`;
+                            })
+                            .join(" · ");
+                    return (
+                      <Card
+                        key={product.id}
+                        className={`overflow-hidden ${product.published === false ? "opacity-70" : ""}`}
+                      >
+                        <div className="aspect-[4/5] w-full overflow-hidden border-b bg-secondary">
+                          {product.images[0] ? (
+                            <img
+                              src={product.images[0]}
+                              alt={product.name}
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                            />
                           ) : (
-                            <Badge variant="outline" className="text-[10px] text-muted-foreground">
-                              Sin SKU
-                            </Badge>
+                            <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                              Sin imagen
+                            </div>
                           )}
-                          {product.published === false && (
-                            <Badge variant="outline">
-                              <EyeOff className="h-3 w-3" /> Borrador
-                            </Badge>
-                          )}
-                          {product.featured && (
-                            <Badge variant="secondary">
-                              <Star className="h-3 w-3" /> Destacado
-                            </Badge>
-                          )}
-                          {product.isNew && <Badge variant="accent">Nuevo</Badge>}
                         </div>
-                        <p className="mt-1 truncate text-xs text-muted-foreground">
-                          {categoryLabel(product.category)} · {formatCLP(product.price)} ·{" "}
-                          {product.sizes.join(" / ") || "sin tallas"} · {product.images.length} imágenes
-                        </p>
-                        <p className="mt-1 text-[10px] text-muted-foreground">
-                          Stock:{" "}
-                          {product.sizes.length === 0
-                            ? "-"
-                            : product.sizes
-                                .map((size) => {
-                                  const colors = stockColors(product);
-                                  const values = colors
-                                    .map((c) => variantStock(product, size, c))
-                                    .filter((v) => v !== null);
-                                  const v =
-                                    values.length > 0 ? values.reduce((a, b) => a + b, 0) : null;
-                                  return `${size} ${v ?? "—"}`;
-                                })
-                                .join(" · ")}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title="Destacar"
-                          onClick={() => toggleFeatured(product)}
-                        >
-                          <Star
-                            className={
-                              product.featured ? "h-4 w-4 fill-primary text-primary" : "h-4 w-4"
-                            }
-                          />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title="Editar"
-                          onClick={() => {
-                            setEditing(product);
-                            setTab("nuevo");
-                          }}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title="Eliminar"
-                          onClick={() => remove(product)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                        <CardContent className="flex flex-col gap-2 p-3">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-start gap-1.5">
+                              <p className="min-w-0 flex-1 truncate font-display font-medium" title={product.name}>
+                                {product.name}
+                              </p>
+                              {product.featured && (
+                                <span title="Destacado" className="shrink-0">
+                                  <Star className="h-3.5 w-3.5 fill-primary text-primary" />
+                                </span>
+                              )}
+                            </div>
+                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                              {product.sku ? (
+                                <Badge variant="outline" className="font-mono text-[10px] tracking-wide">
+                                  {product.sku}
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                                  Sin SKU
+                                </Badge>
+                              )}
+                              {product.published === false && (
+                                <Badge variant="outline" className="text-[10px]">
+                                  <EyeOff className="mr-1 h-3 w-3" /> Borrador
+                                </Badge>
+                              )}
+                              {product.isNew && <Badge variant="accent" className="text-[10px]">Nuevo</Badge>}
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {categoryLabel(product.category)} · {formatCLP(product.price)}
+                          </p>
+                          <p className="line-clamp-2 text-[10px] text-muted-foreground" title={stockLabel}>
+                            <span className="font-medium text-foreground/80">Stock:</span> {stockLabel}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {units} uds · {product.images.length} {product.images.length === 1 ? "imagen" : "imágenes"}
+                          </p>
+                          <div className="mt-1 flex items-center justify-end gap-1 border-t pt-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              title={product.featured ? "Quitar destacado" : "Destacar"}
+                              onClick={() => toggleFeatured(product)}
+                            >
+                              <Star
+                                className={
+                                  product.featured ? "h-4 w-4 fill-primary text-primary" : "h-4 w-4"
+                                }
+                              />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              title="Editar"
+                              onClick={() => {
+                                setEditing(product);
+                                setTab("nuevo");
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              title="Eliminar"
+                              onClick={() => remove(product)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
                 <Pagination
                   page={productPagination.page}
                   pageSize={productPagination.pageSize}
