@@ -22,7 +22,7 @@ import {
   updateSupplier,
 } from "@/lib/suppliers";
 import { categoryLabel } from "@/lib/categories";
-import { isLowStock, isSoldOut, sizeStock, totalStock } from "@/lib/stock";
+import { isLowStock, isSoldOut, stockColors, totalStock, variantStock } from "@/lib/stock";
 import { formatCLP } from "@/lib/utils";
 import { SupplierPurchases } from "@/components/admin/SupplierPurchases";
 import { Button } from "@/components/ui/button";
@@ -67,14 +67,17 @@ function toForm(supplier: Supplier): FormState {
 
 /** ¿El producto tiene unidades registradas? (null/ausente = sin información). */
 function hasStockInfo(product: Product): boolean {
-  return Boolean(product.stockBySize && Object.keys(product.stockBySize).length > 0);
+  return Boolean(
+    (product.stockByVariant && Object.keys(product.stockByVariant).length > 0) ||
+      (product.stockBySize && Object.keys(product.stockBySize).length > 0)
+  );
 }
 
 function stockChipTone(stock: number | null): string {
   if (stock === null) return "border-border bg-background text-muted-foreground";
   if (stock === 0) return "border-destructive/30 bg-destructive/10 text-destructive";
   if (stock <= 3) return "border-amber-500/30 bg-amber-500/10 text-amber-700";
-  return "border-primary/10 bg-secondary text-foreground";
+  return "border-emerald-600/30 bg-emerald-500/10 text-emerald-700";
 }
 
 export function SuppliersManager({ products }: { products: Product[] }) {
@@ -469,22 +472,36 @@ export function SuppliersManager({ products }: { products: Product[] }) {
                                         ))}
                                       </div>
                                     )}
-                                    <div className="mt-1.5 flex flex-wrap gap-1">
+                                    <div className="mt-1.5 space-y-1.5">
                                       {product.sizes.length === 0 ? (
                                         <span className="text-[10px] text-muted-foreground">
                                           Sin tallas
                                         </span>
                                       ) : (
-                                        product.sizes.map((size) => {
-                                          const stock = sizeStock(product, size);
+                                        stockColors(product).map((colorName) => {
+                                          const colors = stockColors(product);
                                           return (
-                                            <span
-                                              key={size}
-                                              className={`rounded border px-1 py-0.5 text-[10px] tabular-nums ${stockChipTone(stock)}`}
-                                            >
-                                              {size}{" "}
-                                              <span className="font-medium">{stock ?? "—"}</span>
-                                            </span>
+                                            <div key={colorName}>
+                                              {colors.length > 1 && (
+                                                <p className="mb-0.5 text-[10px] font-medium text-muted-foreground">
+                                                  {colorName}
+                                                </p>
+                                              )}
+                                              <div className="flex flex-wrap gap-1">
+                                                {product.sizes.map((size) => {
+                                                  const stock = variantStock(product, size, colorName);
+                                                  return (
+                                                    <span
+                                                      key={`${colorName}-${size}`}
+                                                      className={`rounded border px-1 py-0.5 text-[10px] tabular-nums ${stockChipTone(stock)}`}
+                                                    >
+                                                      {size}{" "}
+                                                      <span className="font-medium">{stock ?? "—"}</span>
+                                                    </span>
+                                                  );
+                                                })}
+                                              </div>
+                                            </div>
                                           );
                                         })
                                       )}
