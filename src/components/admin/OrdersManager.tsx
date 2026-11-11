@@ -15,6 +15,7 @@ import {
   Search,
   Trash2,
   Truck,
+  UserRoundSearch,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -157,6 +158,46 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
   const [manualCoupon, setManualCoupon] = useState("");
   const [manualNotes, setManualNotes] = useState("");
   const [manualItems, setManualItems] = useState<ManualItem[]>([emptyManualItem()]);
+  const [selectedCustomerKey, setSelectedCustomerKey] = useState("");
+
+  const knownCustomers = useMemo(() => {
+    const map = new Map<string, OrderCustomer & { key: string; label: string }>();
+    // prefer most recent occurrence
+    const sorted = [...orders].sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+    for (const order of sorted) {
+      const c = order.customer;
+      const email = (order.customerEmail || c.email || "").trim().toLowerCase();
+      const phone = (c.phone || "").replace(/\s+/g, "").trim();
+      const name = (c.name || "").trim().toLowerCase();
+      const key = email || (phone ? `${phone}|${name}` : name ? `name:${name}` : "");
+      if (!key || map.has(key)) continue;
+      if (!c.name && !c.phone && !c.address) continue;
+      const label = [c.name || "Sin nombre", c.phone, c.city].filter(Boolean).join(" · ");
+      map.set(key, {
+        key,
+        label,
+        name: c.name || "",
+        phone: c.phone || "",
+        email: c.email,
+        address: c.address || "",
+        city: c.city || "",
+      });
+    }
+    return Array.from(map.values());
+  }, [orders]);
+
+  const fillManualCustomer = (key: string) => {
+    setSelectedCustomerKey(key);
+    const found = knownCustomers.find((c) => c.key === key);
+    if (!found) return;
+    setManualCustomer({
+      name: found.name,
+      phone: found.phone,
+      email: found.email,
+      address: found.address,
+      city: found.city,
+    });
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -388,6 +429,7 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
     setManualCoupon("");
     setManualNotes("");
     setManualItems([emptyManualItem()]);
+    setSelectedCustomerKey("");
   };
 
   const updateManualCustomer = (field: keyof OrderCustomer, value: string) => {
@@ -532,6 +574,27 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
             </div>
           </CardHeader>
           <CardContent className="space-y-5">
+            {knownCustomers.length > 0 && (
+              <div className="max-w-md">
+                <Label>Seleccionar cliente</Label>
+                <Select value={selectedCustomerKey || "none"} onValueChange={(v) => fillManualCustomer(v === "none" ? "" : v)}>
+                  <SelectTrigger className="mt-1 h-10">
+                    <div className="flex items-center gap-2 truncate">
+                      <UserRoundSearch className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <SelectValue placeholder="Elegir cliente para autocompletar" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin seleccionar</SelectItem>
+                    {knownCustomers.map((c) => (
+                      <SelectItem key={c.key} value={c.key}>
+                        {c.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <div>
                 <Label htmlFor="m-name">Nombre completo *</Label>

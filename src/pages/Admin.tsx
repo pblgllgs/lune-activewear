@@ -43,12 +43,14 @@ import {
   Trash2,
   Truck,
   UploadCloud,
+  Users,
   X,
 } from "lucide-react";
 import { auth, db, isFirebaseConfigured } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 import { AuthSettings } from "@/components/admin/AuthSettings";
 import { ContentManager } from "@/components/admin/ContentManager";
+import { CustomersManager } from "@/components/admin/CustomersManager";
 import { InventoryPanel } from "@/components/admin/InventoryPanel";
 import { OrdersManager } from "@/components/admin/OrdersManager";
 import { SalesManager } from "@/components/admin/SalesManager";
@@ -90,6 +92,7 @@ type Tab =
   | "productos"
   | "inventario"
   | "proveedores"
+  | "clientes"
   | "ordenes"
   | "ventas"
   | "contenido"
@@ -1270,6 +1273,7 @@ const MENU: { tab: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { tab: "productos", label: "Productos", icon: Package },
   { tab: "inventario", label: "Inventario", icon: Boxes },
   { tab: "proveedores", label: "Proveedores", icon: Truck },
+  { tab: "clientes", label: "Clientes", icon: Users },
   { tab: "ordenes", label: "Órdenes de compra", icon: ClipboardList },
   { tab: "ventas", label: "Ventas", icon: BarChart3 },
   { tab: "comentarios", label: "Comentarios", icon: MessageSquare },
@@ -1284,6 +1288,9 @@ export default function Admin() {
   const [editing, setEditing] = useState<Product | null>(null);
   const [seeding, setSeeding] = useState(false);
   const [fillingSkus, setFillingSkus] = useState(false);
+  const [productCategory, setProductCategory] = useState("todas");
+  const [productSize, setProductSize] = useState("todas");
+  const [productColor, setProductColor] = useState("todos");
 
   useSeo({
     title: "Administración | LUNÉ Activewear",
@@ -1369,7 +1376,33 @@ export default function Admin() {
   );
   const missingSkus = products.filter((p) => !p.sku).length;
 
-  const productPagination = usePagination(products, { pageSize: 10 });
+  const productColorOptions = useMemo(() => {
+    const names = new Set<string>();
+    products.forEach((product) => {
+      product.colors.forEach((color) => {
+        if (color.name) names.add(color.name);
+      });
+    });
+    return Array.from(names).sort((a, b) => a.localeCompare(b, "es"));
+  }, [products]);
+
+  const filteredProducts = useMemo(() => {
+    return products.filter((product) => {
+      if (productCategory !== "todas" && product.category !== productCategory) return false;
+      if (productSize !== "todas" && !product.sizes.includes(productSize)) return false;
+      if (
+        productColor !== "todos" &&
+        !product.colors.some((color) => color.name === productColor)
+      )
+        return false;
+      return true;
+    });
+  }, [products, productCategory, productSize, productColor]);
+
+  const productPagination = usePagination(filteredProducts, {
+    pageSize: 10,
+    resetKey: `${productCategory}|${productSize}|${productColor}`,
+  });
 
   if (!isFirebaseConfigured || !auth) return <SetupNotice />;
 
@@ -1518,13 +1551,15 @@ export default function Admin() {
                     ? "Inventario"
                     : tab === "proveedores"
                       ? "Proveedores"
-                      : tab === "ordenes"
-                        ? "Órdenes de compra"
-                        : tab === "ventas"
-                          ? "Ventas"
-                          : tab === "ajustes"
-                            ? "Ajustes"
-                            : "Catálogo"}
+                      : tab === "clientes"
+                        ? "Clientes"
+                        : tab === "ordenes"
+                          ? "Órdenes de compra"
+                          : tab === "ventas"
+                            ? "Ventas"
+                            : tab === "ajustes"
+                              ? "Ajustes"
+                              : "Catálogo"}
             </h1>
           </div>
           {firebaseAuth.currentUser?.email && (
@@ -1628,6 +1663,7 @@ export default function Admin() {
         )}
 
         {tab === "proveedores" && <SuppliersManager products={products} />}
+        {tab === "clientes" && <CustomersManager />}
         {tab === "ordenes" && <OrdersManager products={products} />}
         {tab === "ventas" && <SalesManager />}
 
@@ -1651,7 +1687,70 @@ export default function Admin() {
               </Card>
             ) : (
               <div className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div className="grid gap-3 sm:grid-cols-[1fr_1fr_1fr_auto]">
+                  <Select value={productCategory} onValueChange={setProductCategory}>
+                    <SelectTrigger aria-label="Filtrar por categoría">
+                      <SelectValue placeholder="Categoría" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todas">Todas las categorías</SelectItem>
+                      {CATEGORIES.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.id}>
+                          {cat.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={productSize} onValueChange={setProductSize}>
+                    <SelectTrigger aria-label="Filtrar por talla">
+                      <SelectValue placeholder="Talla" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todas">Todas las tallas</SelectItem>
+                      {SIZE_OPTIONS.map((size) => (
+                        <SelectItem key={size} value={size}>
+                          {size}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={productColor} onValueChange={setProductColor}>
+                    <SelectTrigger aria-label="Filtrar por color">
+                      <SelectValue placeholder="Color" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos los colores</SelectItem>
+                      {productColorOptions.map((color) => (
+                        <SelectItem key={color} value={color}>
+                          {color}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-10 w-10 shrink-0"
+                    title="Limpiar filtros"
+                    aria-label="Limpiar filtros"
+                    onClick={() => {
+                      setProductCategory("todas");
+                      setProductSize("todas");
+                      setProductColor("todos");
+                    }}
+                    disabled={productCategory === "todas" && productSize === "todas" && productColor === "todos"}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {filteredProducts.length === 0 ? (
+                  <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+                    No hay productos que coincidan con los filtros.
+                  </p>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   {productPagination.pageItems.map((product) => {
                     const units = totalStock(product);
                     const stockLabel =
@@ -1765,17 +1864,19 @@ export default function Admin() {
                       </Card>
                     );
                   })}
-                </div>
-                <Pagination
-                  page={productPagination.page}
-                  pageSize={productPagination.pageSize}
-                  total={productPagination.total}
-                  totalPages={productPagination.totalPages}
-                  onPageChange={productPagination.setPage}
-                  onPageSizeChange={productPagination.setPageSize}
-                  itemLabel="productos"
-                  className="pt-1"
-                />
+                    </div>
+                    <Pagination
+                      page={productPagination.page}
+                      pageSize={productPagination.pageSize}
+                      total={productPagination.total}
+                      totalPages={productPagination.totalPages}
+                      onPageChange={productPagination.setPage}
+                      onPageSizeChange={productPagination.setPageSize}
+                      itemLabel="productos"
+                      className="pt-1"
+                    />
+                  </>
+                )}
               </div>
             )}
           </>
