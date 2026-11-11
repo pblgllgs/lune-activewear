@@ -33,6 +33,7 @@ const helpLinks = [
   { label: "Preguntas frecuentes", to: "/#preguntas" },
   { label: "Envíos y devoluciones", to: "/#preguntas" },
   { label: "Guía de tallas", to: "/#preguntas" },
+  { label: "Guías y consejos", to: "/guias" },
   { label: "Nosotros", to: "/nosotros" },
   { label: "Contacto", to: "/#contacto" },
   { label: "Política de datos", to: "/privacidad" },

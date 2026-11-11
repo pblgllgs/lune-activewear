@@ -11,6 +11,7 @@ import { SearchDialog } from "@/components/shop/SearchDialog";
 const links = [
   { label: "Inicio", to: "/" },
   { label: "Tienda", to: "/tienda" },
+  { label: "Guías", to: "/guias" },
   { label: "Nosotros", to: "/nosotros" },
   { label: "Contacto", to: "/#contacto" },
 ];

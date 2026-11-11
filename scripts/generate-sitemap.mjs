@@ -5,6 +5,7 @@ import {
   SITE_URL,
   TODAY,
   escapeXml,
+  fetchGuides,
   fetchProducts,
 } from "./seo-data.mjs";
 
@@ -16,11 +17,12 @@ const staticUrls = [
     changefreq: "weekly",
     priority: "0.8",
   })),
+  { loc: "/guias", changefreq: "weekly", priority: "0.7" },
   { loc: "/nosotros", changefreq: "monthly", priority: "0.6" },
   { loc: "/privacidad", changefreq: "monthly", priority: "0.3" },
 ];
 
-const products = await fetchProducts();
+const [products, guides] = await Promise.all([fetchProducts(), fetchGuides()]);
 
 const urls = [
   ...staticUrls.map((item) => ({ ...item, lastmod: TODAY })),
@@ -29,6 +31,12 @@ const urls = [
     lastmod: product.lastmod || TODAY,
     changefreq: "weekly",
     priority: "0.7",
+  })),
+  ...guides.map((guide) => ({
+    loc: `/guias/${guide.slug || guide.id}`,
+    lastmod: guide.lastmod || TODAY,
+    changefreq: "monthly",
+    priority: "0.6",
   })),
 ];
 

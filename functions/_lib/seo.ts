@@ -396,3 +396,134 @@ export function injectNotFoundMeta(html: string, base: string) {
   out = replaceMeta(out, "name", "twitter:description", description);
   return setNoscript(out, "Producto no encontrado", description);
 }
+
+/* -------------------------------------------------------------------------- */
+/* Guías / blog                                                               */
+/* -------------------------------------------------------------------------- */
+
+export interface GuideMeta {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string;
+  content: string;
+  coverImage?: string;
+  published: boolean;
+  lastmod: string;
+}
+
+function normalizeGuideDoc(id: string, fields: Record<string, unknown>): GuideMeta {
+  const publishedField = fields.published as { booleanValue?: boolean } | undefined;
+  return {
+    id,
+    slug: str(fields.slug).trim() || id,
+    title: str(fields.title),
+    excerpt: str(fields.excerpt),
+    content: str(fields.content),
+    coverImage: str(fields.coverImage) || undefined,
+    published: publishedField ? publishedField.booleanValue === true : false,
+    lastmod: (str(fields.updatedAt) || str(fields.publishedAt) || str(fields.createdAt)).slice(0, 10),
+  };
+}
+
+export async function fetchGuide(slug: string, env: EdgeEnv): Promise<GuideMeta | null> {
+  const key = `guide:${slug}`;
+  const hit = cached<GuideMeta | null>(key);
+  if (hit !== undefined) return hit;
+
+  const url = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(
+    projectId(env)
+  )}/databases/(default)/documents/guides/${encodeURIComponent(slug)}`;
+
+  const response = await fetch(url, { headers: { accept: "application/json" } });
+  if (response.status === 404) {
+    remember(key, null);
+    return null;
+  }
+  if (!response.ok) throw new Error(`Firestore respondió ${response.status}`);
+
+  const data = (await response.json()) as { fields?: Record<string, unknown> };
+  const guide = normalizeGuideDoc(slug, data.fields ?? {});
+  remember(key, guide);
+  return guide;
+}
+
+export async function fetchGuides(env: EdgeEnv): Promise<GuideMeta[]> {
+  const key = "guides:all";
+  const hit = cached<GuideMeta[]>(key);
+  if (hit) return hit;
+
+  const url = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(
+    projectId(env)
+  )}/databases/(default)/documents/guides?pageSize=300`;
+
+  const response = await fetch(url, { headers: { accept: "application/json" } });
+  if (!response.ok) throw new Error(`Firestore respondió ${response.status}`);
+
+  const data = (await response.json()) as { documents?: { name?: string; fields?: Record<string, unknown> }[] };
+  const guides = (data.documents ?? [])
+    .map((doc) => {
+      const id = String(doc.name ?? "").split("/").pop() ?? "";
+      return normalizeGuideDoc(id, doc.fields ?? {});
+    })
+    .filter((guide) => guide.id && guide.title && guide.published === true);
+
+  remember(key, guides);
+  return guides;
+}
+
+export function injectGuideMeta(html: string, guide: GuideMeta, base: string) {
+  const slug = guide.slug || guide.id;
+  const title = `${guide.title} | ${SITE_NAME}`;
+  const description = truncate(stripHtml(guide.excerpt || guide.content) || `${guide.title}. Guía de activewear femenino de LUNÉ.`);
+  const canonical = `${base}/guias/${slug}`;
+  const image = guide.coverImage ? absolute(guide.coverImage, base) : `${base}/og-image.jpg`;
+
+  let out = replaceTitle(html, title);
+  out = replaceMeta(out, "name", "description", description);
+  out = replaceMeta(out, "name", "robots", "index,follow,max-image-preview:large");
+  out = replaceCanonical(out, canonical);
+  out = replaceMeta(out, "property", "og:type", "article");
+  out = replaceMeta(out, "property", "og:title", title);
+  out = replaceMeta(out, "property", "og:description", description);
+  out = replaceMeta(out, "property", "og:url", canonical);
+  out = replaceMeta(out, "property", "og:image", image);
+  out = replaceMeta(out, "property", "og:image:alt", title);
+  out = replaceMeta(out, "name", "twitter:card", "summary_large_image");
+  out = replaceMeta(out, "name", "twitter:title", title);
+  out = replaceMeta(out, "name", "twitter:description", description);
+  out = replaceMeta(out, "name", "twitter:image", image);
+  out = replaceMeta(out, "name", "twitter:image:alt", title);
+  out = removeMeta(out, "property", "og:image:width");
+  out = removeMeta(out, "property", "og:image:height");
+
+  out = setJsonLd(out, {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: guide.title,
+    description,
+    image: guide.coverImage ? [absolute(guide.coverImage, base)] : undefined,
+    author: { "@type": "Organization", name: SITE_NAME },
+    publisher: { "@type": "Organization", name: SITE_NAME },
+    mainEntityOfPage: canonical,
+  });
+
+  const extra = guide.excerpt ? `<p>${escapeHtml(guide.excerpt)}</p>` : "";
+  return setNoscript(out, guide.title, description, extra);
+}
+
+export function injectGuideNotFoundMeta(html: string, base: string) {
+  const title = `Guía no encontrada | ${SITE_NAME}`;
+  const description = "La guía que buscas no existe o ya no está disponible.";
+
+  let out = replaceTitle(html, title);
+  out = replaceMeta(out, "name", "description", description);
+  out = replaceMeta(out, "name", "robots", "noindex,nofollow");
+  out = replaceCanonical(out, `${base}/guias`);
+  out = replaceMeta(out, "property", "og:title", title);
+  out = replaceMeta(out, "property", "og:description", description);
+  out = replaceMeta(out, "property", "og:url", `${base}/guias`);
+  out = replaceMeta(out, "name", "twitter:title", title);
+  out = replaceMeta(out, "name", "twitter:description", description);
+  return setNoscript(out, "Guía no encontrada", description);
+}

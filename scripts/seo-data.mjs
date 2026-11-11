@@ -101,6 +101,42 @@ export async function fetchProducts() {
   }
 }
 
+export async function fetchGuides() {
+  const url = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(
+    PROJECT_ID
+  )}/databases/(default)/documents/guides?pageSize=300`;
+
+  try {
+    const response = await fetch(url, { headers: { accept: "application/json" } });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const data = await response.json();
+    const docs = Array.isArray(data.documents) ? data.documents : [];
+
+    return docs
+      .map((doc) => {
+        const id = String(doc.name ?? "").split("/").pop() ?? "";
+        const fields = doc.fields ?? {};
+        const published = fields.published ? fields.published.booleanValue === true : false;
+        const slug = str(fields.slug) || id;
+        return {
+          id,
+          slug,
+          title: str(fields.title),
+          excerpt: str(fields.excerpt),
+          content: str(fields.content),
+          coverImage: str(fields.coverImage),
+          published,
+          lastmod: str(fields.updatedAt || fields.publishedAt || fields.createdAt).slice(0, 10),
+        };
+      })
+      .filter((guide) => guide.id && guide.title && guide.published !== false);
+  } catch (error) {
+    console.warn(`[seo] No se pudieron leer guías (${error.message}).`);
+    return [];
+  }
+}
+
 export function escapeXml(value) {
   return String(value)
     .replace(/&/g, "&amp;")

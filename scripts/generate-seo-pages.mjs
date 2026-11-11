@@ -5,12 +5,13 @@ import {
   SITE_URL,
   escapeAttr,
   escapeHtml,
+  fetchGuides,
   fetchProducts,
 } from "./seo-data.mjs";
 
 const dist = path.resolve("dist");
 const template = await readFile(path.join(dist, "index.html"), "utf8");
-const products = await fetchProducts();
+const [products, guides] = await Promise.all([fetchProducts(), fetchGuides()]);
 
 const CATEGORY_LABELS = {
   calzas: "Calzas",
@@ -255,6 +256,23 @@ const privacyMeta = {
   },
 };
 
+const guidesMeta = {
+  title: "Guías y consejos | LUNÉ Activewear",
+  description:
+    "Guías de activewear: cómo elegir calzas según tu cuerpo, guía de tallas y outfits para entrenar con comodidad y estilo.",
+  canonical: `${SITE_URL}/guias`,
+  heading: "Guías y consejos",
+  jsonLd: {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: "Guías y consejos — LUNÉ Activewear",
+    description:
+      "Guías y consejos de activewear femenino: elección de calzas, tallas y outfits.",
+    url: `${SITE_URL}/guias`,
+    isPartOf: { "@type": "WebSite", name: SITE_NAME, url: SITE_URL },
+  },
+};
+
 const adminMeta = {
   title: "Administración | LUNÉ Activewear",
   description: "Panel privado de administración de LUNÉ Activewear.",
@@ -292,6 +310,8 @@ for (const category of CATEGORY_PAGES) {
 await writePage("/nosotros", applyMeta(template, aboutMeta));
 count += 1;
 await writePage("/privacidad", applyMeta(template, privacyMeta));
+count += 1;
+await writePage("/guias", applyMeta(template, guidesMeta));
 count += 1;
 await writePage("/admin", applyMeta(template, adminMeta));
 count += 1;
@@ -339,6 +359,41 @@ for (const product of products) {
   count += 1;
 }
 
+for (const guide of guides) {
+  if (!guide.title) continue;
+  const slug = guide.slug || guide.id;
+  const title = `${guide.title} | LUNÉ Activewear`;
+  const description = truncate(
+    stripHtml(guide.excerpt || guide.content) ||
+      `${guide.title}. Guía de activewear femenino de LUNÉ.`
+  );
+  const canonical = `${SITE_URL}/guias/${slug}`;
+  const noscriptExtra = guide.excerpt ? `<p>${escapeHtml(guide.excerpt)}</p>` : "";
+  await writePage(
+    `/guias/${slug}`,
+    applyMeta(template, {
+      title,
+      description,
+      canonical,
+      image: guide.coverImage || undefined,
+      type: "article",
+      heading: guide.title,
+      noscriptExtra,
+      jsonLd: {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        headline: guide.title,
+        description,
+        image: guide.coverImage ? [guide.coverImage] : undefined,
+        author: { "@type": "Organization", name: SITE_NAME },
+        publisher: { "@type": "Organization", name: SITE_NAME },
+        mainEntityOfPage: canonical,
+      },
+    })
+  );
+  count += 1;
+}
+
 console.log(`[seo-pages] ${count} páginas estáticas generadas en ${dist}`);
 
 // Reglas explícitas para servir las páginas con meta propio. Las rutas no
@@ -348,6 +403,7 @@ const redirects = [
   "/tienda /tienda/index.html 200",
   "/nosotros /nosotros/index.html 200",
   "/privacidad /privacidad/index.html 200",
+  "/guias /guias/index.html 200",
   "/admin /admin/index.html 200",
   ...CATEGORY_PAGES.map(
     (category) => `/categoria/${category.id} /categoria/${category.id}/index.html 200`
@@ -355,6 +411,9 @@ const redirects = [
   ...products
     .filter((product) => product.name)
     .map((product) => `/producto/${product.id} /producto/${product.id}/index.html 200`),
+  ...guides
+    .filter((guide) => guide.title)
+    .map((guide) => `/guias/${guide.slug || guide.id} /guias/${guide.slug || guide.id}/index.html 200`),
 ].join("\n");
 
 await writeFile(path.join(dist, "_redirects"), `${redirects}\n`, "utf8");
@@ -364,11 +423,11 @@ console.log(`[seo-pages] _redirects con ${redirects.split("\n").length} reglas`)
 // estático y no consume invocaciones de Functions.
 const routes = {
   version: 1,
-  include: ["/producto/*", "/sitemap.xml"],
+  include: ["/producto/*", "/guias/*", "/sitemap.xml"],
   exclude: [],
 };
 await writeFile(path.join(dist, "_routes.json"), `${JSON.stringify(routes, null, 2)}\n`, "utf8");
-console.log("[seo-pages] _routes.json: solo /producto/* y /sitemap.xml invocan Functions");
+console.log("[seo-pages] _routes.json: solo /producto/*, /guias/* y /sitemap.xml invocan Functions");
 
 // La URL del sitio es provisoria hasta comprar el dominio. Se reescribe en el
 // build (index.html, robots.txt y páginas generadas) para que el cambio dependa

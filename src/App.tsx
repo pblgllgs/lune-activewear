@@ -20,6 +20,8 @@ const Privacy = lazy(() => import("@/pages/Privacy"));
 const About = lazy(() => import("@/pages/About"));
 const Account = lazy(() => import("@/pages/Account"));
 const Admin = lazy(() => import("@/pages/Admin"));
+const Guides = lazy(() => import("@/pages/Guides"));
+const GuideDetail = lazy(() => import("@/pages/GuideDetail"));
 
 function ScrollToTop() {
   const { pathname, hash } = useLocation();
@@ -85,6 +87,8 @@ function App() {
                     <Route path="/categoria/:categoria" element={<Shop />} />
                     <Route path="/producto/:id" element={<ProductDetail />} />
                     <Route path="/favoritos" element={<Favorites />} />
+                    <Route path="/guias" element={<Guides />} />
+                    <Route path="/guias/:slug" element={<GuideDetail />} />
                     <Route path="/privacidad" element={<Privacy />} />
                     <Route path="/nosotros" element={<About />} />
                     <Route path="/cuenta" element={<Account />} />

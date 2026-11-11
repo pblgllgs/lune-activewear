@@ -22,6 +22,7 @@ import Swal from "sweetalert2";
 import {
   AlertCircle,
   BarChart3,
+  BookOpen,
   Boxes,
   ChevronLeft,
   ChevronRight,
@@ -51,6 +52,7 @@ import { isAdminEmail } from "@/lib/admin";
 import { AuthSettings } from "@/components/admin/AuthSettings";
 import { ContentManager } from "@/components/admin/ContentManager";
 import { CustomersManager } from "@/components/admin/CustomersManager";
+import { GuidesManager } from "@/components/admin/GuidesManager";
 import { InventoryPanel } from "@/components/admin/InventoryPanel";
 import { OrdersManager } from "@/components/admin/OrdersManager";
 import { SalesManager } from "@/components/admin/SalesManager";
@@ -95,6 +97,7 @@ type Tab =
   | "clientes"
   | "ordenes"
   | "ventas"
+  | "guias"
   | "contenido"
   | "comentarios"
   | "ajustes";
@@ -1276,6 +1279,7 @@ const MENU: { tab: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { tab: "clientes", label: "Clientes", icon: Users },
   { tab: "ordenes", label: "Órdenes de compra", icon: ClipboardList },
   { tab: "ventas", label: "Ventas", icon: BarChart3 },
+  { tab: "guias", label: "Guías", icon: BookOpen },
   { tab: "comentarios", label: "Comentarios", icon: MessageSquare },
   { tab: "contenido", label: "Contenido", icon: ImagePlus },
   { tab: "ajustes", label: "Ajustes", icon: Settings },
@@ -1557,9 +1561,11 @@ export default function Admin() {
                           ? "Órdenes de compra"
                           : tab === "ventas"
                             ? "Ventas"
-                            : tab === "ajustes"
-                              ? "Ajustes"
-                              : "Catálogo"}
+                            : tab === "guias"
+                              ? "Guías"
+                              : tab === "ajustes"
+                                ? "Ajustes"
+                                : "Catálogo"}
             </h1>
           </div>
           {firebaseAuth.currentUser?.email && (
@@ -1666,6 +1672,7 @@ export default function Admin() {
         {tab === "clientes" && <CustomersManager />}
         {tab === "ordenes" && <OrdersManager products={products} />}
         {tab === "ventas" && <SalesManager />}
+        {tab === "guias" && <GuidesManager />}
 
         {tab === "productos" && (
           <>

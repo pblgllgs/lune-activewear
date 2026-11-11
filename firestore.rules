@@ -43,6 +43,12 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Guías/blog: artículos de contenido SEO. Lectura pública solo si están publicados.
+    match /guides/{guideId} {
+      allow read: if resource.data.published == true || isAdmin();
+      allow write: if isAdmin();
+    }
+
     // Proveedores, sus productos y el registro de compras (solo admin).
     match /suppliers/{supplierId} {
       allow read, write: if isAdmin();
