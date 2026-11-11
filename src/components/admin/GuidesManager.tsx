@@ -165,9 +165,6 @@ export function GuidesManager() {
     try {
       setSavingVisibility(true);
       await setDoc(doc(db, "settings", "site"), { guidesEnabled: next }, { merge: true });
-      try {
-        localStorage.setItem("lune:guidesEnabled", String(next));
-      } catch {}
       toast.success(next ? "Guías visibles en el menú." : "Guías ocultas del menú.");
     } catch (error) {
       setGuidesVisible(previous);
