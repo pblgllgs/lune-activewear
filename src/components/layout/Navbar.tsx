@@ -41,7 +41,7 @@ export function Navbar() {
   const location = useLocation();
   const firstName = displayName.trim().split(/\s+/)[0] ?? "";
   const isAdmin = isAdminEmail(user?.email);
-  const links = guidesEnabled ? baseLinks : baseLinks.filter((link) => link.to !== "/guias");
+  const links = guidesEnabled || isAdmin ? baseLinks : baseLinks.filter((link) => link.to !== "/guias");
 
   useEffect(() => {
     setOpen(false);

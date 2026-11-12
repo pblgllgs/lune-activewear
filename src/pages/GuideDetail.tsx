@@ -96,7 +96,7 @@ export default function GuideDetail() {
       )}
 
       <div
-        className="prose prose-neutral mt-8 max-w-none text-foreground prose-headings:font-display prose-a:text-primary"
+        className="rich-text mt-8 text-base leading-relaxed text-muted-foreground"
         dangerouslySetInnerHTML={{ __html: body }}
       />
     </article>

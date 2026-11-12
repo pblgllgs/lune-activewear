@@ -33,6 +33,10 @@
     @apply m-0;
   }
 
+  .rich-text h2 {
+    @apply font-display text-xl font-medium text-foreground;
+  }
+
   .rich-text h3 {
     @apply font-display text-base font-medium text-foreground;
   }
