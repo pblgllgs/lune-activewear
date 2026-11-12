@@ -24,6 +24,7 @@ import {
   BarChart3,
   BookOpen,
   Boxes,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
@@ -34,6 +35,7 @@ import {
   ImagePlus,
   LayoutDashboard,
   LogOut,
+  Menu,
   MessageSquare,
   Minus,
   Package,
@@ -73,7 +75,7 @@ import { generateSku } from "@/lib/sku";
 import { SIZE_OPTIONS } from "@/lib/sizes";
 import { LAST_UNITS_THRESHOLD, totalStock } from "@/lib/stock";
 import { CATEGORIES, categoryLabel } from "@/lib/categories";
-import { formatCLP } from "@/lib/utils";
+import { cn, formatCLP } from "@/lib/utils";
 import { useSeo } from "@/lib/seo";
 import { stockColors, variantStock } from "@/lib/stock";
 import type { Product, ProductColor, SizeGuideRow } from "@/types/product";
@@ -1362,6 +1364,7 @@ const MENU: { tab: Tab; label: string; icon: typeof LayoutDashboard }[] = [
 export default function Admin() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [tab, setTab] = useState<Tab>("dashboard");
+  const [menuOpen, setMenuOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [editing, setEditing] = useState<Product | null>(null);
   const [seeding, setSeeding] = useState(false);
@@ -1638,46 +1641,76 @@ export default function Admin() {
     }
   };
 
+  const activeItem = MENU.find((item) => item.tab === tab);
+
   return (
     <div className="container flex min-h-[80vh] flex-col gap-6 py-8 md:flex-row md:py-10">
       <aside className="md:w-60 md:shrink-0">
-        <div className="flex flex-col gap-1 rounded-xl border bg-card p-3 md:sticky md:top-24">
-          <div className="mb-2 flex items-center justify-between px-2">
-            <span className="text-[10px] uppercase tracking-brand text-muted-foreground">Panel</span>
+        <div className="rounded-xl border bg-card p-3 md:sticky md:top-24">
+          <div className="flex items-center justify-between gap-2 px-2 md:mb-2">
+            {/* En móvil el menú se colapsa; en escritorio se ve siempre. */}
+            <button
+              type="button"
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-expanded={menuOpen}
+              aria-controls="admin-menu"
+              className="flex min-w-0 flex-1 items-center gap-2 py-1 text-left md:hidden"
+            >
+              <Menu className="h-4 w-4 shrink-0" />
+              <span className="truncate text-[10px] uppercase tracking-brand text-muted-foreground">
+                {activeItem?.label ?? "Panel"}
+              </span>
+              <ChevronDown
+                className={cn(
+                  "ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                  menuOpen && "rotate-180"
+                )}
+              />
+            </button>
+            <span className="hidden text-[10px] uppercase tracking-brand text-muted-foreground md:inline">
+              Panel
+            </span>
             <Button
               variant="ghost"
               size="sm"
               className="h-8 gap-1.5 px-2 normal-case tracking-normal text-muted-foreground hover:text-foreground"
               onClick={() => void handleSignOut()}
               title="Cerrar sesión"
+              aria-label="Cerrar sesión"
             >
               <LogOut className="h-4 w-4" />
-              <span className="text-xs">Cerrar sesión</span>
+              <span className="hidden text-xs sm:inline">Cerrar sesión</span>
             </Button>
           </div>
-          {MENU.map((item) => (
-            <Button
-              key={item.tab}
-              variant={tab === item.tab ? "secondary" : "ghost"}
-              className="justify-start normal-case tracking-normal"
-              onClick={() => {
-                setTab(item.tab);
-                if (item.tab !== "nuevo") setEditing(null);
-              }}
-            >
-              <item.icon className="mr-2 h-4 w-4" />
-              {item.label}
-              {item.tab === "productos" && products.length > 0 && (
-                <span className="ml-auto text-xs text-muted-foreground">{products.length}</span>
-              )}
-            </Button>
-          ))}
-          <Link
-            to="/"
-            className="mt-2 flex items-center gap-2 rounded-md px-3 py-2 text-xs text-muted-foreground transition hover:bg-secondary"
+          <div
+            id="admin-menu"
+            className={cn("flex-col gap-1 md:flex", menuOpen ? "mt-2 flex" : "hidden")}
           >
-            <Eye className="h-4 w-4" /> Ver tienda
-          </Link>
+            {MENU.map((item) => (
+              <Button
+                key={item.tab}
+                variant={tab === item.tab ? "secondary" : "ghost"}
+                className="justify-start normal-case tracking-normal"
+                onClick={() => {
+                  setTab(item.tab);
+                  setMenuOpen(false);
+                  if (item.tab !== "nuevo") setEditing(null);
+                }}
+              >
+                <item.icon className="mr-2 h-4 w-4" />
+                {item.label}
+                {item.tab === "productos" && products.length > 0 && (
+                  <span className="ml-auto text-xs text-muted-foreground">{products.length}</span>
+                )}
+              </Button>
+            ))}
+            <Link
+              to="/"
+              className="mt-2 flex items-center gap-2 rounded-md px-3 py-2 text-xs text-muted-foreground transition hover:bg-secondary"
+            >
+              <Eye className="h-4 w-4" /> Ver tienda
+            </Link>
+          </div>
         </div>
       </aside>
 
