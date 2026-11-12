@@ -11,6 +11,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { diffAuditFields, logAudit } from "@/lib/audit";
 import { sanitizeRichText } from "@/lib/rich-text";
 import type { Guide, GuideInput } from "@/types/guide";
 
@@ -105,26 +106,106 @@ export async function saveGuide(input: GuideInput, existingId?: string): Promise
     if (existingId !== slug) {
       // move document to new slug id
       const prev = await getDoc(ref);
+      const previous = prev.exists()
+        ? normalizeGuide(existingId, prev.data() as Record<string, unknown>)
+        : null;
       await setDoc(doc(db, "guides", slug), {
         ...(prev.exists() ? prev.data() : {}),
         ...payload,
         createdAt: prev.exists() ? (prev.data().createdAt || now) : now,
       });
       await deleteDoc(ref);
+      void logAudit({
+        action: "guide.update",
+        entity: "guide",
+        entityId: slug,
+        entityLabel: payload.title,
+        summary: `Actualizó la guía «${payload.title}».`,
+        changes: previous
+          ? diffAuditFields(
+              {
+                title: previous.title,
+                slug: previous.slug,
+                excerpt: previous.excerpt,
+                published: previous.published,
+                coverImage: previous.coverImage || null,
+              },
+              {
+                title: payload.title,
+                slug: payload.slug,
+                excerpt: payload.excerpt,
+                published: payload.published,
+                coverImage: payload.coverImage || null,
+              },
+              ["title", "slug", "excerpt", "published", "coverImage"]
+            )
+          : undefined,
+        metadata: { previousId: existingId },
+      });
       return slug;
     }
     const prev = await getDoc(ref);
+    const previous = prev.exists()
+      ? normalizeGuide(existingId, prev.data() as Record<string, unknown>)
+      : null;
     await updateDoc(ref, {
       ...payload,
       ...(prev.exists() && prev.data().createdAt ? {} : { createdAt: now }),
     });
+    void logAudit({
+      action: "guide.update",
+      entity: "guide",
+      entityId: existingId,
+      entityLabel: payload.title,
+      summary: `Actualizó la guía «${payload.title}».`,
+      changes: previous
+        ? diffAuditFields(
+            {
+              title: previous.title,
+              slug: previous.slug,
+              excerpt: previous.excerpt,
+              published: previous.published,
+              coverImage: previous.coverImage || null,
+            },
+            {
+              title: payload.title,
+              slug: payload.slug,
+              excerpt: payload.excerpt,
+              published: payload.published,
+              coverImage: payload.coverImage || null,
+            },
+            ["title", "slug", "excerpt", "published", "coverImage"]
+          )
+        : undefined,
+    });
     return existingId;
   }
   await setDoc(doc(db, "guides", slug), { ...payload, createdAt: now });
+  void logAudit({
+    action: "guide.create",
+    entity: "guide",
+    entityId: slug,
+    entityLabel: payload.title,
+    summary: `Creó la guía «${payload.title}».`,
+    metadata: { published: payload.published, excerpt: payload.excerpt },
+  });
   return slug;
 }
 
 export async function deleteGuide(id: string): Promise<void> {
   if (!db) throw new Error("Firebase no está configurado.");
-  await deleteDoc(doc(db, "guides", id));
+  const ref = doc(db, "guides", id);
+  const snap = await getDoc(ref);
+  const guide = snap.exists()
+    ? normalizeGuide(id, snap.data() as Record<string, unknown>)
+    : null;
+  await deleteDoc(ref);
+  void logAudit({
+    action: "guide.delete",
+    entity: "guide",
+    entityId: id,
+    entityLabel: guide?.title ?? id,
+    summary: guide ? `Eliminó la guía «${guide.title}».` : "Eliminó una guía.",
+    metadata: { slug: guide?.slug ?? id, published: guide?.published ?? false },
+  });
 }

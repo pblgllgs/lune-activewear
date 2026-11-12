@@ -1,5 +1,6 @@
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { logAudit } from "@/lib/audit";
 
 /** Ajustes de acceso, en `settings/auth` (lectura pública, escritura admin). */
 export interface AuthSettings {
@@ -34,4 +35,14 @@ export async function saveMagicLinkEnabled(enabled: boolean): Promise<void> {
     { magicLinkEnabled: enabled, updatedAt: new Date().toISOString() },
     { merge: true }
   );
+  void logAudit({
+    action: "settings.magicLink",
+    entity: "settings",
+    entityId: "auth",
+    entityLabel: "Enlace mágico",
+    summary: enabled
+      ? "Activó el enlace mágico por correo."
+      : "Desactivó el enlace mágico por correo.",
+    changes: { magicLinkEnabled: { after: enabled } },
+  });
 }

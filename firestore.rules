@@ -122,6 +122,31 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // Registro de auditoría: cada usuario autenticado crea sus propias entradas
+    // (autor, acción y fecha del servidor). Solo el admin puede leerlas.
+    // No se permite editar ni borrar para conservar el historial.
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if request.auth != null
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.actorEmail == ownerEmail()
+        && request.resource.data.actorRole in ['admin', 'client']
+        // Las clientas solo registran sus propias compras y comentarios.
+        && (isAdmin()
+            || request.resource.data.action in ['order.create', 'review.create'])
+        && request.resource.data.action is string
+        && request.resource.data.action.size() > 0
+        && request.resource.data.action.size() <= 80
+        && request.resource.data.entity is string
+        && request.resource.data.entity.size() > 0
+        && request.resource.data.entity.size() <= 80
+        && request.resource.data.summary is string
+        && request.resource.data.summary.size() > 0
+        && request.resource.data.summary.size() <= 500
+        && request.resource.data.timestamp == request.time;
+      allow update, delete: if false;
+    }
+
     // Bloqueo total del resto
     match /{document=**} {
       allow read, write: if false;

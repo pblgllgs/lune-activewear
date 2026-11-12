@@ -13,6 +13,7 @@ import {
   type Transaction,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { diffAuditFields, logAudit } from "@/lib/audit";
 import type {
   CreateManualOrderInput,
   CreateOrderInput,
@@ -164,6 +165,21 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     updatedAt: now,
   });
 
+  void logAudit({
+    action: "order.create",
+    entity: "order",
+    entityId: ref.id,
+    entityLabel: code,
+    summary: `Creó el pedido ${code} (${customer.name}).`,
+    metadata: {
+      items: items.length,
+      subtotal,
+      city: customer.city,
+      source: "web",
+    },
+    source: "web",
+  });
+
   return {
     id: ref.id,
     code,
@@ -228,11 +244,22 @@ export async function updateOrder(orderId: string, input: UpdateOrderInput): Pro
   const firestore = db;
   if (!firestore) throw new Error("Firebase no está configurado.");
   const ref = doc(firestore, "orders", orderId);
+  const snapshot: {
+    before?: Order;
+    after?: {
+      customer: OrderCustomer;
+      items: OrderItem[];
+      subtotal: number;
+      coupon: string;
+      notes: string;
+    };
+  } = {};
 
   await runTransaction(firestore, async (transaction) => {
     const snap = await transaction.get(ref);
     if (!snap.exists()) throw new Error("La orden no existe.");
     const current = normalizeOrder(snap.id, snap.data());
+    snapshot.before = current;
 
     const customer = normalizeCustomer(input.customer);
     let items = current.items;
@@ -245,16 +272,51 @@ export async function updateOrder(orderId: string, input: UpdateOrderInput): Pro
       if (items.length === 0) throw new Error("La orden debe tener al menos un producto.");
     }
 
-    transaction.update(ref, {
+    const next = {
       customer,
-      customerEmail: customer.email?.toLowerCase() ?? "",
       items,
       subtotal: calculateSubtotal(items),
       coupon: input.coupon?.trim() || "",
       notes: input.notes?.trim() || "",
+    };
+    snapshot.after = next;
+
+    transaction.update(ref, {
+      ...next,
+      customerEmail: customer.email?.toLowerCase() ?? "",
       updatedAt: new Date().toISOString(),
     });
   });
+
+  const before = snapshot.before;
+  const after = snapshot.after;
+  if (before && after) {
+    void logAudit({
+      action: "order.update",
+      entity: "order",
+      entityId: orderId,
+      entityLabel: before.code,
+      summary: `Actualizó el pedido ${before.code} (${after.customer.name}).`,
+      changes: diffAuditFields(
+        {
+          customer: before.customer,
+          items: before.items,
+          subtotal: before.subtotal,
+          coupon: before.coupon || null,
+          notes: before.notes || null,
+        },
+        {
+          customer: after.customer,
+          items: after.items,
+          subtotal: after.subtotal,
+          coupon: after.coupon || null,
+          notes: after.notes || null,
+        },
+        ["customer", "items", "subtotal", "coupon", "notes"]
+      ),
+      metadata: { status: before.status },
+    });
+  }
 }
 
 /* --------------------------- Stock de las órdenes --------------------------- */
@@ -438,12 +500,14 @@ export async function setOrderStatus(
 ): Promise<void> {
   const firestore = db;
   if (!firestore) throw new Error("Firebase no está configurado.");
+  const snapshot: { order?: Order } = {};
 
   await runTransaction(firestore, async (transaction) => {
     const orderRef = doc(firestore, "orders", orderId);
     const orderSnap = await transaction.get(orderRef);
     if (!orderSnap.exists()) throw new Error("La orden no existe.");
     const order = normalizeOrder(orderSnap.id, orderSnap.data());
+    snapshot.order = order;
     if (order.status === nextStatus) return;
 
     const requested = groupRequested(order.items);
@@ -514,6 +578,30 @@ export async function setOrderStatus(
     // currentIsSale used only conceptually; no-op extra.
     void currentIsSale;
   });
+
+  const previous = snapshot.order;
+  if (previous && previous.status !== nextStatus) {
+    void logAudit({
+      action: "order.status",
+      entity: "order",
+      entityId: orderId,
+      entityLabel: previous.code,
+      summary: `Cambió el pedido ${previous.code} de «${previous.status}» a «${nextStatus}».`,
+      changes: {
+        status: { before: previous.status, after: nextStatus },
+        ...(reason.trim()
+          ? { rejectionReason: { before: previous.rejectionReason ?? null, after: reason.trim() } }
+          : {}),
+      },
+      metadata: {
+        customer: previous.customer.name,
+        subtotal: previous.subtotal,
+        items: previous.items.length,
+        stockAppliedBefore: previous.stockApplied,
+        stockAppliedAfter: isSaleStatus(nextStatus),
+      },
+    });
+  }
 }
 
 /** Atajo para aprobar una orden pendiente. */
@@ -606,6 +694,20 @@ export async function createManualOrder(input: CreateManualOrderInput): Promise<
     transaction.set(orderRef, data);
   });
 
+  void logAudit({
+    action: "order.manual",
+    entity: "order",
+    entityId: orderRef.id,
+    entityLabel: code,
+    summary: `Registró manualmente el pedido ${code} (${customer.name}).`,
+    metadata: {
+      status,
+      items: items.length,
+      subtotal,
+      source: "manual",
+    },
+  });
+
   return {
     id: orderRef.id,
     code,
@@ -636,12 +738,14 @@ export async function createManualOrder(input: CreateManualOrderInput): Promise<
 export async function deleteOrder(orderId: string): Promise<void> {
   const firestore = db;
   if (!firestore) throw new Error("Firebase no está configurado.");
+  const snapshot: { order?: Order } = {};
 
   await runTransaction(firestore, async (transaction) => {
     const orderRef = doc(firestore, "orders", orderId);
     const orderSnap = await transaction.get(orderRef);
     if (!orderSnap.exists()) return;
     const order = normalizeOrder(orderSnap.id, orderSnap.data());
+    snapshot.order = order;
 
     if (order.stockApplied) {
       const requested = groupRequested(order.items);
@@ -651,4 +755,21 @@ export async function deleteOrder(orderId: string): Promise<void> {
 
     transaction.delete(orderRef);
   });
+
+  const previous = snapshot.order;
+  if (previous) {
+    void logAudit({
+      action: "order.delete",
+      entity: "order",
+      entityId: orderId,
+      entityLabel: previous.code,
+      summary: `Eliminó el pedido ${previous.code} (${previous.customer.name}).`,
+      metadata: {
+        status: previous.status,
+        subtotal: previous.subtotal,
+        items: previous.items.length,
+        stockApplied: previous.stockApplied,
+      },
+    });
+  }
 }

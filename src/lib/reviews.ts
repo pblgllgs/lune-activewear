@@ -11,6 +11,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { logAudit } from "@/lib/audit";
 
 export interface Review {
   id: string;
@@ -73,7 +74,7 @@ export async function submitReview(input: {
     input.rating && Number.isFinite(input.rating)
       ? Math.min(5, Math.max(1, Math.round(input.rating)))
       : undefined;
-  await addDoc(collection(db, "products", input.productId, "reviews"), {
+  const ref = await addDoc(collection(db, "products", input.productId, "reviews"), {
     productId: input.productId,
     productName: input.productName,
     name,
@@ -81,6 +82,16 @@ export async function submitReview(input: {
     ...(rating ? { rating } : {}),
     approved: false,
     createdAt: new Date().toISOString(),
+  });
+
+  void logAudit({
+    action: "review.create",
+    entity: "review",
+    entityId: ref.id,
+    entityLabel: input.productName,
+    summary: `Envió un comentario en «${input.productName}».`,
+    metadata: { productId: input.productId, rating: rating ?? null },
+    source: "web",
   });
 }
 
@@ -102,9 +113,25 @@ export async function getPendingReviews(): Promise<Review[]> {
 export async function approveReview(productId: string, reviewId: string): Promise<void> {
   if (!db) throw new Error("Firebase no está configurado.");
   await updateDoc(doc(db, "products", productId, "reviews", reviewId), { approved: true });
+  void logAudit({
+    action: "review.approve",
+    entity: "review",
+    entityId: reviewId,
+    entityLabel: productId,
+    summary: "Aprobó un comentario y lo publicó.",
+    metadata: { productId },
+  });
 }
 
 export async function deleteReview(productId: string, reviewId: string): Promise<void> {
   if (!db) throw new Error("Firebase no está configurado.");
   await deleteDoc(doc(db, "products", productId, "reviews", reviewId));
+  void logAudit({
+    action: "review.delete",
+    entity: "review",
+    entityId: reviewId,
+    entityLabel: productId,
+    summary: "Eliminó un comentario.",
+    metadata: { productId },
+  });
 }

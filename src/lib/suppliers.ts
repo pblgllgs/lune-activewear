@@ -3,10 +3,12 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   onSnapshot,
   updateDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { diffAuditFields, logAudit } from "@/lib/audit";
 import type { Supplier, SupplierInput } from "@/types/supplier";
 
 const str = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
@@ -62,18 +64,79 @@ function payload(input: SupplierInput) {
 
 export async function createSupplier(input: SupplierInput): Promise<void> {
   if (!db) throw new Error("Firebase no está configurado.");
-  await addDoc(collection(db, "suppliers"), {
+  const name = input.name.trim();
+  const ref = await addDoc(collection(db, "suppliers"), {
     ...payload(input),
     createdAt: new Date().toISOString(),
+  });
+  void logAudit({
+    action: "supplier.create",
+    entity: "supplier",
+    entityId: ref.id,
+    entityLabel: name,
+    summary: `Creó el proveedor «${name}».`,
+    metadata: {
+      productIds: input.productIds.length,
+      phone: input.phone ?? "",
+      email: input.email ?? "",
+    },
   });
 }
 
 export async function updateSupplier(id: string, input: SupplierInput): Promise<void> {
   if (!db) throw new Error("Firebase no está configurado.");
-  await updateDoc(doc(db, "suppliers", id), payload(input));
+  const ref = doc(db, "suppliers", id);
+  const beforeSnap = await getDoc(ref);
+  const before = beforeSnap.exists() ? normalizeSupplier(id, beforeSnap.data()) : null;
+  const next = payload(input);
+  await updateDoc(ref, next);
+
+  void logAudit({
+    action: "supplier.update",
+    entity: "supplier",
+    entityId: id,
+    entityLabel: next.name,
+    summary: `Actualizó el proveedor «${next.name}».`,
+    changes: before
+      ? diffAuditFields(
+          {
+            name: before.name,
+            contactName: before.contactName || null,
+            phone: before.phone || null,
+            email: before.email || null,
+            notes: before.notes || null,
+            productIds: before.productIds,
+          },
+          {
+            name: next.name,
+            contactName: next.contactName || null,
+            phone: next.phone || null,
+            email: next.email || null,
+            notes: next.notes || null,
+            productIds: next.productIds,
+          },
+          ["name", "contactName", "phone", "email", "notes", "productIds"]
+        )
+      : undefined,
+  });
 }
 
 export async function deleteSupplier(id: string): Promise<void> {
   if (!db) throw new Error("Firebase no está configurado.");
-  await deleteDoc(doc(db, "suppliers", id));
+  const ref = doc(db, "suppliers", id);
+  const beforeSnap = await getDoc(ref);
+  const before = beforeSnap.exists() ? normalizeSupplier(id, beforeSnap.data()) : null;
+  await deleteDoc(ref);
+  void logAudit({
+    action: "supplier.delete",
+    entity: "supplier",
+    entityId: id,
+    entityLabel: before?.name ?? id,
+    summary: `Eliminó el proveedor «${before?.name ?? id}».`,
+    metadata: {
+      productIds: before?.productIds.length ?? 0,
+      phone: before?.phone ?? "",
+      email: before?.email ?? "",
+    },
+  });
 }

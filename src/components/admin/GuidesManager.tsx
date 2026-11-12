@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { db } from "@/lib/firebase";
+import { logAudit } from "@/lib/audit";
 import { deleteGuide, saveGuide, slugifyGuide, subscribeGuides } from "@/lib/guides";
 import { getSiteContent } from "@/lib/site-content";
 import { usePagination } from "@/lib/use-pagination";
@@ -165,6 +166,16 @@ export function GuidesManager() {
     try {
       setSavingVisibility(true);
       await setDoc(doc(db, "settings", "site"), { guidesEnabled: next }, { merge: true });
+      void logAudit({
+        action: "guide.visibility",
+        entity: "settings",
+        entityId: "site",
+        entityLabel: "Visibilidad de guías",
+        summary: next
+          ? "Mostró el enlace de Guías en el menú."
+          : "Ocultó el enlace de Guías del menú.",
+        changes: { guidesEnabled: { before: previous, after: next } },
+      });
       toast.success(next ? "Guías visibles en el menú." : "Guías ocultas del menú.");
     } catch (error) {
       setGuidesVisible(previous);

@@ -30,6 +30,7 @@ import {
   Eye,
   EyeOff,
   Hash,
+  History,
   ImagePlus,
   LayoutDashboard,
   LogOut,
@@ -49,6 +50,8 @@ import {
 } from "lucide-react";
 import { auth, db, isFirebaseConfigured } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
+import { diffAuditFields, logAudit } from "@/lib/audit";
+import { AuditLogPanel } from "@/components/admin/AuditLogPanel";
 import { AuthSettings } from "@/components/admin/AuthSettings";
 import { ContentManager } from "@/components/admin/ContentManager";
 import { CustomersManager } from "@/components/admin/CustomersManager";
@@ -100,6 +103,7 @@ type Tab =
   | "guias"
   | "contenido"
   | "comentarios"
+  | "auditoria"
   | "ajustes";
 
 /** Columnas editables de la guía de tallas: cada medida es un rango desde/hasta. */const SIZE_GUIDE_FIELDS = [  { label: "Busto", min: "bustMin", max: "bustMax" },
@@ -266,6 +270,12 @@ function LoginForm({ firebaseAuth }: { firebaseAuth: Auth }) {
     setError("");
     try {
       await signInWithEmailAndPassword(firebaseAuth, email, password);
+      await logAudit({
+        action: "auth.login",
+        entity: "session",
+        entityLabel: "Panel de administración",
+        summary: "Inició sesión en el panel de administración.",
+      });
     } catch {
       setError("Credenciales incorrectas o usuario sin permisos.");
     }
@@ -315,9 +325,16 @@ function LoginForm({ firebaseAuth }: { firebaseAuth: Auth }) {
             variant="outline"
             className="w-full"
             onClick={() =>
-              signInWithPopup(firebaseAuth, new GoogleAuthProvider()).catch(() =>
-                setError("No se pudo iniciar sesión con Google.")
-              )
+              signInWithPopup(firebaseAuth, new GoogleAuthProvider())
+                .then(() =>
+                  logAudit({
+                    action: "auth.login",
+                    entity: "session",
+                    entityLabel: "Panel de administración",
+                    summary: "Inició sesión en el panel de administración con Google.",
+                  })
+                )
+                .catch(() => setError("No se pudo iniciar sesión con Google."))
             }
           >
             Entrar con Google
@@ -608,7 +625,8 @@ function ProductForm({
         sku,
         category: form.category,
         price: Number(form.price) || 0,
-        ...(form.compareAtPrice ? { compareAtPrice: Number(form.compareAtPrice) } : {}),
+        // 0 limpia el precio comparativo; `normalizeProduct` lo trata como ausente.
+        compareAtPrice: form.compareAtPrice ? Number(form.compareAtPrice) : 0,
         description: sanitizeRichText(form.description),
         composition: form.composition,
         care: form.care,
@@ -637,6 +655,46 @@ function ProductForm({
 
       if (editing) {
         await updateDoc(doc(db, "products", editing.id), payload);
+        void logAudit({
+          action: "product.update",
+          entity: "product",
+          entityId: editing.id,
+          entityLabel: name,
+          summary: `Actualizó el producto «${name}».`,
+          changes: diffAuditFields(
+            {
+              name: editing.name,
+              price: editing.price,
+              compareAtPrice: editing.compareAtPrice || null,
+              category: editing.category,
+              featured: editing.featured,
+              isNew: editing.isNew,
+              published: editing.published,
+              sku: editing.sku ?? null,
+            },
+            {
+              name,
+              price: payload.price,
+              compareAtPrice: payload.compareAtPrice || null,
+              category: payload.category,
+              featured: payload.featured,
+              isNew: payload.isNew,
+              published: payload.published,
+              sku: payload.sku,
+            },
+            ["name", "price", "compareAtPrice", "category", "featured", "isNew", "published", "sku"]
+          ),
+          metadata: {
+            images: urls.length,
+            colors: payload.colors.map((color) => color.name),
+            sizes,
+            stockTotal: Object.values(payload.stockByVariant).reduce(
+              (sum, bySize) =>
+                sum + Object.values(bySize).reduce((inner, qty) => inner + qty, 0),
+              0
+            ),
+          },
+        });
         const removed = editing.images.filter((url) => !urls.includes(url));
         for (const url of removed) {
           try {
@@ -660,6 +718,21 @@ function ProductForm({
         await setDoc(doc(db, "products", slug), {
           ...payload,
           createdAt: new Date().toISOString(),
+        });
+        void logAudit({
+          action: "product.create",
+          entity: "product",
+          entityId: slug,
+          entityLabel: name,
+          summary: `Creó y publicó el producto «${name}».`,
+          metadata: {
+            price: payload.price,
+            category: payload.category,
+            published: payload.published,
+            sizes,
+            colors: payload.colors.map((color) => color.name),
+            images: urls.length,
+          },
         });
         toast.success("Producto publicado correctamente.");
         setImages([]);
@@ -1282,6 +1355,7 @@ const MENU: { tab: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { tab: "guias", label: "Guías", icon: BookOpen },
   { tab: "comentarios", label: "Comentarios", icon: MessageSquare },
   { tab: "contenido", label: "Contenido", icon: ImagePlus },
+  { tab: "auditoria", label: "Auditoría", icon: History },
   { tab: "ajustes", label: "Ajustes", icon: Settings },
 ];
 
@@ -1340,20 +1414,37 @@ export default function Admin() {
       products.map((product) => product.sku).filter((sku): sku is string => Boolean(sku))
     );
     void (async () => {
-      let created = 0;
+      const generated: Product[] = [];
       for (const product of missing) {
         try {
           const sku = generateSku(product.category, taken);
           taken.add(sku);
           await updateDoc(doc(db, "products", product.id), { sku });
-          created += 1;
+          generated.push(product);
         } catch {
           /* best effort: se puede reintentar con el botón del dashboard */
         }
       }
-      if (created > 0) {
+      if (generated.length > 0) {
+        void logAudit({
+          action: "product.sku",
+          entity: "product",
+          entityLabel:
+            generated.length === 1 ? generated[0].name : `${generated.length} productos`,
+          summary:
+            generated.length === 1
+              ? `Generó automáticamente el SKU de «${generated[0].name}».`
+              : `Generó automáticamente SKUs para ${generated.length} productos.`,
+          metadata: {
+            count: generated.length,
+            automatic: true,
+            products: generated.map((product) => ({ id: product.id, name: product.name })),
+          },
+        });
         toast.success(
-          created === 1 ? "SKU generado para 1 producto." : `SKUs generados para ${created} productos.`
+          generated.length === 1
+            ? "SKU generado para 1 producto."
+            : `SKUs generados para ${generated.length} productos.`
         );
       }
     })();
@@ -1418,9 +1509,30 @@ export default function Admin() {
 
   const firebaseAuth = auth;
 
+  const handleSignOut = async () => {
+    await logAudit({
+      action: "auth.logout",
+      entity: "session",
+      entityLabel: "Panel de administración",
+      summary: "Cerró sesión en el panel de administración.",
+    });
+    await signOut(firebaseAuth);
+  };
+
   const toggleFeatured = async (product: Product) => {
     if (!db) return;
-    await updateDoc(doc(db, "products", product.id), { featured: !product.featured });
+    const next = !product.featured;
+    await updateDoc(doc(db, "products", product.id), { featured: next });
+    void logAudit({
+      action: "product.featured",
+      entity: "product",
+      entityId: product.id,
+      entityLabel: product.name,
+      summary: next
+        ? `Marcó «${product.name}» como destacado.`
+        : `Quitó «${product.name}» de los destacados.`,
+      changes: { featured: { before: product.featured, after: next } },
+    });
     toast.success(product.featured ? "Quitado de destacados." : "Marcado como destacado.");
   };
 
@@ -1437,6 +1549,19 @@ export default function Admin() {
         taken.add(sku);
         await updateDoc(doc(db, "products", product.id), { sku });
       }
+      void logAudit({
+        action: "product.sku",
+        entity: "product",
+        entityLabel: missing.length === 1 ? missing[0].name : `${missing.length} productos`,
+        summary:
+          missing.length === 1
+            ? `Generó el SKU de «${missing[0].name}».`
+            : `Generó SKUs para ${missing.length} productos.`,
+        metadata: {
+          count: missing.length,
+          products: missing.map((product) => ({ id: product.id, name: product.name })),
+        },
+      });
       toast.success(
         missing.length === 1 ? "SKU generado." : `${missing.length} SKUs generados.`
       );
@@ -1462,6 +1587,20 @@ export default function Admin() {
 
     try {
       await deleteDoc(doc(db, "products", product.id));
+      void logAudit({
+        action: "product.delete",
+        entity: "product",
+        entityId: product.id,
+        entityLabel: product.name,
+        summary: `Eliminó el producto «${product.name}».`,
+        metadata: {
+          category: product.category,
+          price: product.price,
+          published: product.published,
+          images: product.images.length,
+          stockTotal: totalStock(product),
+        },
+      });
       for (const url of product.images) {
         try {
           await deleteFromR2(url);
@@ -1509,7 +1648,7 @@ export default function Admin() {
               variant="ghost"
               size="sm"
               className="h-8 gap-1.5 px-2 normal-case tracking-normal text-muted-foreground hover:text-foreground"
-              onClick={() => firebaseAuth && void signOut(firebaseAuth)}
+              onClick={() => void handleSignOut()}
               title="Cerrar sesión"
             >
               <LogOut className="h-4 w-4" />
@@ -1563,9 +1702,11 @@ export default function Admin() {
                             ? "Ventas"
                             : tab === "guias"
                               ? "Guías"
-                              : tab === "ajustes"
-                                ? "Ajustes"
-                                : "Catálogo"}
+                              : tab === "auditoria"
+                                ? "Auditoría"
+                                : tab === "ajustes"
+                                  ? "Ajustes"
+                                  : "Catálogo"}
             </h1>
           </div>
           {firebaseAuth.currentUser?.email && (
@@ -1891,6 +2032,7 @@ export default function Admin() {
 
         {tab === "comentarios" && <ReviewsModeration />}
         {tab === "contenido" && <ContentManager />}
+        {tab === "auditoria" && <AuditLogPanel />}
         {tab === "ajustes" && <AuthSettings />}
       </main>
     </div>

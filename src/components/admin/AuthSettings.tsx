@@ -3,6 +3,7 @@ import { doc, setDoc } from "firebase/firestore";
 import { Loader2, Mail, MessageCircle, Save } from "lucide-react";
 import { toast } from "sonner";
 import { getAuthSettings, saveMagicLinkEnabled } from "@/lib/auth-settings";
+import { logAudit } from "@/lib/audit";
 import { formatWhatsAppDisplay, normalizeWhatsAppNumber, setWhatsAppNumber } from "@/lib/contact";
 import { db } from "@/lib/firebase";
 import { getSiteContent } from "@/lib/site-content";
@@ -21,6 +22,7 @@ export function AuthSettings() {
   const [saving, setSaving] = useState(false);
 
   const [whatsappNumber, setWhatsappNumberInput] = useState("");
+  const [savedWhatsApp, setSavedWhatsApp] = useState("");
   const [loadingWhatsApp, setLoadingWhatsApp] = useState(true);
   const [savingWhatsApp, setSavingWhatsApp] = useState(false);
 
@@ -42,7 +44,9 @@ export function AuthSettings() {
     let cancelled = false;
     getSiteContent()
       .then((content) => {
-        if (!cancelled) setWhatsappNumberInput(content.whatsappNumber || "");
+        if (cancelled) return;
+        setWhatsappNumberInput(content.whatsappNumber || "");
+        setSavedWhatsApp(normalizeWhatsAppNumber(content.whatsappNumber || ""));
       })
       .finally(() => {
         if (!cancelled) setLoadingWhatsApp(false);
@@ -76,6 +80,7 @@ export function AuthSettings() {
       toast.error("Ingresa un número de WhatsApp válido (con código de país).");
       return;
     }
+    const previous = savedWhatsApp;
     setSavingWhatsApp(true);
     try {
       await setDoc(
@@ -85,6 +90,17 @@ export function AuthSettings() {
       );
       setWhatsAppNumber(normalized);
       setWhatsappNumberInput(normalized);
+      setSavedWhatsApp(normalized);
+      void logAudit({
+        action: "settings.whatsapp",
+        entity: "settings",
+        entityId: "site",
+        entityLabel: "Número de WhatsApp",
+        summary: `Actualizó el número de WhatsApp a ${formatWhatsAppDisplay(normalized)}.`,
+        changes: {
+          whatsappNumber: { before: previous || null, after: normalized },
+        },
+      });
       toast.success("Número de WhatsApp actualizado.");
     } catch {
       toast.error("No se pudo guardar el número de WhatsApp.");

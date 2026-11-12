@@ -1,5 +1,6 @@
 import { addDoc, collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { logAudit } from "@/lib/audit";
 import { normalizeSizeGuide } from "@/lib/size-guide";
 import type { Product } from "@/types/product";
 
@@ -380,6 +381,14 @@ export async function seedDemoProducts(): Promise<number> {
       createdAt: data.createdAt ?? new Date().toISOString(),
     });
   }
+
+  void logAudit({
+    action: "catalog.seed",
+    entity: "catalog",
+    entityLabel: "Catálogo de ejemplo",
+    summary: `Importó ${DEMO_PRODUCTS.length} productos de ejemplo al catálogo.`,
+    metadata: { count: DEMO_PRODUCTS.length },
+  });
 
   return DEMO_PRODUCTS.length;
 }

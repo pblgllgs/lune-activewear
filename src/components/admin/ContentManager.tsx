@@ -3,6 +3,7 @@ import { doc, setDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, ImagePlus, Plus, Save, X } from "lucide-react";
 import { db } from "@/lib/firebase";
+import { logAudit } from "@/lib/audit";
 import { uploadToR2 } from "@/lib/upload";
 import {
   DEFAULT_HERO_SLIDES,
@@ -386,6 +387,19 @@ export function ContentManager() {
         { ...payload, updatedAt: new Date().toISOString() },
         { merge: true }
       );
+
+      void logAudit({
+        action: "settings.content",
+        entity: "settings",
+        entityId: "site",
+        entityLabel: "Contenido del sitio",
+        summary: "Actualizó las imágenes y el contenido del sitio.",
+        metadata: {
+          heroSlides: payload.heroSlides.length,
+          guidesEnabled: payload.guidesEnabled,
+          whatsappNumber: payload.whatsappNumber,
+        },
+      });
 
       setHeroDrafts(toHeroDrafts(payload));
       setAboutDrafts(toAboutDrafts(payload));
