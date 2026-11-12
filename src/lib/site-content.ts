@@ -1,5 +1,6 @@
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { DEFAULT_WHATSAPP_NUMBER, normalizeWhatsAppNumber, setWhatsAppNumber } from "@/lib/contact";
 
 export type HeroSlideFit = "cover" | "contain";
 export type HeroSlidePosition = "center" | "top" | "bottom";
@@ -23,6 +24,8 @@ export interface SiteContent {
   aboutImageTwo: string;
   /** Muestra u oculta el enlace "Guías" en el navbar público. */
   guidesEnabled: boolean;
+  /** Número de WhatsApp (solo dígitos, para wa.me). */
+  whatsappNumber: string;
   updatedAt?: string;
 }
 
@@ -67,6 +70,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     "https://images.pexels.com/photos/4498157/pexels-photo-4498157.jpeg?auto=compress&cs=tinysrgb&w=1000"
   ),
   guidesEnabled: true,
+  whatsappNumber: DEFAULT_WHATSAPP_NUMBER,
 };
 
 const text = (value: unknown, fallback: string) =>
@@ -101,10 +105,16 @@ const slideList = (value: unknown): HeroSlide[] => {
 };
 
 export async function getSiteContent(): Promise<SiteContent> {
-  if (!db) return DEFAULT_SITE_CONTENT;
+  if (!db) {
+    setWhatsAppNumber(DEFAULT_SITE_CONTENT.whatsappNumber);
+    return DEFAULT_SITE_CONTENT;
+  }
   try {
     const snap = await getDoc(doc(db, "settings", "site"));
-    if (!snap.exists()) return DEFAULT_SITE_CONTENT;
+    if (!snap.exists()) {
+      setWhatsAppNumber(DEFAULT_SITE_CONTENT.whatsappNumber);
+      return DEFAULT_SITE_CONTENT;
+    }
     const data = snap.data();
 
     // `heroSlides` manda. Los documentos antiguos guardaban `heroImages`
@@ -118,6 +128,10 @@ export async function getSiteContent(): Promise<SiteContent> {
         ? storedImages.map((url) => ({ url, fit: "contain" as const, position: "center" as const }))
         : DEFAULT_HERO_SLIDES;
 
+    const whatsappNumber =
+      normalizeWhatsAppNumber(text(data.whatsappNumber, "")) || DEFAULT_WHATSAPP_NUMBER;
+    setWhatsAppNumber(whatsappNumber);
+
     return {
       heroImage: heroSlides[0].url,
       heroImages: heroSlides.map((slide) => slide.url),
@@ -125,10 +139,12 @@ export async function getSiteContent(): Promise<SiteContent> {
       aboutImageOne: text(data.aboutImageOne, DEFAULT_SITE_CONTENT.aboutImageOne),
       aboutImageTwo: text(data.aboutImageTwo, DEFAULT_SITE_CONTENT.aboutImageTwo),
       guidesEnabled: typeof data.guidesEnabled === "boolean" ? data.guidesEnabled : true,
+      whatsappNumber,
       updatedAt: data.updatedAt ? String(data.updatedAt) : undefined,
     };
   } catch (error) {
     console.warn("No se pudo leer el contenido del sitio; se usan las imágenes por defecto.", error);
+    setWhatsAppNumber(DEFAULT_SITE_CONTENT.whatsappNumber);
     return DEFAULT_SITE_CONTENT;
   }
 }

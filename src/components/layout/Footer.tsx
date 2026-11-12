@@ -1,15 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowUpRight, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
-import {
-  EMAIL,
-  LOCATION,
-  SOCIAL,
-  WHATSAPP_DISPLAY,
-  whatsappLink,
-} from "@/lib/constants";
+import { EMAIL, LOCATION, SOCIAL } from "@/lib/constants";
 import { CATEGORIES } from "@/lib/categories";
 import { openCookiePreferences } from "@/lib/consent";
+import { useContact } from "@/lib/use-contact";
 
 function InstagramIcon({ className }: { className?: string }) {
   return (
@@ -41,6 +36,7 @@ const helpLinks = [
 
 export function Footer() {
   const [email, setEmail] = useState("");
+  const { whatsappDisplay, whatsappUrl, whatsappLink } = useContact();
 
   const handleNewsletter = (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,7 +73,7 @@ export function Footer() {
                 <InstagramIcon className="h-4 w-4" />
               </a>
               <a
-                href={SOCIAL.whatsapp}
+                href={whatsappUrl}
                 target="_blank"
                 rel="noreferrer"
                 aria-label="WhatsApp de Luné"
@@ -141,12 +137,12 @@ export function Footer() {
             <ul className="mt-5 space-y-3 text-sm text-primary-foreground/80">
               <li>
                 <a
-                  href={SOCIAL.whatsapp}
+                  href={whatsappUrl}
                   target="_blank"
                   rel="noreferrer"
                   className="flex items-center gap-2 transition hover:text-primary-foreground"
                 >
-                  <Phone className="h-3.5 w-3.5 shrink-0" /> {WHATSAPP_DISPLAY}
+                  <Phone className="h-3.5 w-3.5 shrink-0" /> {whatsappDisplay}
                 </a>
               </li>
               <li>

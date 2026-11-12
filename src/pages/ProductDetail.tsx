@@ -27,7 +27,7 @@ import {
   sizeStock,
 } from "@/lib/stock";
 import { discountPercent, formatCLP } from "@/lib/utils";
-import { whatsappLink } from "@/lib/constants";
+import { useContact } from "@/lib/use-contact";
 import { richTextToDisplayHtml, richTextToPlainText } from "@/lib/rich-text";
 import { usePagination } from "@/lib/use-pagination";
 import { breadcrumbJsonLd, productJsonLd, truncate, useSeo } from "@/lib/seo";
@@ -49,6 +49,7 @@ export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const { addItem, openCart } = useCart();
   const { has: isFavorite, toggle: toggleFavorite } = useWishlist();
+  const { whatsappLink } = useContact();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [related, setRelated] = useState<Product[]>([]);

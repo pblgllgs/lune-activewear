@@ -1,6 +1,7 @@
-import { whatsappLink } from "@/lib/constants";
+import { useContact } from "@/lib/use-contact";
 
 export function WhatsAppFloat() {
+  const { whatsappLink } = useContact();
   return (
     <a
       href={whatsappLink("Hola Luné! Quiero información sobre sus prendas.")}

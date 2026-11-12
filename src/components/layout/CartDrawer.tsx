@@ -4,7 +4,8 @@ import { ArrowLeft, Loader2, Minus, Plus, ShoppingBag, Trash2, X } from "lucide-
 import { toast } from "sonner";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
-import { FREE_SHIPPING_THRESHOLD, whatsappLink } from "@/lib/constants";
+import { FREE_SHIPPING_THRESHOLD } from "@/lib/constants";
+import { useContact } from "@/lib/use-contact";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import { createOrder } from "@/lib/orders";
 import { formatCLP } from "@/lib/utils";
@@ -30,6 +31,7 @@ function emptyCustomer(): CustomerForm {
 export function CartDrawer() {
   const { items, count, subtotal, isOpen, closeCart, removeItem, setQty, clear } = useCart();
   const { user } = useAuth();
+  const { whatsappLink } = useContact();
   const [coupon, setCoupon] = useState("");
   const [step, setStep] = useState<"cart" | "checkout">("cart");
   const [customer, setCustomer] = useState<CustomerForm>(emptyCustomer);

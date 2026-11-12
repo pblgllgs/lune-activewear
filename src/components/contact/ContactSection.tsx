@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Mail, MapPin, MessageCircle, Phone, Send } from "lucide-react";
-import { EMAIL, LOCATION, WHATSAPP_DISPLAY, whatsappLink } from "@/lib/constants";
+import { EMAIL, LOCATION } from "@/lib/constants";
+import { useContact } from "@/lib/use-contact";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,6 +23,7 @@ export function ContactSection() {
   const [phone, setPhone] = useState("");
   const [reason, setReason] = useState("");
   const [message, setMessage] = useState("");
+  const { whatsappDisplay, whatsappLink } = useContact();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,7 +64,7 @@ export function ContactSection() {
                   <p className="text-[10px] uppercase tracking-wider2 text-muted-foreground">
                     Teléfono / WhatsApp
                   </p>
-                  <p className="font-medium">{WHATSAPP_DISPLAY}</p>
+                  <p className="font-medium">{whatsappDisplay}</p>
                 </div>
               </li>
               <li className="flex items-center gap-3">

@@ -317,6 +317,7 @@ export function ContentManager() {
     toAboutDrafts(DEFAULT_SITE_CONTENT)
   );
   const [guidesEnabled, setGuidesEnabled] = useState(true);
+  const [whatsappNumber, setWhatsappNumberState] = useState(DEFAULT_SITE_CONTENT.whatsappNumber);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -328,6 +329,7 @@ export function ContentManager() {
         setHeroDrafts(toHeroDrafts(content));
         setAboutDrafts(toAboutDrafts(content));
         setGuidesEnabled(content.guidesEnabled !== false);
+        setWhatsappNumberState(content.whatsappNumber || DEFAULT_SITE_CONTENT.whatsappNumber);
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -376,6 +378,7 @@ export function ContentManager() {
           DEFAULT_SITE_CONTENT.aboutImageTwo
         ),
         guidesEnabled,
+        whatsappNumber,
       };
 
       await setDoc(

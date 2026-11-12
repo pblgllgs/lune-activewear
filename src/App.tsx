@@ -11,6 +11,7 @@ import { CartDrawer } from "@/components/layout/CartDrawer";
 import { CookieBanner } from "@/components/layout/CookieBanner";
 import { WhatsAppFloat } from "@/components/layout/WhatsAppFloat";
 import { useSeo } from "@/lib/seo";
+import { getSiteContent } from "@/lib/site-content";
 import Home from "@/pages/Home";
 
 const Shop = lazy(() => import("@/pages/Shop"));
@@ -69,6 +70,10 @@ function RouteFallback() {
 }
 
 function App() {
+  useEffect(() => {
+    void getSiteContent();
+  }, []);
+
   return (
     <BrowserRouter>
       <AuthProvider>
