@@ -41,7 +41,9 @@ import {
   Package,
   Pencil,
   Plus,
+  PowerOff,
   RotateCcw,
+  Save,
   Settings,
   Star,
   Trash2,
@@ -383,7 +385,9 @@ function ProductForm({
       editing?.shipping ?? "Despacho a todo Chile en 2 a 5 días hábiles. Retiro gratis en Chillán.",
     featured: editing?.featured ?? false,
     isNew: editing?.isNew ?? false,
-    published: editing?.published ?? true,
+    published: editing?.published ?? false,
+    active: editing?.active ?? true,
+    isTest: editing?.isTest ?? false,
   }));
 
   const [sizes, setSizes] = useState<string[]>(
@@ -451,7 +455,6 @@ function ProductForm({
   );
   const [status, setStatus] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
-  const publishIntentRef = useRef<boolean>(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const set = (key: keyof typeof form) => (
@@ -588,6 +591,12 @@ function ProductForm({
     e.preventDefault();
     const name = form.name.trim();
     if (!name) return;
+    // El botón «Publicar» fuerza la visibilidad; «Guardar» respeta el checkbox.
+    // Un producto desactivado nunca puede quedar publicado.
+    const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const wantsPublish = submitter?.value === "publish";
+    const active = wantsPublish ? true : form.active;
+    const publish = active && (wantsPublish || form.published);
     if (richTextToPlainText(form.description).length === 0) {
       toast.error("Escribe una descripción para el producto.");
       return;
@@ -651,7 +660,9 @@ function ProductForm({
         imageColors,
         featured: form.featured,
         isNew: form.isNew,
-        published: publishIntentRef.current,
+        published: publish,
+        active,
+        isTest: form.isTest,
         updatedAt: new Date().toISOString(),
       };
 
@@ -672,6 +683,8 @@ function ProductForm({
               featured: editing.featured,
               isNew: editing.isNew,
               published: editing.published,
+              active: editing.active,
+              isTest: editing.isTest,
               sku: editing.sku ?? null,
             },
             {
@@ -682,9 +695,22 @@ function ProductForm({
               featured: payload.featured,
               isNew: payload.isNew,
               published: payload.published,
+              active: payload.active,
+              isTest: payload.isTest,
               sku: payload.sku,
             },
-            ["name", "price", "compareAtPrice", "category", "featured", "isNew", "published", "sku"]
+            [
+              "name",
+              "price",
+              "compareAtPrice",
+              "category",
+              "featured",
+              "isNew",
+              "published",
+              "active",
+              "isTest",
+              "sku",
+            ]
           ),
           metadata: {
             images: urls.length,
@@ -706,6 +732,7 @@ function ProductForm({
           }
         }
         toast.success("Producto actualizado correctamente.");
+        setForm((current) => ({ ...current, active, published: publish }));
       } else {
         // El ID del documento es el slug: mantiene URLs limpias (/producto/<slug>)
         // y permite que la Function del edge resuelva la ficha sin rebuild.
@@ -726,17 +753,29 @@ function ProductForm({
           entity: "product",
           entityId: slug,
           entityLabel: name,
-          summary: `Creó y publicó el producto «${name}».`,
+          summary: form.isTest
+            ? `Creó el producto de prueba «${name}».`
+            : publish
+              ? `Creó y publicó el producto «${name}».`
+              : `Creó el borrador «${name}».`,
           metadata: {
             price: payload.price,
             category: payload.category,
             published: payload.published,
+            active: payload.active,
+            isTest: payload.isTest,
             sizes,
             colors: payload.colors.map((color) => color.name),
             images: urls.length,
           },
         });
-        toast.success("Producto publicado correctamente.");
+        toast.success(
+          form.isTest
+            ? "Producto de prueba guardado."
+            : publish
+              ? "Producto publicado correctamente."
+              : "Borrador guardado correctamente."
+        );
         setImages([]);
         setColors([{ name: "Chocolate", hex: "#49372D" }]);
         const resetSizes = ["S", "M", "L"];
@@ -756,7 +795,9 @@ function ProductForm({
           shipping: "Despacho a todo Chile en 2 a 5 días hábiles. Retiro gratis en Chillán.",
           featured: false,
           isNew: false,
-          published: true,
+          published: false,
+          active: true,
+          isTest: false,
         });
       }
       setStatus("");
@@ -797,7 +838,9 @@ function ProductForm({
       ),
       featured: form.featured,
       isNew: form.isNew,
-      published: publishIntentRef.current,
+      published: form.active && form.published,
+      active: form.active,
+      isTest: form.isTest,
     };
   }, [
     editing,
@@ -1295,38 +1338,78 @@ function ProductForm({
               />
               Marcar como nuevo
             </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={form.published}
-                onChange={(e) => setForm({ ...form, published: e.target.checked })}
-                className="h-4 w-4 rounded border-input accent-primary"
-              />
-              Publicado (visible en la tienda)
-            </label>
+          </div>
+
+          <div className="space-y-3 rounded-lg border bg-secondary/20 p-4">
+            <div className="flex flex-wrap gap-6">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.active}
+                  onChange={(e) => {
+                    const active = e.target.checked;
+                    setForm({
+                      ...form,
+                      active,
+                      // Un producto desactivado no puede quedar publicado.
+                      published: active ? form.published : false,
+                    });
+                  }}
+                  className="h-4 w-4 rounded border-input accent-primary"
+                />
+                Activo
+              </label>
+              <label
+                className={`flex items-center gap-2 text-sm ${
+                  form.active ? "" : "opacity-60"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={form.published}
+                  disabled={!form.active}
+                  onChange={(e) => setForm({ ...form, published: e.target.checked })}
+                  className="h-4 w-4 rounded border-input accent-primary disabled:cursor-not-allowed"
+                />
+                Publicado (visible en la tienda)
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.isTest}
+                  onChange={(e) => setForm({ ...form, isTest: e.target.checked })}
+                  className="h-4 w-4 rounded border-input accent-primary"
+                />
+                Producto de prueba (no cuenta en métricas)
+              </label>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              {form.active
+                ? "Activo es el estado normal del producto. Si además está publicado, aparece en la tienda."
+                : "Producto desactivado: no se muestra en la tienda y no puede publicarse."}
+            </p>
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row">
             <Button
               type="submit"
+              name="intent"
+              value="save"
               variant="outline"
               className="flex-1"
-              onClick={() => {
-                publishIntentRef.current = false;
-              }}
             >
-              <EyeOff className="h-4 w-4" />
-              Guardar como borrador
+              <Save className="h-4 w-4" />
+              Guardar
             </Button>
             <Button
               type="submit"
+              name="intent"
+              value="publish"
               className="flex-1"
-              onClick={() => {
-                publishIntentRef.current = true;
-              }}
+              title="Activa el producto si estaba desactivado y lo publica en la tienda"
             >
               <UploadCloud className="h-4 w-4" />
-              {editing ? "Guardar y publicar" : "Publicar producto"}
+              Publicar
             </Button>
           </div>
           {status && <p className="text-center text-sm text-muted-foreground">{status}</p>}
@@ -1453,20 +1536,28 @@ export default function Admin() {
     })();
   }, [isAdmin, products]);
 
+  /** Productos reales: los de prueba quedan fuera de métricas e inventario. */
+  const catalogProducts = useMemo(
+    () => products.filter((product) => !product.isTest),
+    [products]
+  );
+
   const stats = useMemo(() => {
-    const stock = products.reduce((sum, product) => sum + totalStock(product), 0);
+    // Los productos de prueba no cuentan en las métricas del catálogo.
+    const counted = catalogProducts;
+    const stock = counted.reduce((sum, product) => sum + totalStock(product), 0);
     // Valor del inventario: precio de cada prenda × unidades registradas.
-    const value = products.reduce(
+    const value = counted.reduce(
       (sum, product) => sum + (product.price || 0) * totalStock(product),
       0
     );
     return {
-      count: products.length,
-      featured: products.filter((p) => p.featured).length,
+      count: counted.length,
+      featured: counted.filter((p) => p.featured).length,
       stock,
       value,
     };
-  }, [products]);
+  }, [catalogProducts]);
 
   const takenSkus = useMemo(
     () => products.map((p) => p.sku).filter((sku): sku is string => Boolean(sku)),
@@ -1699,8 +1790,10 @@ export default function Admin() {
               >
                 <item.icon className="mr-2 h-4 w-4" />
                 {item.label}
-                {item.tab === "productos" && products.length > 0 && (
-                  <span className="ml-auto text-xs text-muted-foreground">{products.length}</span>
+                {item.tab === "productos" && catalogProducts.length > 0 && (
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {catalogProducts.length}
+                  </span>
                 )}
               </Button>
             ))}
@@ -1753,7 +1846,7 @@ export default function Admin() {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-3xl">{stats.count}</CardTitle>
-                  <CardDescription>Productos publicados</CardDescription>
+                  <CardDescription>Productos en catálogo</CardDescription>
                 </CardHeader>
               </Card>
               <Card>
@@ -1775,6 +1868,14 @@ export default function Admin() {
                 </CardHeader>
               </Card>
             </div>
+
+            {products.length > catalogProducts.length && (
+              <p className="text-xs text-muted-foreground">
+                {products.length - catalogProducts.length} producto
+                {products.length - catalogProducts.length === 1 ? "" : "s"} de prueba no se
+                cuenta{products.length - catalogProducts.length === 1 ? "" : "n"} en las métricas.
+              </p>
+            )}
 
             {products.length === 0 && (
               <Card className="border-primary/25 bg-secondary/40">
@@ -1834,7 +1935,7 @@ export default function Admin() {
 
         {tab === "inventario" && (
           <InventoryPanel
-            products={products}
+            products={catalogProducts}
             onEdit={(product) => {
               setEditing(product);
               setTab("nuevo");
@@ -1950,7 +2051,9 @@ export default function Admin() {
                     return (
                       <Card
                         key={product.id}
-                        className={`overflow-hidden ${product.published === false ? "opacity-70" : ""}`}
+                        className={`overflow-hidden ${
+                          product.active === false || product.published === false ? "opacity-70" : ""
+                        }`}
                       >
                         <div className="aspect-[4/5] w-full overflow-hidden border-b bg-secondary">
                           {product.images[0] ? (
@@ -1988,9 +2091,19 @@ export default function Admin() {
                                   Sin SKU
                                 </Badge>
                               )}
+                              {product.active === false && (
+                                <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                                  <PowerOff className="mr-1 h-3 w-3" /> Inactivo
+                                </Badge>
+                              )}
                               {product.published === false && (
                                 <Badge variant="outline" className="text-[10px]">
                                   <EyeOff className="mr-1 h-3 w-3" /> Borrador
+                                </Badge>
+                              )}
+                              {product.isTest && (
+                                <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                                  Prueba
                                 </Badge>
                               )}
                               {product.isNew && <Badge variant="accent" className="text-[10px]">Nuevo</Badge>}

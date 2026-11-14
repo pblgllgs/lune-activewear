@@ -85,14 +85,20 @@ export async function fetchProducts() {
           // Sin el campo se considera publicado. Los borradores no entran al
           // sitemap ni tienen página estática.
           published: fields.published ? fields.published.booleanValue === true : true,
+          // Sin el campo se considera activo. Los desactivados no se publican.
+          active: fields.active ? fields.active.booleanValue === true : true,
+          isTest: fields.isTest ? fields.isTest.booleanValue === true : false,
           lastmod: str(fields.updatedAt || fields.createdAt).slice(0, 10),
         };
       })
       .filter((product) => product.id && product.name.trim().toLowerCase() !== "test");
 
     if (all.length === 0) throw new Error("catálogo vacío");
-    // Los borradores no se publican ni entran al sitemap.
-    return all.filter((product) => product.published !== false);
+    // Los borradores y desactivados no se publican ni entran al sitemap; los
+    // productos de prueba tampoco se indexan.
+    return all.filter(
+      (product) => product.published !== false && product.active !== false && !product.isTest
+    );
   } catch (error) {
     console.warn(
       `[seo] No se pudo leer Firestore (${error.message}). Se usan los slugs conocidos.`

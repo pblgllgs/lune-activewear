@@ -55,6 +55,17 @@ export interface Product {
    * Ausente o `true` = publicado (compatibilidad con el catálogo existente).
    */
   published?: boolean;
+  /**
+   * Si es `false` el producto está desactivado: no se muestra en la tienda y no
+   * puede estar publicado. Ausente o `true` = activo (compatibilidad con el
+   * catálogo existente).
+   */
+  active?: boolean;
+  /**
+   * Producto de prueba: se gestiona desde el admin, pero no cuenta en las
+   * métricas del catálogo (dashboard, inventario ni contador del menú).
+   */
+  isTest?: boolean;
   /** Promedio de las reseñas aprobadas (0 si aún no hay). */
   ratingAvg?: number;
   /** Cantidad de reseñas aprobadas con calificación. */

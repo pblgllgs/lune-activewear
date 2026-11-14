@@ -30,6 +30,10 @@ export interface ProductMeta {
   soldOut: boolean;
   /** `false` = borrador: no se sirve ni entra al sitemap. */
   published: boolean;
+  /** `false` = desactivado: no se sirve ni entra al sitemap. */
+  active: boolean;
+  /** Producto de prueba: no entra al sitemap. */
+  isTest: boolean;
   lastmod: string;
 }
 
@@ -100,6 +104,8 @@ export function normalizeDoc(id: string, fields: Record<string, unknown>): Produ
     }
   }
   const publishedField = fields.published as { booleanValue?: boolean } | undefined;
+  const activeField = fields.active as { booleanValue?: boolean } | undefined;
+  const testField = fields.isTest as { booleanValue?: boolean } | undefined;
 
   return {
     id,
@@ -115,6 +121,9 @@ export function normalizeDoc(id: string, fields: Record<string, unknown>): Produ
     soldOut,
     // Sin el campo se considera publicado (catálogo anterior a los borradores).
     published: publishedField ? publishedField.booleanValue === true : true,
+    // Sin el campo se considera activo (catálogo anterior a los desactivados).
+    active: activeField ? activeField.booleanValue === true : true,
+    isTest: testField?.booleanValue === true,
     lastmod: (str(fields.updatedAt) || str(fields.createdAt)).slice(0, 10),
   };
 }
@@ -179,7 +188,11 @@ export async function fetchProducts(env: EdgeEnv): Promise<ProductMeta[]> {
     })
     .filter(
       (product) =>
-        product.id && product.name.trim().toLowerCase() !== "test" && product.published !== false
+        product.id &&
+        product.name.trim().toLowerCase() !== "test" &&
+        product.published !== false &&
+        product.active !== false &&
+        !product.isTest
     );
 
   remember(key, products);

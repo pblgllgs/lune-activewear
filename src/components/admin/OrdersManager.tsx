@@ -239,7 +239,10 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
 
   const adminEmail = auth?.currentUser?.email ?? "admin";
   const catalog = useMemo(
-    () => products.filter((p) => p.published !== false).sort((a, b) => a.name.localeCompare(b.name, "es")),
+    () =>
+      products
+        .filter((p) => p.active !== false && p.published !== false)
+        .sort((a, b) => a.name.localeCompare(b.name, "es")),
     [products]
   );
 

@@ -324,6 +324,9 @@ export function normalizeProduct(id: string, data: Record<string, unknown>): Pro
     isNew: Boolean(data.isNew),
     // Sin el campo se considera publicado (catálogo anterior a los borradores).
     published: data.published === undefined ? true : Boolean(data.published),
+    // Sin el campo se considera activo (catálogo anterior a los desactivados).
+    active: data.active === undefined ? true : Boolean(data.active),
+    isTest: Boolean(data.isTest),
     ratingAvg:
       typeof data.ratingAvg === "number" && Number.isFinite(data.ratingAvg)
         ? Math.max(0, Number(data.ratingAvg))
@@ -337,9 +340,14 @@ export function normalizeProduct(id: string, data: Record<string, unknown>): Pro
   };
 }
 
-/** Un producto sin el campo `published` se considera publicado. */
+/** Un producto sin el campo `active` se considera activo. */
+export function isActive(product: Product): boolean {
+  return product.active !== false;
+}
+
+/** Visible en la tienda: debe estar activo y publicado. */
 export function isPublished(product: Product): boolean {
-  return product.published !== false;
+  return isActive(product) && product.published !== false;
 }
 
 export async function getProducts(): Promise<Product[]> {
