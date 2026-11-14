@@ -324,6 +324,14 @@ export function normalizeProduct(id: string, data: Record<string, unknown>): Pro
     isNew: Boolean(data.isNew),
     // Sin el campo se considera publicado (catálogo anterior a los borradores).
     published: data.published === undefined ? true : Boolean(data.published),
+    ratingAvg:
+      typeof data.ratingAvg === "number" && Number.isFinite(data.ratingAvg)
+        ? Math.max(0, Number(data.ratingAvg))
+        : undefined,
+    ratingCount:
+      typeof data.ratingCount === "number" && Number.isFinite(data.ratingCount)
+        ? Math.max(0, Math.round(Number(data.ratingCount)))
+        : undefined,
     createdAt: data.createdAt ? String(data.createdAt) : undefined,
     updatedAt: data.updatedAt ? String(data.updatedAt) : undefined,
   };

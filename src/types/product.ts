@@ -55,6 +55,10 @@ export interface Product {
    * Ausente o `true` = publicado (compatibilidad con el catálogo existente).
    */
   published?: boolean;
+  /** Promedio de las reseñas aprobadas (0 si aún no hay). */
+  ratingAvg?: number;
+  /** Cantidad de reseñas aprobadas con calificación. */
+  ratingCount?: number;
   createdAt?: string;
   updatedAt?: string;
 }

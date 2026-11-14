@@ -2,16 +2,19 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
+  BadgeCheck,
   Bell,
   ChevronLeft,
   ChevronRight,
   Heart,
+  ImagePlus,
   Minus,
   Plus,
   RefreshCw,
   ShoppingBag,
   Star,
   Truck,
+  X,
 } from "lucide-react";
 import { getProduct, getProducts } from "@/lib/catalog";
 import { categoryLabel } from "@/lib/categories";
@@ -31,7 +34,12 @@ import { useContact } from "@/lib/use-contact";
 import { richTextToDisplayHtml, richTextToPlainText } from "@/lib/rich-text";
 import { usePagination } from "@/lib/use-pagination";
 import { breadcrumbJsonLd, productJsonLd, truncate, useSeo } from "@/lib/seo";
-import { getApprovedReviews, submitReview, type Review } from "@/lib/reviews";
+import { getApprovedReviews, MAX_REVIEW_PHOTOS, submitReview, type Review } from "@/lib/reviews";
+import { getMyOrders } from "@/lib/orders";
+import { deleteFromR2, isUploadConfigured, uploadToR2 } from "@/lib/upload";
+import { compressImage, validateReviewPhoto } from "@/lib/image-compress";
+import { SALE_STATUSES } from "@/types/order";
+import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
 import type { Product } from "@/types/product";
@@ -50,6 +58,7 @@ export default function ProductDetail() {
   const { addItem, openCart } = useCart();
   const { has: isFavorite, toggle: toggleFavorite } = useWishlist();
   const { whatsappLink } = useContact();
+  const { user, displayName } = useAuth();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [related, setRelated] = useState<Product[]>([]);
@@ -64,7 +73,12 @@ export default function ProductDetail() {
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewSending, setReviewSending] = useState(false);
   const [reviewSent, setReviewSent] = useState(false);
+  const [reviewPhotos, setReviewPhotos] = useState<{ file: File; preview: string }[]>([]);
+  const [verifiedOrderId, setVerifiedOrderId] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<string | null>(null);
   const touchX = useRef<number | null>(null);
+  const reviewPhotosRef = useRef(reviewPhotos);
+  const uploadsEnabled = isUploadConfigured();
 
   const reviewPagination = usePagination(reviews, { pageSize: 6, resetKey: id });
 
@@ -123,6 +137,58 @@ export default function ProductDetail() {
     getApprovedReviews(id).then(setReviews).catch(() => setReviews([]));
     getProducts().then((all) => setRelated(all.filter((p) => p.id !== id)));
   }, [id]);
+
+  // Sello de compra verificada: cruza la sesión con los pedidos confirmados.
+  useEffect(() => {
+    if (!product || !user?.email) {
+      setVerifiedOrderId(null);
+      return;
+    }
+    let active = true;
+    getMyOrders(user.email, user.uid)
+      .then((orders) => {
+        if (!active) return;
+        const match = orders.find(
+          (order) =>
+            SALE_STATUSES.includes(order.status) &&
+            order.items.some((item) => item.productId === product.id)
+        );
+        setVerifiedOrderId(match?.id ?? null);
+      })
+      .catch(() => {
+        if (active) setVerifiedOrderId(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [product, user]);
+
+  // El nombre de la sesión se propone en el formulario (se puede cambiar).
+  useEffect(() => {
+    setReviewName((current) => current || displayName);
+  }, [displayName]);
+
+  useEffect(() => {
+    reviewPhotosRef.current = reviewPhotos;
+  }, [reviewPhotos]);
+
+  // Libera las miniaturas al salir de la ficha.
+  useEffect(
+    () => () => {
+      reviewPhotosRef.current.forEach((photo) => URL.revokeObjectURL(photo.preview));
+    },
+    []
+  );
+
+  // Cierra la foto ampliada con Escape.
+  useEffect(() => {
+    if (!lightbox) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setLightbox(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lightbox]);
 
   /**
    * El carrusel muestra todas las fotos del producto. Al elegir una foto se
@@ -248,24 +314,82 @@ export default function ProductDetail() {
       ].join("\n")
     );
 
+  const addPhotos = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    if (!user) {
+      toast.error("Inicia sesión para adjuntar fotos a tu comentario.");
+      return;
+    }
+    if (!uploadsEnabled) {
+      toast.error("La subida de fotos no está disponible en este momento.");
+      return;
+    }
+    const remaining = MAX_REVIEW_PHOTOS - reviewPhotos.length;
+    if (remaining <= 0) {
+      toast.message(`Puedes adjuntar hasta ${MAX_REVIEW_PHOTOS} fotos.`);
+      return;
+    }
+    const selected = Array.from(files);
+    if (selected.length > remaining) {
+      toast.message(`Puedes adjuntar hasta ${MAX_REVIEW_PHOTOS} fotos.`);
+    }
+    const next: { file: File; preview: string }[] = [];
+    for (const file of selected.slice(0, remaining)) {
+      const error = validateReviewPhoto(file);
+      if (error) {
+        toast.error(error);
+        continue;
+      }
+      next.push({ file, preview: URL.createObjectURL(file) });
+    }
+    if (next.length > 0) setReviewPhotos((current) => [...current, ...next]);
+  };
+
+  const removePhoto = (index: number) => {
+    setReviewPhotos((current) => {
+      const photo = current[index];
+      if (photo) URL.revokeObjectURL(photo.preview);
+      return current.filter((_, i) => i !== index);
+    });
+  };
+
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!product) return;
     setReviewSending(true);
+    const uploaded: string[] = [];
     try {
+      // Las fotos se suben recién al enviar: así no quedan archivos huérfanos
+      // si la clienta abandona el formulario.
+      for (const photo of reviewPhotos) {
+        const compressed = await compressImage(photo.file);
+        uploaded.push(await uploadToR2(compressed, `reviews/${product.id}`));
+      }
       await submitReview({
         productId: product.id,
         productName: product.name,
         name: reviewName,
         text: reviewText,
         rating: reviewRating,
+        photos: uploaded,
+        verifiedPurchase: Boolean(verifiedOrderId),
+        orderId: verifiedOrderId ?? undefined,
+        userId: user?.uid,
       });
+      reviewPhotos.forEach((photo) => URL.revokeObjectURL(photo.preview));
+      setReviewPhotos([]);
       setReviewSent(true);
       setReviewName("");
       setReviewText("");
       setReviewRating(5);
-      toast.success("Gracias. Tu comentario será revisado antes de publicarse.");
+      toast.success(
+        uploaded.length > 0
+          ? "Gracias. Revisaremos tu comentario y sus fotos antes de publicarlos."
+          : "Gracias. Tu comentario será revisado antes de publicarse."
+      );
     } catch (error) {
+      // Si falla el envío, borra las fotos ya subidas para no dejar basura en R2.
+      await Promise.allSettled(uploaded.map((url) => deleteFromR2(url)));
       toast.error(error instanceof Error ? error.message : "No se pudo enviar el comentario.");
     } finally {
       setReviewSending(false);
@@ -377,6 +501,30 @@ export default function ProductDetail() {
                   SKU {product.sku}
                 </p>
               )}
+              {product.ratingCount ? (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                  <span
+                    className="flex items-center gap-0.5"
+                    aria-label={`${product.ratingAvg ?? 0} de 5 estrellas`}
+                  >
+                    {Array.from({ length: 5 }, (_, i) => (
+                      <Star
+                        key={i}
+                        className={`h-3.5 w-3.5 ${
+                          i < Math.round(product.ratingAvg ?? 0)
+                            ? "fill-primary text-primary"
+                            : "text-primary/20"
+                        }`}
+                      />
+                    ))}
+                  </span>
+                  <span>{(product.ratingAvg ?? 0).toFixed(1)}</span>
+                  <span aria-hidden>·</span>
+                  <span>
+                    {product.ratingCount} reseña{product.ratingCount === 1 ? "" : "s"}
+                  </span>
+                </div>
+              ) : null}
             </div>
             <button
               type="button"
@@ -614,7 +762,34 @@ export default function ProductDetail() {
                     </div>
                   ) : null}
                   <p className="mt-2 text-sm leading-relaxed text-muted-foreground">“{review.text}”</p>
-                  <p className="mt-3 text-xs font-medium uppercase tracking-wider2">{review.name}</p>
+                  {review.photos.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {review.photos.map((photo, i) => (
+                        <button
+                          key={photo}
+                          type="button"
+                          onClick={() => setLightbox(photo)}
+                          className="h-16 w-16 overflow-hidden rounded-md border transition hover:opacity-90"
+                          aria-label={`Ampliar foto ${i + 1} de ${review.name}`}
+                        >
+                          <ImageWithFallback
+                            src={photo}
+                            alt={`Foto de la reseña de ${review.name}`}
+                            className="h-full w-full object-cover"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <p className="text-xs font-medium uppercase tracking-wider2">{review.name}</p>
+                    {review.verifiedPurchase && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[10px] uppercase tracking-wider2 text-primary">
+                        <BadgeCheck className="h-3 w-3" />
+                        Compra verificada
+                      </span>
+                    )}
+                  </div>
                 </article>
               ))}
             </div>
@@ -636,6 +811,12 @@ export default function ProductDetail() {
           <p className="mt-1 text-xs text-muted-foreground">
             Tu comentario será revisado por el equipo antes de publicarse.
           </p>
+          {verifiedOrderId && (
+            <p className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-primary">
+              <BadgeCheck className="h-3.5 w-3.5" />
+              Compra verificada: tu reseña llevará el sello.
+            </p>
+          )}
 
           {reviewSent ? (
             <p className="mt-4 rounded-md border bg-background p-3 text-sm text-muted-foreground">
@@ -694,6 +875,70 @@ export default function ProductDetail() {
                   required
                 />
               </div>
+
+              <div className="space-y-2">
+                <Label
+                  htmlFor={user ? "review-photos" : undefined}
+                  className="text-[11px] uppercase tracking-wider2 text-muted-foreground"
+                >
+                  Fotos (opcional)
+                </Label>
+                {user ? (
+                  <>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {reviewPhotos.map((photo, i) => (
+                        <div
+                          key={photo.preview}
+                          className="relative h-20 w-20 overflow-hidden rounded-md border"
+                        >
+                          <img
+                            src={photo.preview}
+                            alt={`Foto ${i + 1} de tu comentario`}
+                            className="h-full w-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removePhoto(i)}
+                            aria-label="Quitar foto"
+                            className="absolute right-1 top-1 rounded-full bg-background/90 p-0.5 shadow-sm transition hover:bg-background"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                      {reviewPhotos.length < MAX_REVIEW_PHOTOS && (
+                        <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed text-[10px] uppercase tracking-wider2 text-muted-foreground transition hover:bg-secondary/40">
+                          <ImagePlus className="h-4 w-4" />
+                          Añadir
+                          <input
+                            id="review-photos"
+                            name="review-photos"
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            multiple
+                            className="sr-only"
+                            onChange={(e) => {
+                              addPhotos(e.target.files);
+                              e.target.value = "";
+                            }}
+                          />
+                        </label>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Hasta {MAX_REVIEW_PHOTOS} fotos. Se revisan antes de publicarse.
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground">
+                    <Link to="/cuenta" className="underline underline-offset-2 hover:text-foreground">
+                      Inicia sesión
+                    </Link>{" "}
+                    para adjuntar fotos y obtener el sello de compra verificada.
+                  </p>
+                )}
+              </div>
+
               <Button type="submit" disabled={reviewSending}>
                 {reviewSending ? "Enviando…" : "Enviar comentario"}
               </Button>
@@ -722,6 +967,31 @@ export default function ProductDetail() {
             ))}
           </div>
         </section>
+      )}
+
+      {lightbox && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Foto ampliada de la reseña"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setLightbox(null)}
+        >
+          <button
+            type="button"
+            onClick={() => setLightbox(null)}
+            aria-label="Cerrar foto"
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm transition hover:bg-background"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <img
+            src={lightbox}
+            alt="Foto de la reseña"
+            className="max-h-[90vh] max-w-full rounded-lg object-contain"
+            onClick={(event) => event.stopPropagation()}
+          />
+        </div>
       )}
     </div>
   );

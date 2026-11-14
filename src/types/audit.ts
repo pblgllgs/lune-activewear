@@ -30,6 +30,7 @@ export type AuditAction =
   | "guide.visibility"
   | "review.create"
   | "review.approve"
+  | "review.hide"
   | "review.delete"
   | "settings.magicLink"
   | "settings.whatsapp"

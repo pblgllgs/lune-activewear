@@ -13,12 +13,25 @@ service cloud.firestore {
       return request.auth != null ? request.auth.token.get('email', '').lower() : '';
     }
 
+    // La orden existe, está confirmada y pertenece a quien escribe la reseña.
+    // Se usa para el sello "compra verificada"; si la orden no existe, get()
+    // falla y la regla deniega la escritura.
+    function ownsConfirmedOrder(orderId) {
+      let order = get(/databases/$(database)/documents/orders/$(orderId)).data;
+      return request.auth != null
+        && order.status in ['aprobada', 'pagado', 'enviado']
+        && (order.get('userId', '') == request.auth.uid
+            || (ownerEmail() != ''
+                && order.get('customerEmail', '') == ownerEmail()));
+    }
+
     match /products/{productId} {
       allow read: if true;
       allow write: if isAdmin();
 
       // Comentarios/reseñas por producto: la clienta crea (pendiente de aprobación)
-      // y el admin modera (aprueba/elimina).
+      // y el admin modera (aprueba/oculta/elimina). Las fotos requieren sesión y
+      // el sello de compra verificada se valida contra la orden real.
       match /reviews/{reviewId} {
         allow read: if resource.data.approved == true || isAdmin();
         allow create: if request.resource.data.approved == false
@@ -29,6 +42,15 @@ service cloud.firestore {
           && request.resource.data.text.size() > 0
           && request.resource.data.text.size() <= 1200
           && request.resource.data.productId == productId
+          && request.resource.data.photos is list
+          && request.resource.data.photos.size() <= 3
+          // Solo una clienta con sesión puede adjuntar fotos.
+          && (request.resource.data.photos.size() == 0 || request.auth != null)
+          && request.resource.data.verifiedPurchase is bool
+          && (request.resource.data.verifiedPurchase == false
+              || (request.auth != null
+                  && request.resource.data.orderId is string
+                  && ownsConfirmedOrder(request.resource.data.orderId)))
           && (!('rating' in request.resource.data)
               || (request.resource.data.rating is int
                   && request.resource.data.rating >= 1

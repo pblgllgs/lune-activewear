@@ -156,6 +156,14 @@ export function productJsonLd(product: Product) {
     brand: { "@type": "Brand", name: SITE_NAME },
     color: product.colors.map((color) => color.name).join(", ") || undefined,
     size: product.sizes.join(", ") || undefined,
+    aggregateRating:
+      product.ratingCount && product.ratingAvg
+        ? {
+            "@type": "AggregateRating",
+            ratingValue: product.ratingAvg,
+            reviewCount: product.ratingCount,
+          }
+        : undefined,
     offers: {
       "@type": "Offer",
       url,

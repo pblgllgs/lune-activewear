@@ -51,6 +51,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "guide.visibility": "Visibilidad de guías",
   "review.create": "Comentario enviado",
   "review.approve": "Comentario aprobado",
+  "review.hide": "Comentario ocultado",
   "review.delete": "Comentario eliminado",
   "settings.magicLink": "Enlace mágico",
   "settings.whatsapp": "WhatsApp actualizado",
