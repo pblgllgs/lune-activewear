@@ -3,24 +3,34 @@ import { SlidersHorizontal, X } from "lucide-react";
 import type { Product } from "@/types/product";
 import { CATEGORIES, categoryLabel } from "@/lib/categories";
 import { SIZE_OPTIONS } from "@/lib/sizes";
+import { hasSizeAvailable, isColorSoldOut } from "@/lib/stock";
 
-/** Tramos de precio de la tienda. `max` es inclusivo. */
+/** Tramo de precio de la tienda. `max` es inclusivo. */
 export const PRICE_RANGES = [
   { id: "hasta-15", label: "Hasta $15.000", min: 0, max: 14999 },
   { id: "15-18", label: "$15.000 – $18.000", min: 15000, max: 17999 },
   { id: "desde-18", label: "$18.000 o más", min: 18000, max: Number.POSITIVE_INFINITY },
 ];
 
+/**
+ * Color seleccionado en los filtros. `category` vacía significa una selección
+ * antigua (o global) que aplica a todas las categorías.
+ */
+export interface SelectedColor {
+  category: string;
+  name: string;
+}
+
 interface ShopFiltersProps {
   products: Product[];
   /** Categoría activa (`todas` = sin filtro): define qué colores se muestran. */
   activeCategory: string;
   selectedSizes: string[];
-  selectedColors: string[];
+  selectedColors: SelectedColor[];
   priceRange: string;
   resultCount: number;
   onToggleSize: (size: string) => void;
-  onToggleColor: (color: string) => void;
+  onToggleColor: (category: string, color: string) => void;
   onChangePrice: (id: string) => void;
   onClear: () => void;
 }
@@ -28,7 +38,7 @@ interface ShopFiltersProps {
 interface ColorGroup {
   id: string;
   label: string;
-  colors: { name: string; hex: string }[];
+  colors: { name: string; hex: string; available: boolean }[];
 }
 
 interface FilterGroupsProps
@@ -36,15 +46,17 @@ interface FilterGroupsProps
     ShopFiltersProps,
     "products" | "activeCategory" | "resultCount" | "onClear"
   > {
-  sizes: string[];
+  sizes: { name: string; available: boolean }[];
   colorGroups: ColorGroup[];
 }
 
-const chipClass = (active: boolean) =>
+const chipClass = (active: boolean, disabled = false) =>
   `inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] uppercase tracking-wider2 transition ${
-    active
-      ? "border-primary bg-primary text-primary-foreground"
-      : "border-primary/15 bg-card text-foreground hover:border-primary/40"
+    disabled
+      ? "cursor-not-allowed border-dashed border-primary/15 bg-card text-muted-foreground/50"
+      : active
+        ? "border-primary bg-primary text-primary-foreground"
+        : "border-primary/15 bg-card text-foreground hover:border-primary/40"
   }`;
 
 function FilterGroups({
@@ -63,17 +75,19 @@ function FilterGroups({
         <section>
           <p className="text-[10px] uppercase tracking-wider2 text-muted-foreground">Talla</p>
           <div className="mt-2 flex flex-wrap gap-2">
-            {sizes.map((size) => {
-              const active = selectedSizes.includes(size);
+            {sizes.map(({ name, available }) => {
+              const active = selectedSizes.includes(name);
               return (
                 <button
-                  key={size}
+                  key={name}
                   type="button"
-                  onClick={() => onToggleSize(size)}
+                  onClick={() => onToggleSize(name)}
                   aria-pressed={active}
-                  className={chipClass(active)}
+                  disabled={!available}
+                  title={available ? undefined : "Sin stock"}
+                  className={chipClass(active, !available)}
                 >
-                  {size}
+                  {name}
                 </button>
               );
             })}
@@ -94,14 +108,20 @@ function FilterGroups({
                 )}
                 <div className="flex flex-wrap gap-2">
                   {group.colors.map((color) => {
-                    const active = selectedColors.includes(color.name);
+                    const active = selectedColors.some(
+                      (selection) =>
+                        selection.name === color.name &&
+                        (selection.category === "" || selection.category === group.id)
+                    );
                     return (
                       <button
                         key={`${group.id}-${color.name}`}
                         type="button"
-                        onClick={() => onToggleColor(color.name)}
+                        onClick={() => onToggleColor(group.id, color.name)}
                         aria-pressed={active}
-                        className={chipClass(active)}
+                        disabled={!color.available}
+                        title={color.available ? undefined : "Sin stock"}
+                        className={chipClass(active, !color.available)}
                       >
                         <span
                           className="h-3 w-3 rounded-full border border-primary/20"
@@ -159,22 +179,40 @@ export function ShopFilters({
   const [open, setOpen] = useState(false);
 
   const { sizes, colorGroups } = useMemo(() => {
+    // La disponibilidad se calcula solo con las prendas de la categoría activa:
+    // una talla o color sin stock en esa categoría se muestra deshabilitado.
+    const scope =
+      activeCategory === "todas"
+        ? products
+        : products.filter((product) => product.category === activeCategory);
+
     const sizeSet = new Set<string>();
-    const byCategory = new Map<string, Map<string, string>>();
-    products.forEach((product) => {
-      product.sizes.forEach((size) => sizeSet.add(size));
+    const availableSizeSet = new Set<string>();
+    const byCategory = new Map<string, Map<string, { hex: string; available: boolean }>>();
+
+    scope.forEach((product) => {
+      product.sizes.forEach((size) => {
+        sizeSet.add(size);
+        if (hasSizeAvailable(product, size)) availableSizeSet.add(size);
+      });
       if (!byCategory.has(product.category)) byCategory.set(product.category, new Map());
       const colorMap = byCategory.get(product.category)!;
       product.colors.forEach((color) => {
-        if (color.name && !colorMap.has(color.name)) colorMap.set(color.name, color.hex);
+        if (!color.name) return;
+        const available = !isColorSoldOut(product, color.name);
+        const current = colorMap.get(color.name);
+        if (!current) colorMap.set(color.name, { hex: color.hex, available });
+        else if (available) current.available = true;
       });
     });
 
-    const sortedSizes = [...sizeSet].sort((a, b) => {
-      const ia = SIZE_OPTIONS.indexOf(a);
-      const ib = SIZE_OPTIONS.indexOf(b);
-      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-    });
+    const sortedSizes = [...sizeSet]
+      .sort((a, b) => {
+        const ia = SIZE_OPTIONS.indexOf(a);
+        const ib = SIZE_OPTIONS.indexOf(b);
+        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+      })
+      .map((name) => ({ name, available: availableSizeSet.has(name) }));
 
     // Orden de las categorías del sitio; cualquier categoría desconocida va al final.
     const knownIds = CATEGORIES.map((category) => category.id);
@@ -191,7 +229,11 @@ export function ShopFilters({
       .map((id) => ({
         id,
         label: categoryLabel(id),
-        colors: [...(byCategory.get(id)?.entries() ?? [])].map(([name, hex]) => ({ name, hex })),
+        colors: [...(byCategory.get(id)?.entries() ?? [])].map(([name, value]) => ({
+          name,
+          hex: value.hex,
+          available: value.available,
+        })),
       }))
       .filter((group) => group.colors.length > 0);
 

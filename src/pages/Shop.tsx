@@ -3,11 +3,11 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowUpDown, X } from "lucide-react";
 import { getProducts } from "@/lib/catalog";
 import { CATEGORIES, categoryInfo } from "@/lib/categories";
-import { isSizeSoldOut } from "@/lib/stock";
+import { hasSizeAvailable, isColorSoldOut } from "@/lib/stock";
 import { matchesQuery } from "@/lib/search";
 import { breadcrumbJsonLd, collectionPageJsonLd, useSeo } from "@/lib/seo";
 import { ProductCard } from "@/components/shop/ProductCard";
-import { PRICE_RANGES, ShopFilters } from "@/components/shop/ShopFilters";
+import { PRICE_RANGES, ShopFilters, type SelectedColor } from "@/components/shop/ShopFilters";
 import { Pagination } from "@/components/ui/pagination";
 import { usePagination } from "@/lib/use-pagination";
 import type { Product } from "@/types/product";
@@ -18,6 +18,27 @@ const SORTS = [
   { id: "price-asc", label: "Menor precio" },
   { id: "price-desc", label: "Mayor precio" },
 ];
+
+/**
+ * Decodifica `colores=categoria:nombre,...`.
+ * Las entradas sin categoría son selecciones antiguas o globales.
+ */
+function parseSelectedColors(value: string): SelectedColor[] {
+  return value
+    .split(",")
+    .filter(Boolean)
+    .map((entry) => {
+      const separator = entry.indexOf(":");
+      if (separator === -1) return { category: "", name: entry };
+      return { category: entry.slice(0, separator), name: entry.slice(separator + 1) };
+    });
+}
+
+function encodeSelectedColors(colors: SelectedColor[]): string {
+  return colors
+    .map((color) => (color.category ? `${color.category}:${color.name}` : color.name))
+    .join(",");
+}
 
 export default function Shop() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -33,7 +54,8 @@ export default function Shop() {
   const category = activeCategory === "todas" ? undefined : categoryInfo(activeCategory);
   const invalidCategory = activeCategory !== "todas" && !category;
   const selectedSizes = (searchParams.get("tallas") ?? "").split(",").filter(Boolean);
-  const selectedColors = (searchParams.get("colores") ?? "").split(",").filter(Boolean);
+  const colorsParam = searchParams.get("colores") ?? "";
+  const selectedColors = useMemo(() => parseSelectedColors(colorsParam), [colorsParam]);
   const priceRange = searchParams.get("precio") ?? "";
   const searchQuery = searchParams.get("buscar") ?? "";
   const activeFilterCount =
@@ -106,14 +128,21 @@ export default function Shop() {
     if (selectedSizes.length > 0) {
       list = list.filter((product) =>
         selectedSizes.some(
-          (size) => product.sizes.includes(size) && !isSizeSoldOut(product, size)
+          (size) => product.sizes.includes(size) && hasSizeAvailable(product, size)
         )
       );
     }
 
     if (selectedColors.length > 0) {
       list = list.filter((product) =>
-        product.colors.some((color) => selectedColors.includes(color.name))
+        selectedColors.some(
+          (selection) =>
+            (selection.category === "" || selection.category === product.category) &&
+            product.colors.some(
+              (color) =>
+                color.name === selection.name && !isColorSoldOut(product, color.name)
+            )
+        )
       );
     }
 
@@ -153,10 +182,21 @@ export default function Shop() {
     setSearchParams(next, { replace: true });
   };
 
-  /** Cambia de categoría conservando los filtros activos en la URL. */
+  /**
+   * Cambia de categoría conservando los filtros activos en la URL.
+   * Los colores se eligen por categoría: al entrar a una categoría concreta se
+   * descartan las selecciones de las demás (las globales se mantienen).
+   */
   const setCategory = (id: string) => {
     const next = new URLSearchParams(searchParams);
     next.delete("categoria");
+    if (id !== "todas") {
+      const kept = selectedColors.filter(
+        (selection) => selection.category === "" || selection.category === id
+      );
+      if (kept.length > 0) next.set("colores", encodeSelectedColors(kept));
+      else next.delete("colores");
+    }
     const query = next.toString();
     const base = id === "todas" ? "/tienda" : `/categoria/${id}`;
     navigate(query ? `${base}?${query}` : base);
@@ -167,6 +207,19 @@ export default function Shop() {
       ? current.filter((item) => item !== value)
       : [...current, value];
     setParam(key, next.length > 0 ? next.join(",") : null);
+  };
+
+  /** Los colores se seleccionan de forma independiente en cada categoría. */
+  const toggleColor = (category: string, color: string) => {
+    const exists = selectedColors.some(
+      (selection) => selection.category === category && selection.name === color
+    );
+    const next = exists
+      ? selectedColors.filter(
+          (selection) => !(selection.category === category && selection.name === color)
+        )
+      : [...selectedColors, { category, name: color }];
+    setParam("colores", next.length > 0 ? encodeSelectedColors(next) : null);
   };
 
   const clearFilters = () => {
@@ -258,7 +311,7 @@ export default function Shop() {
           priceRange={priceRange}
           resultCount={filtered.length}
           onToggleSize={(size) => toggleValue("tallas", selectedSizes, size)}
-          onToggleColor={(color) => toggleValue("colores", selectedColors, color)}
+          onToggleColor={toggleColor}
           onChangePrice={(id) => setParam("precio", priceRange === id ? null : id)}
           onClear={clearFilters}
         />
