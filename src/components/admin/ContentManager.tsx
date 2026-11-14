@@ -57,14 +57,16 @@ const positionClass = (position: HeroSlidePosition) => {
   return "object-center";
 };
 
-function toAboutDrafts(content: SiteContent): Record<AboutSlotKey, DraftImage> {
+function toAboutDrafts(
+  content: Pick<SiteContent, "aboutImageOne" | "aboutImageTwo">
+): Record<AboutSlotKey, DraftImage> {
   return {
     aboutImageOne: { url: content.aboutImageOne },
     aboutImageTwo: { url: content.aboutImageTwo },
   };
 }
 
-function toHeroDrafts(content: SiteContent): DraftSlide[] {
+function toHeroDrafts(content: Pick<SiteContent, "heroSlides">): DraftSlide[] {
   const slides = content.heroSlides.length ? content.heroSlides : DEFAULT_HERO_SLIDES;
   // Todas las fotos se muestran a `cover` para que el carrusel mantenga el
   // mismo tamaño; se normaliza aquí para migrar ajustes antiguos al guardar.
@@ -340,7 +342,7 @@ export function ContentManager() {
       }
       const finalSlides = heroSlides.length ? heroSlides : DEFAULT_HERO_SLIDES;
 
-      const payload: SiteContent = {
+      const payload: Omit<SiteContent, "maintenanceMode"> = {
         heroImage: finalSlides[0].url,
         heroImages: finalSlides.map((slide) => slide.url),
         heroSlides: finalSlides,

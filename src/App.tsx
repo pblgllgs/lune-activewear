@@ -10,6 +10,7 @@ import { Footer } from "@/components/layout/Footer";
 import { CartDrawer } from "@/components/layout/CartDrawer";
 import { CookieBanner } from "@/components/layout/CookieBanner";
 import { WhatsAppFloat } from "@/components/layout/WhatsAppFloat";
+import { MaintenanceGate } from "@/components/layout/MaintenanceGate";
 import { useSeo } from "@/lib/seo";
 import { getSiteContent } from "@/lib/site-content";
 import Home from "@/pages/Home";
@@ -81,32 +82,34 @@ function App() {
           <WishlistProvider>
             <ScrollToTop />
             <Toaster richColors position="top-right" />
-            <div className="flex min-h-screen flex-col bg-background">
-              <AnnouncementBar />
-              <Navbar />
-              <main className="flex-1">
-                <Suspense fallback={<RouteFallback />}>
-                  <Routes>
-                    <Route path="/" element={<Home />} />
-                    <Route path="/tienda" element={<Shop />} />
-                    <Route path="/categoria/:categoria" element={<Shop />} />
-                    <Route path="/producto/:id" element={<ProductDetail />} />
-                    <Route path="/favoritos" element={<Favorites />} />
-                    <Route path="/guias" element={<Guides />} />
-                    <Route path="/guias/:slug" element={<GuideDetail />} />
-                    <Route path="/privacidad" element={<Privacy />} />
-                    <Route path="/nosotros" element={<About />} />
-                    <Route path="/cuenta" element={<Account />} />
-                    <Route path="/admin" element={<Admin />} />
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </Suspense>
-              </main>
-              <Footer />
-              <CartDrawer />
-              <CookieBanner />
-              <WhatsAppFloat />
-            </div>
+            <MaintenanceGate>
+              <div className="flex min-h-screen flex-col bg-background">
+                <AnnouncementBar />
+                <Navbar />
+                <main className="flex-1">
+                  <Suspense fallback={<RouteFallback />}>
+                    <Routes>
+                      <Route path="/" element={<Home />} />
+                      <Route path="/tienda" element={<Shop />} />
+                      <Route path="/categoria/:categoria" element={<Shop />} />
+                      <Route path="/producto/:id" element={<ProductDetail />} />
+                      <Route path="/favoritos" element={<Favorites />} />
+                      <Route path="/guias" element={<Guides />} />
+                      <Route path="/guias/:slug" element={<GuideDetail />} />
+                      <Route path="/privacidad" element={<Privacy />} />
+                      <Route path="/nosotros" element={<About />} />
+                      <Route path="/cuenta" element={<Account />} />
+                      <Route path="/admin" element={<Admin />} />
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </Suspense>
+                </main>
+                <Footer />
+                <CartDrawer />
+                <CookieBanner />
+                <WhatsAppFloat />
+              </div>
+            </MaintenanceGate>
           </WishlistProvider>
         </CartProvider>
       </AuthProvider>

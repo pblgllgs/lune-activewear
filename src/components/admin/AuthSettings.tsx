@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { doc, setDoc } from "firebase/firestore";
-import { Loader2, Mail, MessageCircle, Save } from "lucide-react";
+import { Loader2, Mail, MessageCircle, Save, Wrench } from "lucide-react";
 import { toast } from "sonner";
+import Swal from "sweetalert2";
 import { getAuthSettings, saveMagicLinkEnabled } from "@/lib/auth-settings";
 import { logAudit } from "@/lib/audit";
 import { formatWhatsAppDisplay, normalizeWhatsAppNumber, setWhatsAppNumber } from "@/lib/contact";
 import { db } from "@/lib/firebase";
-import { getSiteContent } from "@/lib/site-content";
+import { getSiteContent, saveMaintenanceMode } from "@/lib/site-content";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +26,10 @@ export function AuthSettings() {
   const [savedWhatsApp, setSavedWhatsApp] = useState("");
   const [loadingWhatsApp, setLoadingWhatsApp] = useState(true);
   const [savingWhatsApp, setSavingWhatsApp] = useState(false);
+
+  const [maintenance, setMaintenance] = useState(false);
+  const [loadingMaintenance, setLoadingMaintenance] = useState(true);
+  const [savingMaintenance, setSavingMaintenance] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,9 +52,13 @@ export function AuthSettings() {
         if (cancelled) return;
         setWhatsappNumberInput(content.whatsappNumber || "");
         setSavedWhatsApp(normalizeWhatsAppNumber(content.whatsappNumber || ""));
+        setMaintenance(content.maintenanceMode);
       })
       .finally(() => {
-        if (!cancelled) setLoadingWhatsApp(false);
+        if (!cancelled) {
+          setLoadingWhatsApp(false);
+          setLoadingMaintenance(false);
+        }
       });
     return () => {
       cancelled = true;
@@ -67,6 +76,34 @@ export function AuthSettings() {
       toast.error("No se pudo guardar el ajuste.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const toggleMaintenance = async () => {
+    const next = !maintenance;
+    if (next) {
+      const result = await Swal.fire({
+        title: "¿Activar el modo mantenimiento?",
+        text: "La tienda dejará de estar disponible para las clientas: verán un mensaje de mantenimiento y no podrán iniciar sesión. Solo el panel de administración seguirá funcionando.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Sí, activar",
+        cancelButtonText: "Cancelar",
+        confirmButtonColor: "#8f3f38",
+      });
+      if (!result.isConfirmed) return;
+    }
+    setSavingMaintenance(true);
+    try {
+      await saveMaintenanceMode(next);
+      setMaintenance(next);
+      toast.success(
+        next ? "Modo mantenimiento activado." : "Modo mantenimiento desactivado."
+      );
+    } catch {
+      toast.error("No se pudo guardar el modo mantenimiento.");
+    } finally {
+      setSavingMaintenance(false);
     }
   };
 
@@ -162,6 +199,59 @@ export function AuthSettings() {
             Este interruptor controla la aplicación. Para cortar el proveedor por completo hay
             que deshabilitar «Email link» en Firebase Console → Authentication → Sign-in method.
             El enlace caduca en 1 hora y es de un solo uso.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-xl">
+            <Wrench className="h-4 w-4" /> Modo mantenimiento
+          </CardTitle>
+          <CardDescription>
+            Cierra temporalmente la tienda al público. Las clientas verán un mensaje de
+            mantenimiento y no podrán iniciar sesión hasta que lo desactives.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
+            <div>
+              <p className="text-sm font-medium">Web en mantenimiento</p>
+              <p className="text-xs text-muted-foreground">
+                {loadingMaintenance
+                  ? "Leyendo el ajuste…"
+                  : maintenance
+                    ? "Activo: la tienda está cerrada. Solo el panel de administración responde."
+                    : "Desactivado: la tienda está disponible para las clientas."}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              role="switch"
+              aria-checked={maintenance}
+              aria-label="Activar modo mantenimiento"
+              disabled={loadingMaintenance || savingMaintenance}
+              onClick={() => void toggleMaintenance()}
+              className={cn(
+                "relative h-8 w-14 shrink-0 rounded-full border p-0 transition",
+                maintenance ? "border-destructive bg-destructive" : "border-border bg-muted"
+              )}
+            >
+              <span
+                className={cn(
+                  "absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-background shadow transition-all",
+                  maintenance ? "left-8" : "left-1"
+                )}
+              />
+              {savingMaintenance && <Loader2 className="mx-auto h-3 w-3 animate-spin" />}
+            </Button>
+          </div>
+
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            Mientras esté activo, cualquier ruta pública muestra la pantalla de mantenimiento.
+            El acceso de administración en <code className="rounded bg-secondary px-1.5 py-0.5 text-[10px]">/admin</code>{" "}
+            sigue funcionando para que puedas desactivarlo. El cambio se aplica al instante.
           </p>
         </CardContent>
       </Card>

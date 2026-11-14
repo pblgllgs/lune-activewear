@@ -33,6 +33,7 @@ export type AuditAction =
   | "review.delete"
   | "settings.magicLink"
   | "settings.whatsapp"
+  | "settings.maintenance"
   | "settings.content";
 
 /** Diferencia de un campo entre el estado anterior y el nuevo. */

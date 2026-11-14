@@ -1,5 +1,6 @@
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { logAudit } from "@/lib/audit";
 import { DEFAULT_WHATSAPP_NUMBER, normalizeWhatsAppNumber, setWhatsAppNumber } from "@/lib/contact";
 
 export type HeroSlideFit = "cover" | "contain";
@@ -26,6 +27,11 @@ export interface SiteContent {
   guidesEnabled: boolean;
   /** Número de WhatsApp (solo dígitos, para wa.me). */
   whatsappNumber: string;
+  /**
+   * Si está activo, la web pública queda bloqueada con un mensaje de
+   * mantenimiento. Solo el panel de administración sigue disponible.
+   */
+  maintenanceMode: boolean;
   updatedAt?: string;
 }
 
@@ -71,6 +77,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
   ),
   guidesEnabled: true,
   whatsappNumber: DEFAULT_WHATSAPP_NUMBER,
+  maintenanceMode: false,
 };
 
 const text = (value: unknown, fallback: string) =>
@@ -140,6 +147,7 @@ export async function getSiteContent(): Promise<SiteContent> {
       aboutImageTwo: text(data.aboutImageTwo, DEFAULT_SITE_CONTENT.aboutImageTwo),
       guidesEnabled: typeof data.guidesEnabled === "boolean" ? data.guidesEnabled : true,
       whatsappNumber,
+      maintenanceMode: data.maintenanceMode === true,
       updatedAt: data.updatedAt ? String(data.updatedAt) : undefined,
     };
   } catch (error) {
@@ -147,4 +155,48 @@ export async function getSiteContent(): Promise<SiteContent> {
     setWhatsAppNumber(DEFAULT_SITE_CONTENT.whatsappNumber);
     return DEFAULT_SITE_CONTENT;
   }
+}
+
+function siteDoc() {
+  if (!db) throw new Error("Firebase no está configurado.");
+  return doc(db, "settings", "site");
+}
+
+/** Activa o desactiva el modo mantenimiento de la web pública. */
+export async function saveMaintenanceMode(enabled: boolean): Promise<void> {
+  await setDoc(
+    siteDoc(),
+    { maintenanceMode: enabled, updatedAt: new Date().toISOString() },
+    { merge: true }
+  );
+  void logAudit({
+    action: "settings.maintenance",
+    entity: "settings",
+    entityId: "site",
+    entityLabel: "Modo mantenimiento",
+    summary: enabled
+      ? "Activó el modo mantenimiento de la web."
+      : "Desactivó el modo mantenimiento de la web.",
+    changes: { maintenanceMode: { after: enabled } },
+  });
+}
+
+/**
+ * Escucha el modo mantenimiento en tiempo real para que el cambio del admin se
+ * refleje sin recargar. Si la lectura falla se asume inactivo: es preferible
+ * mantener la tienda arriba antes que bloquearla por un error de red.
+ */
+export function subscribeMaintenanceMode(onChange: (enabled: boolean) => void): () => void {
+  if (!db) {
+    onChange(false);
+    return () => {};
+  }
+  return onSnapshot(
+    siteDoc(),
+    (snap) => onChange(snap.data()?.maintenanceMode === true),
+    (error) => {
+      console.warn("No se pudo leer el modo mantenimiento; se mantiene la tienda activa.", error);
+      onChange(false);
+    }
+  );
 }

@@ -54,6 +54,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "review.delete": "Comentario eliminado",
   "settings.magicLink": "Enlace mágico",
   "settings.whatsapp": "WhatsApp actualizado",
+  "settings.maintenance": "Modo mantenimiento",
   "settings.content": "Contenido actualizado",
 };
 
