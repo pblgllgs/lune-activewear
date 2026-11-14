@@ -10,12 +10,27 @@ import { useWishlist } from "@/context/WishlistContext";
 import { Badge } from "@/components/ui/badge";
 import { ImageWithFallback } from "@/components/shop/ImageWithFallback";
 
-export function ProductCard({ product }: { product: Product }) {
+export function ProductCard({
+  product,
+  color,
+}: {
+  product: Product;
+  /** Color activo en los filtros: la tarjeta muestra su foto si existe. */
+  color?: string;
+}) {
   const discount = discountPercent(product.price, product.compareAtPrice);
   const soldOut = isSoldOut(product);
   const lowStock = !soldOut && isLowStock(product);
   const { has, toggle } = useWishlist();
   const favorite = has(product.id);
+
+  // Foto de la variante del color seleccionado; si no tiene, usa la principal.
+  const variantImage = color
+    ? product.images.find(
+        (url) => product.imageColors?.[url]?.trim() === color.trim()
+      )
+    : undefined;
+  const image = variantImage ?? product.images[0];
 
   const toggleFavorite = (event: MouseEvent) => {
     event.preventDefault();
@@ -29,7 +44,7 @@ export function ProductCard({ product }: { product: Product }) {
       <Link to={`/producto/${product.id}`} className="block">
         <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-secondary">
           <ImageWithFallback
-            src={product.images[0]}
+            src={image}
             alt={product.name}
             className="h-full w-full object-cover transition duration-700 ease-out group-hover:scale-105"
           />

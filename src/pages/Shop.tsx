@@ -230,6 +230,18 @@ export default function Shop() {
     setSearchParams(next, { replace: true });
   };
 
+  /**
+   * Color seleccionado que corresponde a la prenda, para que la tarjeta
+   * muestre la foto de esa variante. Las selecciones globales (sin categoría)
+   * aplican a cualquier prenda.
+   */
+  const preferredColor = (product: Product): string | undefined =>
+    selectedColors.find(
+      (selection) =>
+        (selection.category === "" || selection.category === product.category) &&
+        product.colors.some((color) => color.name === selection.name)
+    )?.name;
+
   return (
     <div className="container py-12 md:py-16">
       <header className="max-w-2xl">
@@ -410,7 +422,11 @@ export default function Shop() {
             <>
               <div className="mt-8 grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-3 lg:mt-0 lg:grid-cols-3 xl:grid-cols-4">
                 {pagination.pageItems.map((product) => (
-                  <ProductCard key={product.id} product={product} />
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    color={preferredColor(product)}
+                  />
                 ))}
               </div>
               <Pagination
