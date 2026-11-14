@@ -92,9 +92,6 @@ export default function Home() {
                   Explorar colección <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
-              <Button asChild size="lg" variant="outline">
-                <Link to="/nosotros">Conoce Luné</Link>
-              </Button>
             </div>
           </div>
 
