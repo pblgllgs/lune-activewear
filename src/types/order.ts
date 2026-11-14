@@ -49,6 +49,17 @@ export interface Order {
   rejectedAt?: string;
   rejectedBy?: string;
   rejectionReason?: string;
+  /** Número de seguimiento del envío (courier). Se envía en el correo de «enviado». */
+  trackingNumber?: string;
+  /** Correos enviados, por evento (`confirmation`, `pagado`, `enviado`…). */
+  emails?: Record<string, OrderEmailState>;
+}
+
+export interface OrderEmailState {
+  sentAt?: string;
+  messageId?: string;
+  to?: string;
+  by?: string;
 }
 
 export interface CreateOrderInput {

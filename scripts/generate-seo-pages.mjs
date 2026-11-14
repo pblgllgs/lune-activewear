@@ -423,11 +423,13 @@ console.log(`[seo-pages] _redirects con ${redirects.split("\n").length} reglas`)
 // estático y no consume invocaciones de Functions.
 const routes = {
   version: 1,
-  include: ["/producto/*", "/guias/*", "/sitemap.xml"],
+  include: ["/producto/*", "/guias/*", "/sitemap.xml", "/api/*"],
   exclude: [],
 };
 await writeFile(path.join(dist, "_routes.json"), `${JSON.stringify(routes, null, 2)}\n`, "utf8");
-console.log("[seo-pages] _routes.json: solo /producto/*, /guias/* y /sitemap.xml invocan Functions");
+console.log(
+  "[seo-pages] _routes.json: /producto/*, /guias/*, /sitemap.xml y /api/* invocan Functions"
+);
 
 // La URL del sitio es provisoria hasta comprar el dominio. Se reescribe en el
 // build (index.html, robots.txt y páginas generadas) para que el cambio dependa

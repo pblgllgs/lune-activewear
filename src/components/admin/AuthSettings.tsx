@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { doc, setDoc } from "firebase/firestore";
-import { Loader2, Mail, MessageCircle, Save, Wrench } from "lucide-react";
+import { Loader2, Mail, MessageCircle, Save, Send, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import Swal from "sweetalert2";
 import { getAuthSettings, saveMagicLinkEnabled } from "@/lib/auth-settings";
 import { logAudit } from "@/lib/audit";
 import { formatWhatsAppDisplay, normalizeWhatsAppNumber, setWhatsAppNumber } from "@/lib/contact";
-import { db } from "@/lib/firebase";
+import { sendTestEmail } from "@/lib/email";
+import { auth, db } from "@/lib/firebase";
 import { getSiteContent, saveMaintenanceMode } from "@/lib/site-content";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,9 @@ export function AuthSettings() {
   const [maintenance, setMaintenance] = useState(false);
   const [loadingMaintenance, setLoadingMaintenance] = useState(true);
   const [savingMaintenance, setSavingMaintenance] = useState(false);
+
+  const [testTo, setTestTo] = useState("");
+  const [testBusy, setTestBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -147,6 +151,29 @@ export function AuthSettings() {
   };
 
   const preview = formatWhatsAppDisplay(whatsappNumber);
+
+  const sendTest = async () => {
+    const to = (testTo.trim() || auth?.currentUser?.email || "").toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) {
+      toast.error("Escribe un correo válido.");
+      return;
+    }
+    setTestBusy(true);
+    try {
+      const result = await sendTestEmail(to);
+      toast.success(
+        result.provider === "dry-run"
+          ? "Correo simulado (EMAIL_DRY_RUN activo)."
+          : `Correo de prueba enviado a ${to}.`
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "No se pudo enviar el correo de prueba."
+      );
+    } finally {
+      setTestBusy(false);
+    }
+  };
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -285,6 +312,39 @@ export function AuthSettings() {
           <Button type="button" onClick={() => void saveWhatsApp()} disabled={loadingWhatsApp || savingWhatsApp}>
             {savingWhatsApp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Guardar número
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-xl">
+            <Send className="h-4 w-4" /> Correos transaccionales
+          </CardTitle>
+          <CardDescription>
+            Envía un correo de prueba con la plantilla de confirmación para revisar el
+            diseño y confirmar que Brevo está bien configurado.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="test-email">Enviar prueba a</Label>
+            <Input
+              id="test-email"
+              type="email"
+              value={testTo}
+              onChange={(e) => setTestTo(e.target.value)}
+              placeholder={auth?.currentUser?.email ?? "tu@correo.cl"}
+              disabled={testBusy}
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Si lo dejas vacío, se envía a tu correo de administración. Los correos de
+              pedidos usan el dominio configurado en Cloudflare Pages.
+            </p>
+          </div>
+          <Button type="button" variant="outline" onClick={() => void sendTest()} disabled={testBusy}>
+            {testBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            Enviar correo de prueba
           </Button>
         </CardContent>
       </Card>

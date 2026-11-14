@@ -57,13 +57,39 @@ service cloud.firestore {
                   && request.resource.data.rating <= 5));
         allow update, delete: if isAdmin();
       }
+
+      // Avisos de reposición: cualquier visitante puede dejar su correo para una
+      // talla agotada. Solo el admin los lee, los envía y los marca.
+      match /restockRequests/{requestId} {
+        allow create: if request.resource.data.email is string
+          && request.resource.data.email.size() >= 5
+          && request.resource.data.email.size() <= 120
+          && request.resource.data.email.matches('^[^@ ]+@[^@ ]+[.][^@ ]+$')
+          && request.resource.data.productId == productId
+          && request.resource.data.size is string
+          && request.resource.data.size.size() <= 20
+          && request.resource.data.color is string
+          && request.resource.data.color.size() <= 60
+          && request.resource.data.notifiedAt == null;
+        // La clienta puede volver a suscribirse tras recibir el aviso (mismo
+        // correo y variante, con notifiedAt en null).
+        allow update: if isAdmin()
+          || (request.resource.data.email == resource.data.email
+              && request.resource.data.size == resource.data.size
+              && request.resource.data.color == resource.data.color
+              && request.resource.data.productId == resource.data.productId
+              && request.resource.data.notifiedAt == null);
+        allow read, delete: if isAdmin();
+      }
     }
 
     // Contenido editable del sitio: hero del inicio e imágenes de Nosotros.
     match /settings/{documentId} {
       allow read: if true;
       allow write: if isAdmin();
-    }    // Guías/blog: artículos de contenido SEO. Lectura pública solo si están publicados.
+    }
+
+    // Guías/blog: artículos de contenido SEO. Lectura pública solo si están publicados.
     match /guides/{guideId} {
       allow read: if resource.data.published == true || isAdmin();
       allow write: if isAdmin();

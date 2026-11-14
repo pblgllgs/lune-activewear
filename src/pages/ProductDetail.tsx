@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
+import Swal from "sweetalert2";
 import {
   BadgeCheck,
   Bell,
@@ -36,6 +37,7 @@ import { usePagination } from "@/lib/use-pagination";
 import { breadcrumbJsonLd, productJsonLd, truncate, useSeo } from "@/lib/seo";
 import { getApprovedReviews, MAX_REVIEW_PHOTOS, submitReview, type Review } from "@/lib/reviews";
 import { getMyOrders } from "@/lib/orders";
+import { subscribeRestock } from "@/lib/restock";
 import { deleteFromR2, isUploadConfigured, uploadToR2 } from "@/lib/upload";
 import { compressImage, validateReviewPhoto } from "@/lib/image-compress";
 import { SALE_STATUSES } from "@/types/order";
@@ -313,6 +315,39 @@ export default function ProductDetail() {
         "Mi nombre:",
       ].join("\n")
     );
+
+  const handleRestock = async (soldOutSize: string) => {
+    const result = await Swal.fire({
+      title: "Avísame cuando vuelva",
+      html: `<p style="margin:0;font-size:13px;color:#7A6C61;line-height:1.5;">Te enviaremos un correo cuando repongamos esta talla.</p>`,
+      input: "email",
+      inputLabel: `${product.name} · ${color} · Talla ${soldOutSize}`,
+      inputValue: user?.email ?? "",
+      inputPlaceholder: "tu@correo.cl",
+      showCancelButton: true,
+      confirmButtonText: "Avísame",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#49372D",
+      inputValidator: (value) =>
+        !value || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value)
+          ? "Escribe un correo válido."
+          : undefined,
+    });
+    if (!result.isConfirmed || typeof result.value !== "string") return;
+
+    try {
+      await subscribeRestock(product.id, {
+        email: result.value,
+        size: soldOutSize,
+        color,
+      });
+      toast.success("Listo, te avisaremos cuando vuelva a estar disponible.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "No se pudo guardar el aviso."
+      );
+    }
+  };
 
   const addPhotos = (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -651,18 +686,29 @@ export default function ProductDetail() {
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {soldOutSizes.map((soldOutSize) => (
-                    <a
+                    <button
                       key={soldOutSize}
-                      href={notifyLink(soldOutSize)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 rounded-full border border-whatsapp/40 px-3 py-1.5 text-[10px] uppercase tracking-wider2 text-whatsapp transition hover:border-whatsapp hover:bg-whatsapp hover:text-whatsapp-foreground"
+                      type="button"
+                      onClick={() => void handleRestock(soldOutSize)}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 px-3 py-1.5 text-[10px] uppercase tracking-wider2 text-primary transition hover:border-primary hover:bg-primary hover:text-primary-foreground"
                     >
                       <Bell className="h-3 w-3" />
                       Avísame talla {soldOutSize}
-                    </a>
+                    </button>
                   ))}
                 </div>
+                <p className="mt-2 text-[10px] text-muted-foreground">
+                  Te enviaremos un correo cuando repongamos esa talla. También puedes{" "}
+                  <a
+                    href={notifyLink(soldOutSizes[0])}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline underline-offset-2 transition hover:text-foreground"
+                  >
+                    escribirnos por WhatsApp
+                  </a>
+                  .
+                </p>
               </div>
             )}
           </div>

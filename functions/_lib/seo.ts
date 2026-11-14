@@ -48,7 +48,7 @@ export const CATEGORY_LABELS: Record<string, string> = {
   otros: "Otros",
 };
 
-export function siteUrl(env: EdgeEnv) {
+export function siteUrl(env: { VITE_SITE_URL?: string }) {
   return (env.VITE_SITE_URL || DEFAULT_SITE_URL).replace(/\/$/, "");
 }
 

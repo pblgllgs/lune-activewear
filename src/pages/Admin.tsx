@@ -22,6 +22,7 @@ import Swal from "sweetalert2";
 import {
   AlertCircle,
   BarChart3,
+  Bell,
   BookOpen,
   Boxes,
   ChevronDown,
@@ -34,6 +35,7 @@ import {
   History,
   ImagePlus,
   LayoutDashboard,
+  Loader2,
   LogOut,
   Menu,
   MessageSquare,
@@ -74,6 +76,7 @@ import { normalizeProduct, seedDemoProducts } from "@/lib/catalog";
 import { richTextToPlainText, sanitizeRichText } from "@/lib/rich-text";
 import { defaultSizeGuide, resolveSizeGuide } from "@/lib/size-guide";
 import { generateSku } from "@/lib/sku";
+import { notifyRestock } from "@/lib/email";
 import { SIZE_OPTIONS } from "@/lib/sizes";
 import { LAST_UNITS_THRESHOLD, totalStock } from "@/lib/stock";
 import { CATEGORIES, categoryLabel } from "@/lib/categories";
@@ -454,6 +457,7 @@ function ProductForm({
     editing ? resolveSizeGuide(editing) : defaultSizeGuide()
   );
   const [status, setStatus] = useState("");
+  const [restockBusy, setRestockBusy] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -586,6 +590,32 @@ function ProductForm({
       copy.splice(nextIndex, 0, item);
       return copy;
     });
+
+  /** Envía los avisos de reposición pendientes del producto que se está editando. */
+  const notifyRestockNow = async () => {
+    if (!editing) return;
+    setRestockBusy(true);
+    try {
+      const result = await notifyRestock(editing.id);
+      if (result.total === 0) {
+        toast.info("No hay avisos de reposición pendientes para este producto.");
+      } else if (result.sent === 0) {
+        toast.error("No se pudo enviar ningún aviso. Revisa la configuración de correo.");
+      } else {
+        toast.success(
+          `Avisos enviados: ${result.sent}${
+            result.failed ? ` · fallidos: ${result.failed}` : ""
+          }${result.pending ? ` · pendientes: ${result.pending}` : ""}.`
+        );
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "No se pudieron enviar los avisos."
+      );
+    } finally {
+      setRestockBusy(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -733,6 +763,32 @@ function ProductForm({
         }
         toast.success("Producto actualizado correctamente.");
         setForm((current) => ({ ...current, active, published: publish }));
+
+        // Si alguna variante pasó de agotada a disponible, avisa a quienes la
+        // esperaban. Un fallo de correo no afecta el guardado del producto.
+        const restocked = Object.entries(payload.stockByVariant).flatMap(
+          ([colorName, bySize]) =>
+            Object.entries(bySize)
+              .filter(
+                ([size, qty]) => qty > 0 && variantStock(editing, size, colorName) === 0
+              )
+              .map(([size]) => `${colorName} · ${size}`)
+        );
+        if (restocked.length > 0) {
+          void notifyRestock(editing.id)
+            .then((result) => {
+              if (result.sent > 0) {
+                toast.success(
+                  `Avisamos a ${result.sent} ${
+                    result.sent === 1 ? "persona" : "personas"
+                  } de la reposición (${restocked.join(", ")}).`
+                );
+              }
+            })
+            .catch((error) => {
+              console.warn("No se pudieron enviar los avisos de reposición.", error);
+            });
+        }
       } else {
         // El ID del documento es el slug: mantiene URLs limpias (/producto/<slug>)
         // y permite que la Function del edge resuelva la ficha sin rebuild.
@@ -1389,6 +1445,36 @@ function ProductForm({
                 : "Producto desactivado: no se muestra en la tienda y no puede publicarse."}
             </p>
           </div>
+
+          {editing && (
+            <div className="rounded-lg border border-dashed p-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="flex items-center gap-1.5 text-sm font-medium">
+                    <Bell className="h-3.5 w-3.5" /> Avisos de reposición
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Envía un correo a quienes pidieron aviso cuando una talla estaba
+                    agotada. Al subir stock de una variante agotada se envían solos.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void notifyRestockNow()}
+                  disabled={restockBusy}
+                >
+                  {restockBusy ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Bell className="h-3.5 w-3.5" />
+                  )}
+                  Avisar reposición
+                </Button>
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-col gap-2 sm:flex-row">
             <Button

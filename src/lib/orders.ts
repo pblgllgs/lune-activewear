@@ -19,11 +19,13 @@ import type {
   CreateOrderInput,
   Order,
   OrderCustomer,
+  OrderEmailState,
   OrderItem,
   OrderStatus,
   UpdateOrderInput,
 } from "@/types/order";
 import { SALE_STATUSES } from "@/types/order";
+import { notifyOrderEmail } from "@/lib/email";
 
 const str = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
 const int = (value: unknown): number => {
@@ -102,6 +104,11 @@ export function normalizeOrder(id: string, data: Record<string, unknown>): Order
     rejectedAt: data.rejectedAt ? String(data.rejectedAt) : undefined,
     rejectedBy: data.rejectedBy ? String(data.rejectedBy) : undefined,
     rejectionReason: data.rejectionReason ? String(data.rejectionReason) : undefined,
+    trackingNumber: str(data.trackingNumber) || undefined,
+    emails:
+      data.emails && typeof data.emails === "object"
+        ? (data.emails as Record<string, OrderEmailState>)
+        : undefined,
   };
 }
 
@@ -178,6 +185,12 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
       source: "web",
     },
     source: "web",
+  });
+
+  // La confirmación no debe bloquear la compra: si falla, el admin puede
+  // reenviarla desde el panel.
+  void notifyOrderEmail(ref.id, "confirmation").catch((error) => {
+    console.warn("No se pudo enviar la confirmación del pedido.", error);
   });
 
   return {
@@ -496,7 +509,8 @@ export async function setOrderStatus(
   orderId: string,
   nextStatus: OrderStatus,
   adminEmail: string,
-  reason = ""
+  reason = "",
+  trackingNumber = ""
 ): Promise<void> {
   const firestore = db;
   if (!firestore) throw new Error("Firebase no está configurado.");
@@ -551,6 +565,7 @@ export async function setOrderStatus(
         base.paidBy = order.paidBy ?? adminEmail;
         base.shippedAt = now;
         base.shippedBy = adminEmail;
+        base.trackingNumber = trackingNumber.trim() || order.trackingNumber || "";
       }
       transaction.update(orderRef, base);
       return;
@@ -592,6 +607,14 @@ export async function setOrderStatus(
         ...(reason.trim()
           ? { rejectionReason: { before: previous.rejectionReason ?? null, after: reason.trim() } }
           : {}),
+        ...(nextStatus === "enviado" && trackingNumber.trim()
+          ? {
+              trackingNumber: {
+                before: previous.trackingNumber ?? null,
+                after: trackingNumber.trim(),
+              },
+            }
+          : {}),
       },
       metadata: {
         customer: previous.customer.name,
@@ -601,6 +624,13 @@ export async function setOrderStatus(
         stockAppliedAfter: isSaleStatus(nextStatus),
       },
     });
+
+    // Aviso por correo del cambio de estado (los fallos no revierten el cambio).
+    if (nextStatus !== "pendiente") {
+      void notifyOrderEmail(orderId, nextStatus).catch((error) => {
+        console.warn(`No se pudo enviar el correo de estado «${nextStatus}».`, error);
+      });
+    }
   }
 }
 

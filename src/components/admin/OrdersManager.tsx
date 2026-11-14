@@ -5,6 +5,7 @@ import {
   ClipboardList,
   Clock,
   Loader2,
+  Mail,
   MapPin,
   PackageCheck,
   Pencil,
@@ -27,6 +28,7 @@ import {
   subscribeOrders,
   updateOrder,
 } from "@/lib/orders";
+import { notifyOrderEmail, type OrderEmailEvent } from "@/lib/email";
 import { auth } from "@/lib/firebase";
 import { stockColors, variantStock } from "@/lib/stock";
 import { usePagination } from "@/lib/use-pagination";
@@ -96,6 +98,22 @@ function statusLabel(status: OrderStatus): string {
   return STATUS_OPTIONS.find((s) => s.value === status)?.label ?? "Pendiente";
 }
 
+const EMAIL_EVENT_LABELS: Record<string, string> = {
+  confirmation: "Confirmación",
+  aprobada: "Pedido confirmado",
+  pagado: "Pago recibido",
+  enviado: "Pedido enviado",
+  rechazada: "Pedido rechazado",
+};
+
+/** Último correo enviado del pedido, si hay alguno. */
+function lastEmail(order: Order): { event: string; sentAt?: string } | null {
+  const entries = Object.entries(order.emails ?? {}).filter(([, state]) => state?.sentAt);
+  if (entries.length === 0) return null;
+  entries.sort((a, b) => (b[1].sentAt ?? "").localeCompare(a[1].sentAt ?? ""));
+  return { event: entries[0][0], sentAt: entries[0][1].sentAt };
+}
+
 function StatusBadge({ status }: { status: OrderStatus }) {
   const className =
     status === "aprobada" || status === "pagado"
@@ -139,6 +157,7 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
   const [query, setQuery] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [emailBusyId, setEmailBusyId] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<EditForm | null>(null);
@@ -367,15 +386,28 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
             cancelButtonText: "Cancelar",
             confirmButtonColor: "#49372D",
           })
-        : await Swal.fire({
-            title,
-            html,
-            icon: "question",
-            showCancelButton: true,
-            confirmButtonText: "Sí, cambiar",
-            cancelButtonText: "Cancelar",
-            confirmButtonColor: "#49372D",
-          });
+        : nextStatus === "enviado"
+          ? await Swal.fire({
+              title,
+              html: `${html}<p style="margin-top:10px;font-size:12px;color:#7A6C61;">El número se incluye en el correo de «pedido en camino».</p>`,
+              input: "text",
+              inputLabel: "Número de seguimiento (opcional)",
+              inputPlaceholder: "Ej: 1234567890",
+              inputValue: order.trackingNumber ?? "",
+              showCancelButton: true,
+              confirmButtonText: "Sí, marcar enviado",
+              cancelButtonText: "Cancelar",
+              confirmButtonColor: "#49372D",
+            })
+          : await Swal.fire({
+              title,
+              html,
+              icon: "question",
+              showCancelButton: true,
+              confirmButtonText: "Sí, cambiar",
+              cancelButtonText: "Cancelar",
+              confirmButtonColor: "#49372D",
+            });
     if (!result.isConfirmed) return;
 
     setBusyId(order.id);
@@ -384,7 +416,8 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
         order.id,
         nextStatus,
         adminEmail,
-        typeof result.value === "string" ? result.value : ""
+        nextStatus === "rechazada" && typeof result.value === "string" ? result.value : "",
+        nextStatus === "enviado" && typeof result.value === "string" ? result.value : ""
       );
       const message = deducting
         ? `Orden ${order.code} marcada como ${statusLabel(nextStatus)} y stock descontado.`
@@ -399,8 +432,25 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
     }
   };
 
-  const removeOrder = async (order: Order) => {
-    const result = await Swal.fire({
+  /** Reenvía el correo del estado actual (o la confirmación si sigue pendiente). */
+  const resendEmail = async (order: Order) => {
+    const event: OrderEmailEvent = order.status === "pendiente" ? "confirmation" : order.status;
+    setEmailBusyId(order.id);
+    try {
+      await notifyOrderEmail(order.id, event, { force: true });
+      toast.success(
+        `Correo reenviado a ${order.customerEmail || order.customer.email || "la clienta"}.`
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "No se pudo enviar el correo."
+      );
+    } finally {
+      setEmailBusyId(null);
+    }
+  };
+
+  const removeOrder = async (order: Order) => {    const result = await Swal.fire({
       title: `¿Eliminar la orden ${order.code}?`,
       html: order.stockApplied
         ? "Se eliminará el registro y se devolverá al stock lo descontado.<br/>Esta acción no se puede deshacer."
@@ -843,6 +893,8 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
             <div className="space-y-3">
               {orderPagination.pageItems.map((order) => {
                 const isOpen = expandedId === order.id;
+                const emailLog = lastEmail(order);
+                const emailAddress = order.customerEmail || order.customer.email;
                 const isEditing = editingId === order.id;
                 const busy = busyId === order.id;
                 const units = itemCount(order);
@@ -892,6 +944,20 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
                             {STATUS_OPTIONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
                           </SelectContent>
                         </Select>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => void resendEmail(order)}
+                          disabled={busy || saving || emailBusyId === order.id || !emailAddress}
+                          title={emailAddress ? "Reenviar el correo del pedido" : "El pedido no tiene correo"}
+                        >
+                          {emailBusyId === order.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Mail className="h-3.5 w-3.5" />
+                          )}
+                          Correo
+                        </Button>
                         <Button size="sm" variant="outline" onClick={() => startEdit(order)} disabled={busy || saving}>
                           <Pencil className="h-3.5 w-3.5" /> Editar
                         </Button>
@@ -955,6 +1021,23 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
                             </>
                           )}
                           {order.status === "pendiente" && <p>Al confirmar la venta (pagado/enviado/aprobada) se descuenta el stock.</p>}
+                          {order.trackingNumber && (
+                            <p>
+                              <Truck className="mr-1 inline h-3 w-3" />
+                              Seguimiento:{" "}
+                              <span className="font-mono text-foreground">{order.trackingNumber}</span>
+                            </p>
+                          )}
+                          <p>
+                            <Mail className="mr-1 inline h-3 w-3" />
+                            {!emailAddress
+                              ? "Sin correo registrado"
+                              : emailLog
+                                ? `Último correo: ${
+                                    EMAIL_EVENT_LABELS[emailLog.event] ?? emailLog.event
+                                  } · ${formatDateTime(emailLog.sentAt)}`
+                                : "Sin correos enviados todavía"}
+                          </p>
                         </div>
                       </div>
                     )}
