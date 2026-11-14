@@ -138,31 +138,25 @@ export async function submitReview(input: {
 /** Admin: comentarios pendientes de todos los productos. */
 export async function getPendingReviews(): Promise<Review[]> {
   if (!db) return [];
-  try {
-    const q = query(collectionGroup(db, "reviews"), where("approved", "==", false));
-    const snap = await getDocs(q);
-    return snap.docs
-      .map((d) => normalizeReview(d.id, d.data() as Record<string, unknown>))
-      .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
-  } catch (error) {
-    console.warn("No se pudieron leer los comentarios pendientes.", error);
-    return [];
-  }
+  const q = query(
+    collectionGroup(db, "reviews"),
+    where("approved", "==", false),
+    orderBy("createdAt", "desc")
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => normalizeReview(d.id, d.data() as Record<string, unknown>));
 }
 
 /** Admin: comentarios publicados de todos los productos. */
 export async function getPublishedReviews(): Promise<Review[]> {
   if (!db) return [];
-  try {
-    const q = query(collectionGroup(db, "reviews"), where("approved", "==", true));
-    const snap = await getDocs(q);
-    return snap.docs
-      .map((d) => normalizeReview(d.id, d.data() as Record<string, unknown>))
-      .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
-  } catch (error) {
-    console.warn("No se pudieron leer los comentarios publicados.", error);
-    return [];
-  }
+  const q = query(
+    collectionGroup(db, "reviews"),
+    where("approved", "==", true),
+    orderBy("createdAt", "desc")
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => normalizeReview(d.id, d.data() as Record<string, unknown>));
 }
 
 /**

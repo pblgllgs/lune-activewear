@@ -43,6 +43,7 @@ export function ReviewsModeration() {
   const [tab, setTab] = useState<Tab>("pending");
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
   const pagination = usePagination(reviews, { pageSize: 10, resetKey: tab });
@@ -50,10 +51,18 @@ export function ReviewsModeration() {
   useEffect(() => {
     let active = true;
     setLoading(true);
+    setError(null);
     const request = tab === "pending" ? getPendingReviews() : getPublishedReviews();
     request
       .then((items) => {
         if (active) setReviews(items);
+      })
+      .catch((err) => {
+        if (!active) return;
+        setReviews([]);
+        setError(
+          err instanceof Error ? err.message : "No se pudieron cargar los comentarios."
+        );
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -65,8 +74,12 @@ export function ReviewsModeration() {
 
   const load = async () => {
     setLoading(true);
+    setError(null);
     try {
       setReviews(tab === "pending" ? await getPendingReviews() : await getPublishedReviews());
+    } catch (err) {
+      setReviews([]);
+      setError(err instanceof Error ? err.message : "No se pudieron cargar los comentarios.");
     } finally {
       setLoading(false);
     }
@@ -166,6 +179,15 @@ export function ReviewsModeration() {
       <CardContent>
         {loading ? (
           <p className="text-sm text-muted-foreground">Cargando comentarios…</p>
+        ) : error ? (
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+            <p className="font-medium">No se pudieron cargar los comentarios.</p>
+            <p className="mt-1 break-words text-xs">{error}</p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Si acabas de desplegar, espera a que Firestore termine de construir los índices y
+              pulsa «Actualizar».
+            </p>
+          </div>
         ) : reviews.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-10 text-center text-sm text-muted-foreground">
             <MessageSquare className="h-5 w-5" />
