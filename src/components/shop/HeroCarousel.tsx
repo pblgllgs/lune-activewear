@@ -12,8 +12,6 @@ interface HeroCarouselProps {
   className?: string;
 }
 
-const fitClass = (fit: HeroSlide["fit"]) => (fit === "contain" ? "object-contain" : "object-cover");
-
 const positionClass = (position: HeroSlide["position"]) => {
   if (position === "top") return "object-top";
   if (position === "bottom") return "object-bottom";
@@ -135,8 +133,9 @@ export function HeroCarousel({ slides, alt, interval = 5500, className }: HeroCa
               alt={alt}
               priority={i === 0}
               className={cn(
-                "h-full w-full",
-                fitClass(slide.fit),
+                // Todas las fotos llenan el mismo marco para que el carrusel no
+                // cambie de tamaño al pasar de una a otra.
+                "h-full w-full object-cover",
                 positionClass(slide.position)
               )}
             />

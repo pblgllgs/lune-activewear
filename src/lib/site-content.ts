@@ -50,10 +50,10 @@ export const DEFAULT_HERO_IMAGES: string[] = HERO_FALLBACKS.map((fallback, index
   r2OrFallback(`site/hero-${index + 1}.jpg`, fallback)
 );
 
-/** Las fotos de la colección se muestran completas por defecto. */
+/** Las fotos de la colección llenan el mismo marco del hero. */
 export const DEFAULT_HERO_SLIDES: HeroSlide[] = DEFAULT_HERO_IMAGES.map((url) => ({
   url,
-  fit: "contain",
+  fit: "cover",
   position: "center",
 }));
 
@@ -97,7 +97,7 @@ const slideList = (value: unknown): HeroSlide[] => {
     return [
       {
         url,
-        fit: isFit(record.fit) ? record.fit : "contain",
+        fit: isFit(record.fit) ? record.fit : "cover",
         position: isPosition(record.position) ? record.position : "center",
       },
     ];
@@ -125,7 +125,7 @@ export async function getSiteContent(): Promise<SiteContent> {
     const heroSlides = storedSlides.length
       ? storedSlides
       : storedImages.length
-        ? storedImages.map((url) => ({ url, fit: "contain" as const, position: "center" as const }))
+        ? storedImages.map((url) => ({ url, fit: "cover" as const, position: "center" as const }))
         : DEFAULT_HERO_SLIDES;
 
     const whatsappNumber =

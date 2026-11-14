@@ -51,8 +51,6 @@ const ABOUT_SLOTS: { key: AboutSlotKey; label: string; hint: string }[] = [
   },
 ];
 
-const fitClass = (fit: HeroSlideFit) => (fit === "contain" ? "object-contain" : "object-cover");
-
 const positionClass = (position: HeroSlidePosition) => {
   if (position === "top") return "object-top";
   if (position === "bottom") return "object-bottom";
@@ -68,23 +66,18 @@ function toAboutDrafts(content: SiteContent): Record<AboutSlotKey, DraftImage> {
 
 function toHeroDrafts(content: SiteContent): DraftSlide[] {
   const slides = content.heroSlides.length ? content.heroSlides : DEFAULT_HERO_SLIDES;
-  return slides.map((slide) => ({ ...slide }));
+  // Todas las fotos se muestran a `cover` para que el carrusel mantenga el
+  // mismo tamaño; se normaliza aquí para migrar ajustes antiguos al guardar.
+  return slides.map((slide) => ({ ...slide, fit: "cover" }));
 }
 
 /**
- * Al elegir una foto, detecta su orientación para partir con un ajuste que no
- * la recorte: verticales → `contain`; horizontales → `cover` (si no, quedarían
- * como una franja pequeña). El admin puede cambiarlo después.
+ * Al elegir una foto se guarda como `cover`: todas llenan el mismo marco del
+ * carrusel (se recortan si hace falta) para que las transiciones sean parejas.
  */
 async function fileToSlide(file: File): Promise<DraftSlide> {
   const url = URL.createObjectURL(file);
-  const fit = await new Promise<HeroSlideFit>((resolve) => {
-    const img = new Image();
-    img.onload = () => resolve(img.naturalWidth >= img.naturalHeight ? "cover" : "contain");
-    img.onerror = () => resolve("contain");
-    img.src = url;
-  });
-  return { url, file, fit, position: "center" };
+  return { url, file, fit: "cover", position: "center" };
 }
 
 function ImageSlot({
@@ -237,7 +230,7 @@ function HeroImageList({
               <ImageWithFallback
                 src={item.url}
                 alt={`Slide ${index + 1} del carrusel`}
-                className={`h-full w-full ${fitClass(item.fit)} ${positionClass(item.position)}`}
+                className={`h-full w-full object-cover ${positionClass(item.position)}`}
               />
               {item.file && (
                 <span className="absolute bottom-2 right-2 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">
@@ -248,29 +241,10 @@ function HeroImageList({
 
             <div className="space-y-1.5">
               <Label className="text-[11px] uppercase tracking-wider2 text-muted-foreground">
-                Tamaño en el carrusel
-              </Label>
-              <Select
-                value={item.fit}
-                onValueChange={(value) => updateAt(index, { fit: value as HeroSlideFit })}
-              >
-                <SelectTrigger className="h-9 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="contain">Completa (sin recortar)</SelectItem>
-                  <SelectItem value="cover">Rellenar el panel</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-[11px] uppercase tracking-wider2 text-muted-foreground">
                 Encuadre
               </Label>
               <Select
                 value={item.position}
-                disabled={item.fit === "contain"}
                 onValueChange={(value) => updateAt(index, { position: value as HeroSlidePosition })}
               >
                 <SelectTrigger className="h-9 text-xs">
