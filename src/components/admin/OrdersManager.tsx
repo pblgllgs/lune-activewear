@@ -448,7 +448,11 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
     }
     const colors = stockColors(product);
     const color = colors[0] ?? "Único";
-    const size = product.sizes[0] ?? "Único";
+    // Parte con la primera talla que tenga stock en el color elegido.
+    const size =
+      product.sizes.find((option) => variantStock(product, option, color) !== 0) ??
+      product.sizes[0] ??
+      "Único";
     updateManualItem(index, {
       productId: product.id,
       name: product.name,
@@ -469,6 +473,14 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
     if (manualCustomer.phone.replace(/\D/g, "").length < 8) return toast.error("Escribe un teléfono válido.");
     if (manualCustomer.address.trim().length < 4) return toast.error("Escribe la dirección de envío.");
     if (manualCustomer.city.trim().length < 2) return toast.error("Indica la comuna o ciudad.");
+
+    for (const item of manualItems) {
+      if (!item.productId || !item.color) continue;
+      const product = products.find((p) => p.id === item.productId);
+      if (product && product.sizes.length > 0 && !item.size) {
+        return toast.error(`«${product.name}» no tiene tallas con stock en ${item.color}.`);
+      }
+    }
 
     const items: OrderItem[] = manualItems.map((it) => ({
       productId: it.productId.trim(),
@@ -652,6 +664,12 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
                   const product = products.find((p) => p.id === item.productId);
                   const colors = product ? stockColors(product) : [];
                   const sizes = product?.sizes ?? [];
+                  // Solo las tallas con stock (o sin información registrada) del
+                  // color elegido; así el pedido manual no ofrece variantes agotadas.
+                  const availableSizes =
+                    product && item.color
+                      ? sizes.filter((size) => variantStock(product, size, item.color) !== 0)
+                      : sizes;
                   const stockInfo =
                     product && item.color && item.size ? variantStock(product, item.size, item.color) : null;
                   return (
@@ -676,7 +694,22 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
                         <div>
                           <Label className="text-[10px]">Color</Label>
                           {colors.length > 0 ? (
-                            <Select value={item.color || colors[0]} onValueChange={(v) => updateManualItem(index, { color: v })}>
+                            <Select
+                              value={item.color || colors[0]}
+                              onValueChange={(v) => {
+                                // Al cambiar de color, la talla pasa a la primera
+                                // que tenga stock en ese color.
+                                const nextSizes = product
+                                  ? product.sizes.filter(
+                                      (size) => variantStock(product, size, v) !== 0
+                                    )
+                                  : [];
+                                const nextSize =
+                                  nextSizes[0] ??
+                                  (product && product.sizes.length === 0 ? "Único" : "");
+                                updateManualItem(index, { color: v, size: nextSize });
+                              }}
+                            >
                               <SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
                               <SelectContent>
                                 {colors.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
@@ -688,13 +721,17 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
                         </div>
                         <div>
                           <Label className="text-[10px]">Talla</Label>
-                          {sizes.length > 0 ? (
-                            <Select value={item.size || sizes[0]} onValueChange={(v) => updateManualItem(index, { size: v })}>
-                              <SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
+                          {availableSizes.length > 0 ? (
+                            <Select value={item.size} onValueChange={(v) => updateManualItem(index, { size: v })}>
+                              <SelectTrigger className="mt-1 h-9"><SelectValue placeholder="Talla" /></SelectTrigger>
                               <SelectContent>
-                                {sizes.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                {availableSizes.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                               </SelectContent>
                             </Select>
+                          ) : product && sizes.length > 0 ? (
+                            <div className="mt-1 flex h-9 items-center rounded-md border border-dashed px-3 text-xs text-muted-foreground">
+                              Sin stock en este color
+                            </div>
                           ) : (
                             <Input value={item.size} onChange={(e) => updateManualItem(index, { size: e.target.value })} className="mt-1 h-9" placeholder="Talla" />
                           )}
