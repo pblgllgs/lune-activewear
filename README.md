@@ -41,7 +41,8 @@ informativo hasta conectar Firebase.
 
 | Script | Descripción |
 |---|---|
-| `npm run dev` | Servidor de desarrollo |
+| `npm run dev` | Servidor de desarrollo (Vite; hace proxy de `/api/*` a `127.0.0.1:8788`) |
+| `npm run dev:api` | Pages Functions en local (`wrangler pages dev`, lee `.env`). Necesario para correos: sin él `/api/*` da 404 |
 | `npm run build` | Build de producción (`prebuild` sitemap → `tsc -b && vite build` → `postbuild` páginas SEO) |
 | `npm run preview` | Previsualiza el build (no aplica `_redirects`) |
 | `npm run sitemap` | Regenera `public/sitemap.xml` desde Firestore |

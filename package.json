@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:api": "npx wrangler pages dev dist --port 8788 --env-file .env",
     "prebuild": "node scripts/generate-sitemap.mjs",
     "build": "tsc -b && vite build",
     "postbuild": "node scripts/generate-seo-pages.mjs",
