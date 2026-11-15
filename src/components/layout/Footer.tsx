@@ -26,11 +26,13 @@ function InstagramIcon({ className }: { className?: string }) {
 
 const helpLinks = [
   { label: "Preguntas frecuentes", to: "/#preguntas" },
-  { label: "Envíos y devoluciones", to: "/#preguntas" },
+  { label: "Envíos y entregas", to: "/envios" },
+  { label: "Cambios y devoluciones", to: "/cambios" },
   { label: "Guía de tallas", to: "/#preguntas" },
   { label: "Guías y consejos", to: "/guias" },
   { label: "Nosotros", to: "/nosotros" },
   { label: "Contacto", to: "/#contacto" },
+  { label: "Términos y condiciones", to: "/terminos" },
   { label: "Política de datos", to: "/privacidad" },
 ];
 

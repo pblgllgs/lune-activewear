@@ -19,6 +19,9 @@ const Shop = lazy(() => import("@/pages/Shop"));
 const ProductDetail = lazy(() => import("@/pages/ProductDetail"));
 const Favorites = lazy(() => import("@/pages/Favorites"));
 const Privacy = lazy(() => import("@/pages/Privacy"));
+const Shipping = lazy(() => import("@/pages/Shipping"));
+const Returns = lazy(() => import("@/pages/Returns"));
+const Terms = lazy(() => import("@/pages/Terms"));
 const About = lazy(() => import("@/pages/About"));
 const Account = lazy(() => import("@/pages/Account"));
 const Admin = lazy(() => import("@/pages/Admin"));
@@ -97,6 +100,9 @@ function App() {
                       <Route path="/guias" element={<Guides />} />
                       <Route path="/guias/:slug" element={<GuideDetail />} />
                       <Route path="/privacidad" element={<Privacy />} />
+                      <Route path="/envios" element={<Shipping />} />
+                      <Route path="/cambios" element={<Returns />} />
+                      <Route path="/terminos" element={<Terms />} />
                       <Route path="/nosotros" element={<About />} />
                       <Route path="/cuenta" element={<Account />} />
                       <Route path="/admin" element={<Admin />} />

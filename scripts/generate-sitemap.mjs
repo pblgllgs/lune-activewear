@@ -20,6 +20,9 @@ const staticUrls = [
   { loc: "/guias", changefreq: "weekly", priority: "0.7" },
   { loc: "/nosotros", changefreq: "monthly", priority: "0.6" },
   { loc: "/privacidad", changefreq: "monthly", priority: "0.3" },
+  { loc: "/envios", changefreq: "monthly", priority: "0.4" },
+  { loc: "/cambios", changefreq: "monthly", priority: "0.4" },
+  { loc: "/terminos", changefreq: "monthly", priority: "0.3" },
 ];
 
 const [products, guides] = await Promise.all([fetchProducts(), fetchGuides()]);

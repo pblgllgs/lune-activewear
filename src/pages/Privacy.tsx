@@ -1,7 +1,7 @@
-import { useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useSeo, absoluteUrl, SITE_NAME, SITE_URL } from "@/lib/seo";
 import { EMAIL, WHATSAPP_DISPLAY } from "@/lib/constants";
+import { LegalLayout, Section, Table } from "@/components/legal/LegalLayout";
 
 const LAST_UPDATED = "8 de noviembre de 2026";
 
@@ -17,70 +17,7 @@ const sections = [
   { id: "cambios", label: "Cambios en esta política" },
 ];
 
-function Section({
-  id,
-  title,
-  children,
-}: {
-  id: string;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section id={id} className="scroll-mt-28 border-t border-border/70 pt-8 first:border-t-0 first:pt-0">
-      <h2 className="font-display text-2xl font-medium tracking-tight md:text-3xl">{title}</h2>
-      <div className="mt-4 space-y-4 text-sm leading-relaxed text-muted-foreground md:text-base">
-        {children}
-      </div>
-    </section>
-  );
-}
-
-function Table({
-  headers,
-  rows,
-}: {
-  headers: string[];
-  rows: string[][];
-}) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[34rem] border-collapse text-left text-xs md:text-sm">
-        <thead>
-          <tr>
-            {headers.map((header) => (
-              <th
-                key={header}
-                scope="col"
-                className="border-b border-border py-2 pr-4 text-[10px] uppercase tracking-wider2 text-muted-foreground"
-              >
-                {header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row[0]} className="align-top">
-              {row.map((cell, index) => (
-                <td
-                  key={`${row[0]}-${index}`}
-                  className="border-b border-border/60 py-3 pr-4 text-muted-foreground"
-                >
-                  {cell}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 export default function Privacy() {
-  const { hash } = useLocation();
-
   useSeo({
     title: "Política de datos y privacidad | LUNÉ Activewear",
     description:
@@ -98,62 +35,44 @@ export default function Privacy() {
     },
   });
 
-  // La página se carga de forma diferida: el ancla (#cookies) se busca a mano
-  // para que el salto funcione al coming desde el aviso de cookies.
-  useEffect(() => {
-    if (!hash) return;
-    const id = hash.replace("#", "");
-    const target = document.getElementById(id);
-    if (!target) return;
-    const timer = window.setTimeout(
-      () => target.scrollIntoView({ behavior: "smooth", block: "start" }),
-      80
-    );
-    return () => window.clearTimeout(timer);
-  }, [hash]);
-
   return (
-    <div className="container py-12 md:py-16">
-      <div className="grid gap-10 lg:grid-cols-[15rem_1fr] lg:gap-16">
-        {/* Índice */}
-        <aside className="lg:sticky lg:top-28 lg:self-start">
-          <p className="text-[10px] uppercase tracking-brand text-muted-foreground">Legal</p>
-          <h1 className="mt-3 font-display text-3xl font-medium leading-tight tracking-tight md:text-4xl">
-            Política de datos y privacidad
-          </h1>
-          <p className="mt-3 text-xs text-muted-foreground">Última actualización: {LAST_UPDATED}</p>
-
-          <nav aria-label="Contenido de la política" className="mt-6 hidden lg:block">
-            <ul className="space-y-2 text-xs text-muted-foreground">
-              {sections.map((section) => (
-                <li key={section.id}>
-                  <a
-                    href={`#${section.id}`}
-                    className="transition hover:text-foreground hover:underline underline-offset-4"
-                  >
-                    {section.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        </aside>
-
-        {/* Contenido */}
-        <article className="max-w-3xl space-y-8">
-          <div className="rounded-xl border bg-secondary/40 p-5 md:p-6">
-            <p className="text-sm leading-relaxed text-muted-foreground md:text-base">
-              En LUNÉ Activewear cuidamos tus datos personales. Compramos y vendemos en línea,
-              conversamos por WhatsApp y usamos el mínimo de información necesaria para que tu
-              pedido llegue bien. Esta página explica, en palabras simples, qué datos tocamos, por
-              qué, con quién los compartimos y cómo puedes pedirnos que los eliminemos o los
-              corrijamos.
-            </p>
-            <p className="mt-3 text-xs text-muted-foreground">
-              Este documento se elaboró conforme a la Ley 21.719 sobre protección de datos
-              personales y a la normativa de comercio electrónico aplicable en Chile.
-            </p>
-          </div>
+    <LegalLayout
+      title="Política de datos y privacidad"
+      updated={LAST_UPDATED}
+      navLabel="Contenido de la política"
+      sections={sections}
+      intro={
+        <>
+          <p className="text-sm leading-relaxed text-muted-foreground md:text-base">
+            En LUNÉ Activewear cuidamos tus datos personales. Compramos y vendemos en línea,
+            conversamos por WhatsApp y usamos el mínimo de información necesaria para que tu
+            pedido llegue bien. Esta página explica, en palabras simples, qué datos tocamos, por
+            qué, con quién los compartimos y cómo puedes pedirnos que los eliminemos o los
+            corrijamos.
+          </p>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Este documento se elaboró conforme a la Ley 21.719 sobre protección de datos
+            personales y a la normativa de comercio electrónico aplicable en Chile.
+          </p>
+        </>
+      }
+      footer={
+        <>
+          <p className="font-display text-xl">¿Tienes dudas sobre tus datos?</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Escríbenos a{" "}
+            <a href={`mailto:${EMAIL}`} className="underline underline-offset-4">
+              {EMAIL}
+            </a>{" "}
+            o por WhatsApp al {WHATSAPP_DISPLAY}. También puedes volver a la{" "}
+            <Link to="/tienda" className="underline underline-offset-4">
+              tienda
+            </Link>
+            .
+          </p>
+        </>
+      }
+    >
 
           <Section id="responsable" title="Responsable del tratamiento">
             <p>
@@ -391,22 +310,6 @@ export default function Privacy() {
               cambio afecta tus derechos, lo avisaremos de forma visible en el sitio.
             </p>
           </Section>
-
-          <div className="rounded-xl bg-secondary/60 p-5 md:p-6">
-            <p className="font-display text-xl">¿Tienes dudas sobre tus datos?</p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Escríbenos a{" "}
-              <a href={`mailto:${EMAIL}`} className="underline underline-offset-4">
-                {EMAIL}
-              </a>{" "}
-              o por WhatsApp al {WHATSAPP_DISPLAY}. También puedes volver a la{" "}
-              <Link to="/tienda" className="underline underline-offset-4">
-                tienda
-              </Link>
-              .
-            </p>
-          </div>        </article>
-      </div>
-    </div>
+    </LegalLayout>
   );
 }

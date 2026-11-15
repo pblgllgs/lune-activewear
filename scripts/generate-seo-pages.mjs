@@ -256,6 +256,59 @@ const privacyMeta = {
   },
 };
 
+const shippingMeta = {
+  title: "Envíos y entregas | LUNÉ Activewear",
+  description:
+    "Despachamos a todo Chile en 2 a 5 días hábiles. Envío gratis sobre $50.000, retiro en Chillán con cita y seguimiento por correo y WhatsApp.",
+  canonical: `${SITE_URL}/envios`,
+  heading: "Envíos y entregas",
+  jsonLd: {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    name: "Envíos y entregas — LUNÉ Activewear",
+    description:
+      "Plazos, costos, cobertura y seguimiento de los despachos de LUNÉ Activewear a todo Chile.",
+    url: `${SITE_URL}/envios`,
+    inLanguage: "es-CL",
+    isPartOf: { "@type": "WebSite", name: SITE_NAME, url: SITE_URL },
+  },
+};
+
+const returnsMeta = {
+  title: "Cambios y devoluciones | LUNÉ Activewear",
+  description:
+    "Cambia tu talla o color hasta 15 días, ejerce tu derecho a retracto en 10 días o usa la garantía legal de 3 meses. Te explicamos los pasos y los plazos de reembolso.",
+  canonical: `${SITE_URL}/cambios`,
+  heading: "Cambios y devoluciones",
+  jsonLd: {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    name: "Cambios y devoluciones — LUNÉ Activewear",
+    description:
+      "Política de cambios, derecho a retracto y garantía legal de LUNÉ Activewear conforme a la Ley 19.496.",
+    url: `${SITE_URL}/cambios`,
+    inLanguage: "es-CL",
+    isPartOf: { "@type": "WebSite", name: SITE_NAME, url: SITE_URL },
+  },
+};
+
+const termsMeta = {
+  title: "Términos y condiciones | LUNÉ Activewear",
+  description:
+    "Condiciones de compra de LUNÉ Activewear: quién vende, precios en pesos chilenos, cómo se cierra el pedido por WhatsApp, despachos, cambios y ley aplicable.",
+  canonical: `${SITE_URL}/terminos`,
+  heading: "Términos y condiciones",
+  jsonLd: {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    name: "Términos y condiciones — LUNÉ Activewear",
+    description: "Términos y condiciones de compra y uso del sitio de LUNÉ Activewear, Chile.",
+    url: `${SITE_URL}/terminos`,
+    inLanguage: "es-CL",
+    isPartOf: { "@type": "WebSite", name: SITE_NAME, url: SITE_URL },
+  },
+};
+
 const guidesMeta = {
   title: "Guías y consejos | LUNÉ Activewear",
   description:
@@ -310,6 +363,12 @@ for (const category of CATEGORY_PAGES) {
 await writePage("/nosotros", applyMeta(template, aboutMeta));
 count += 1;
 await writePage("/privacidad", applyMeta(template, privacyMeta));
+count += 1;
+await writePage("/envios", applyMeta(template, shippingMeta));
+count += 1;
+await writePage("/cambios", applyMeta(template, returnsMeta));
+count += 1;
+await writePage("/terminos", applyMeta(template, termsMeta));
 count += 1;
 await writePage("/guias", applyMeta(template, guidesMeta));
 count += 1;
@@ -403,6 +462,9 @@ const redirects = [
   "/tienda /tienda/index.html 200",
   "/nosotros /nosotros/index.html 200",
   "/privacidad /privacidad/index.html 200",
+  "/envios /envios/index.html 200",
+  "/cambios /cambios/index.html 200",
+  "/terminos /terminos/index.html 200",
   "/guias /guias/index.html 200",
   "/admin /admin/index.html 200",
   ...CATEGORY_PAGES.map(
