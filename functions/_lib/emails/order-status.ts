@@ -11,6 +11,7 @@ import {
   renderTotals,
 } from "./layout";
 import type { BuiltEmail, OrderEmailData } from "./order-confirmation";
+import { carrierTrackingUrl } from "../carriers";
 
 export type StatusEvent = "aprobada" | "pagado" | "enviado" | "rechazada";
 
@@ -53,12 +54,22 @@ export function orderStatusEmail(
   const name = firstName(order.customerName);
   const accountUrl = `${siteUrl}/cuenta`;
 
+  const trackingUrl = status === "enviado" ? carrierTrackingUrl(order.carrier) : null;
+  /** Nombre del courier; enlazado a su página de rastreo cuando existe. */
+  const carrierHtml = order.carrier
+    ? trackingUrl
+      ? `<a href="${escapeHtml(trackingUrl)}" style="color:${BRAND.text};text-decoration:underline;">${escapeHtml(
+          order.carrier
+        )}</a>`
+      : escapeHtml(order.carrier)
+    : "";
+
   const trackingBlock =
     status === "enviado" && (order.trackingNumber || order.carrier)
       ? (() => {
-          const eyebrow = order.trackingNumber ? "Número de seguimiento" : "Proveedor de envío";
-          const main = order.trackingNumber || order.carrier || "";
-          const detail = order.trackingNumber && order.carrier ? order.carrier : "";
+          const eyebrow = order.trackingNumber ? "Número de seguimiento" : "Empresa de envío";
+          const main = order.trackingNumber ? escapeHtml(order.trackingNumber) : carrierHtml;
+          const detail = order.trackingNumber && order.carrier ? `Envío por ${carrierHtml}` : "";
           return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0 0;background:${BRAND.soft};border-radius:10px;">
           <tr>
             <td style="padding:18px 20px;">
@@ -66,10 +77,17 @@ export function orderStatusEmail(
                 ${eyebrow}
               </p>
               <p style="margin:8px 0 0;font-family:'Jost',Helvetica,Arial,sans-serif;font-size:20px;letter-spacing:0.12em;color:${BRAND.text};">
-                ${escapeHtml(main)}
+                ${main}
               </p>
               ${detail
-                ? `<p style="margin:6px 0 0;font-family:'Inter',Helvetica,Arial,sans-serif;font-size:13px;color:${BRAND.muted};">${escapeHtml(detail)}</p>`
+                ? `<p style="margin:6px 0 0;font-family:'Inter',Helvetica,Arial,sans-serif;font-size:13px;color:${BRAND.muted};">${detail}</p>`
+                : ""}
+              ${trackingUrl
+                ? `<p style="margin:14px 0 0;"><a href="${escapeHtml(
+                    trackingUrl
+                  )}" style="display:inline-block;padding:11px 20px;border:1px solid ${BRAND.text};border-radius:8px;font-family:'Jost',Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:${BRAND.text};text-decoration:none;">Rastrear en ${escapeHtml(
+                    order.carrier ?? ""
+                  )}</a></p>`
                 : ""}
             </td>
           </tr>
@@ -104,7 +122,7 @@ export function orderStatusEmail(
         ...(status === "enviado" && order.trackingNumber
           ? [["Seguimiento", escapeHtml(order.trackingNumber)] as [string, string]]
           : []),
-        ...(order.carrier ? [["Transporte", escapeHtml(order.carrier)] as [string, string]] : []),
+        ...(order.carrier ? [["Transporte", carrierHtml] as [string, string]] : []),
         ...(order.createdAt
           ? [["Pedido", escapeHtml(formatDate(order.createdAt))] as [string, string]]
           : []),
@@ -125,6 +143,7 @@ export function orderStatusEmail(
       ? ["", `Número de seguimiento: ${order.trackingNumber}`]
       : []),
     ...(order.carrier ? ["", `Proveedor de envío: ${order.carrier}`] : []),
+    ...(trackingUrl ? [`Rastrear en ${order.carrier}: ${trackingUrl}`] : []),
     "",
     ...order.items.map(
       (item) => `- ${item.name} (${item.color}, talla ${item.size}) x${item.qty}`
