@@ -10,8 +10,16 @@ Tienda online de ropa deportiva femenina construida sobre el patrón del proyect
 
 ```bash
 npm install
-npm run dev
+npm run dev:all
 ```
+
+`dev:all` levanta la web (Vite, `:5173`) y las Pages Functions (`wrangler`, `:8788`) a la
+vez. Hacen falta las dos: sin el servidor de Functions, `/api/*` responde **502** y fallan
+los correos, la prueba de correo y los avisos de reposición. La primera vez, o después de
+cambiar el front, compila con `npm run build` para tener `dist/` (las Functions se leen del
+código fuente y no necesitan rebuild).
+
+Si prefieres dos terminales: `npm run dev` y `npm run dev:api`.
 
 La tienda funciona **sin configurar nada**: si no hay credenciales de Firebase se muestra
 un catálogo de demostración con imágenes de referencia. El panel `/admin` queda en modo
@@ -42,7 +50,8 @@ informativo hasta conectar Firebase.
 | Script | Descripción |
 |---|---|
 | `npm run dev` | Servidor de desarrollo (Vite; hace proxy de `/api/*` a `127.0.0.1:8788`) |
-| `npm run dev:api` | Pages Functions en local (`wrangler pages dev`, lee `.env`). Necesario para correos: sin él `/api/*` da 404 |
+| `npm run dev:all` | Vite + Pages Functions juntos en una terminal (recomendado) |
+| `npm run dev:api` | Pages Functions en local (`wrangler pages dev`, lee `.env`). Necesario para correos: sin él `/api/*` da **502 Bad Gateway** |
 | `npm run build` | Build de producción (`prebuild` sitemap → `tsc -b && vite build` → `postbuild` páginas SEO) |
 | `npm run preview` | Previsualiza el build (no aplica `_redirects`) |
 | `npm run sitemap` | Regenera `public/sitemap.xml` desde Firestore |

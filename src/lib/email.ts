@@ -38,7 +38,13 @@ async function post<T>(
 
   const data = (await response.json().catch(() => ({}))) as T & ApiError;
   if (!response.ok) {
-    throw new Error(data?.error || "No se pudo enviar el correo.");
+    // Un 502/504 sin JSON viene del proxy de Vite, no de la Function: en
+    // desarrollo significa que `npm run dev:api` no está corriendo.
+    const fallback =
+      !data?.error && (response.status === 502 || response.status === 504)
+        ? "El servidor de Functions no responde. En desarrollo, ejecuta `npm run dev:api` en otra terminal."
+        : "No se pudo enviar el correo.";
+    throw new Error(data?.error || fallback);
   }
   return data;
 }
