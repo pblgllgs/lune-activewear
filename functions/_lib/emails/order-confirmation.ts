@@ -25,6 +25,7 @@ export interface OrderEmailData {
   coupon?: string;
   notes?: string;
   trackingNumber?: string;
+  carrier?: string;
   rejectionReason?: string;
   createdAt?: string;
 }

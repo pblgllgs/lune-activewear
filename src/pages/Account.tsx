@@ -133,6 +133,13 @@ function MyOrders({ email, userId }: { email: string; userId?: string }) {
             {order.status === "enviado" && (
               <p className="mt-2 text-[11px] text-muted-foreground">
                 Tu pedido fue enviado{order.shippedAt ? ` el ${formatDate(order.shippedAt)}` : ""}.
+                {order.carrier ? ` Envío por ${order.carrier}.` : ""}
+                {order.trackingNumber ? (
+                  <>
+                    {" "}Seguimiento:{" "}
+                    <span className="font-mono text-foreground">{order.trackingNumber}</span>.
+                  </>
+                ) : null}
               </p>
             )}
 

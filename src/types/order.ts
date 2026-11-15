@@ -51,6 +51,8 @@ export interface Order {
   rejectionReason?: string;
   /** Número de seguimiento del envío (courier). Se envía en el correo de «enviado». */
   trackingNumber?: string;
+  /** Proveedor de envío (`Chilexpress`, `Starken`…). Se muestra junto al seguimiento. */
+  carrier?: string;
   /** Correos enviados, por evento (`confirmation`, `pagado`, `enviado`…). */
   emails?: Record<string, OrderEmailState>;
 }
@@ -79,6 +81,10 @@ export interface CreateManualOrderInput {
   coupon?: string;
   notes?: string;
   status: OrderStatus;
+  /** Número de seguimiento (solo si el estado es «enviado»). */
+  trackingNumber?: string;
+  /** Proveedor de envío (solo si el estado es «enviado»). */
+  carrier?: string;
   /** Correo del admin que registra la orden. */
   adminEmail: string;
 }

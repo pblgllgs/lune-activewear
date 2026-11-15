@@ -32,7 +32,7 @@ const COPY: Record<
   },
   enviado: {
     title: "Tu pedido está en camino",
-    intro: "Despachamos tu pedido. Revisa el número de seguimiento para saber dónde va.",
+    intro: "Despachamos tu pedido. Revisa los datos de envío para saber dónde va.",
     subject: (code) => `Tu pedido ${code} está en camino · LUNÉ Activewear`,
     preheader: "Tu pedido fue despachado. Aquí tienes el seguimiento.",
   },
@@ -54,19 +54,27 @@ export function orderStatusEmail(
   const accountUrl = `${siteUrl}/cuenta`;
 
   const trackingBlock =
-    status === "enviado" && order.trackingNumber
-      ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0 0;background:${BRAND.soft};border-radius:10px;">
+    status === "enviado" && (order.trackingNumber || order.carrier)
+      ? (() => {
+          const eyebrow = order.trackingNumber ? "Número de seguimiento" : "Proveedor de envío";
+          const main = order.trackingNumber || order.carrier || "";
+          const detail = order.trackingNumber && order.carrier ? order.carrier : "";
+          return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0 0;background:${BRAND.soft};border-radius:10px;">
           <tr>
             <td style="padding:18px 20px;">
               <p style="margin:0;font-family:'Inter',Helvetica,Arial,sans-serif;font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:${BRAND.muted};">
-                Número de seguimiento
+                ${eyebrow}
               </p>
               <p style="margin:8px 0 0;font-family:'Jost',Helvetica,Arial,sans-serif;font-size:20px;letter-spacing:0.12em;color:${BRAND.text};">
-                ${escapeHtml(order.trackingNumber)}
+                ${escapeHtml(main)}
               </p>
+              ${detail
+                ? `<p style="margin:6px 0 0;font-family:'Inter',Helvetica,Arial,sans-serif;font-size:13px;color:${BRAND.muted};">${escapeHtml(detail)}</p>`
+                : ""}
             </td>
           </tr>
-        </table>`
+        </table>`;
+        })()
       : "";
 
   const reasonBlock =
@@ -96,6 +104,7 @@ export function orderStatusEmail(
         ...(status === "enviado" && order.trackingNumber
           ? [["Seguimiento", escapeHtml(order.trackingNumber)] as [string, string]]
           : []),
+        ...(order.carrier ? [["Transporte", escapeHtml(order.carrier)] as [string, string]] : []),
         ...(order.createdAt
           ? [["Pedido", escapeHtml(formatDate(order.createdAt))] as [string, string]]
           : []),
@@ -115,6 +124,7 @@ export function orderStatusEmail(
     ...(status === "enviado" && order.trackingNumber
       ? ["", `Número de seguimiento: ${order.trackingNumber}`]
       : []),
+    ...(order.carrier ? ["", `Proveedor de envío: ${order.carrier}`] : []),
     "",
     ...order.items.map(
       (item) => `- ${item.name} (${item.color}, talla ${item.size}) x${item.qty}`

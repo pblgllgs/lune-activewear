@@ -30,6 +30,7 @@ import {
 } from "@/lib/orders";
 import { notifyOrderEmail, type OrderEmailEvent } from "@/lib/email";
 import { auth } from "@/lib/firebase";
+import { SHIPPING_CARRIERS, isKnownCarrier } from "@/lib/shipping";
 import { stockColors, variantStock } from "@/lib/stock";
 import { usePagination } from "@/lib/use-pagination";
 import { formatCLP } from "@/lib/utils";
@@ -150,6 +151,58 @@ function emptyManualItem(): ManualItem {
   };
 }
 
+/**
+ * Selector de proveedor de envío con opción «Otro» para couriers que no están
+ * en la lista. El valor guardado es el texto final (lista o escrito a mano).
+ */
+function CarrierField({
+  id,
+  value,
+  onChange,
+}: {
+  id?: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [custom, setCustom] = useState(() => Boolean(value) && !isKnownCarrier(value));
+
+  return (
+    <div>
+      <select
+        id={id}
+        value={custom ? "__otro__" : value}
+        onChange={(event) => {
+          const next = event.target.value;
+          if (next === "__otro__") {
+            setCustom(true);
+            onChange("");
+          } else {
+            setCustom(false);
+            onChange(next);
+          }
+        }}
+        className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      >
+        <option value="">Sin especificar</option>
+        {SHIPPING_CARRIERS.map((carrier) => (
+          <option key={carrier} value={carrier}>
+            {carrier}
+          </option>
+        ))}
+        <option value="__otro__">Otro…</option>
+      </select>
+      {custom && (
+        <Input
+          className="mt-2 h-10"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder="Nombre del proveedor"
+        />
+      )}
+    </div>
+  );
+}
+
 export function OrdersManager({ products = [] }: { products?: Product[] }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -176,6 +229,8 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
   });
   const [manualCoupon, setManualCoupon] = useState("");
   const [manualNotes, setManualNotes] = useState("");
+  const [manualCarrier, setManualCarrier] = useState("");
+  const [manualTracking, setManualTracking] = useState("");
   const [manualItems, setManualItems] = useState<ManualItem[]>([emptyManualItem()]);
   const [selectedCustomerKey, setSelectedCustomerKey] = useState("");
 
@@ -389,15 +444,54 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
         : nextStatus === "enviado"
           ? await Swal.fire({
               title,
-              html: `${html}<p style="margin-top:10px;font-size:12px;color:#7A6C61;">El número se incluye en el correo de «pedido en camino».</p>`,
-              input: "text",
-              inputLabel: "Número de seguimiento (opcional)",
-              inputPlaceholder: "Ej: 1234567890",
-              inputValue: order.trackingNumber ?? "",
+              html: `${html}
+                <div style="margin-top:16px;text-align:left;">
+                  <label for="swal-carrier" style="display:block;font-size:12px;color:#49372D;margin-bottom:4px;">Proveedor de envío</label>
+                  <select id="swal-carrier" class="swal2-select" style="display:flex;width:100%;margin:0 0 14px;">
+                    <option value="">Sin especificar</option>
+                    ${SHIPPING_CARRIERS.map((carrier) => `<option value="${carrier}">${carrier}</option>`).join("")}
+                    <option value="__otro__">Otro…</option>
+                  </select>
+                  <input id="swal-carrier-other" class="swal2-input" style="display:none;width:100%;margin:0 0 14px;" placeholder="Nombre del proveedor" />
+                  <label for="swal-tracking" style="display:block;font-size:12px;color:#49372D;margin-bottom:4px;">Número de seguimiento (opcional)</label>
+                  <input id="swal-tracking" class="swal2-input" style="width:100%;margin:0;" placeholder="Ej: 1234567890" />
+                </div>
+                <p style="margin-top:12px;font-size:12px;color:#7A6C61;">El proveedor y el número se incluyen en el correo de «pedido en camino».</p>`,
+              focusConfirm: false,
               showCancelButton: true,
               confirmButtonText: "Sí, marcar enviado",
               cancelButtonText: "Cancelar",
               confirmButtonColor: "#49372D",
+              didOpen: () => {
+                const select = document.getElementById("swal-carrier") as HTMLSelectElement | null;
+                const other = document.getElementById("swal-carrier-other") as HTMLInputElement | null;
+                const tracking = document.getElementById("swal-tracking") as HTMLInputElement | null;
+                if (tracking) tracking.value = order.trackingNumber ?? "";
+                if (!select) return;
+                if (order.carrier && !isKnownCarrier(order.carrier)) {
+                  select.value = "__otro__";
+                  if (other) {
+                    other.value = order.carrier;
+                    other.style.display = "block";
+                  }
+                } else if (order.carrier) {
+                  select.value = order.carrier;
+                }
+                select.addEventListener("change", () => {
+                  if (!other) return;
+                  const custom = select.value === "__otro__";
+                  other.style.display = custom ? "block" : "none";
+                  if (custom) other.focus();
+                });
+              },
+              preConfirm: () => {
+                const select = document.getElementById("swal-carrier") as HTMLSelectElement | null;
+                const other = document.getElementById("swal-carrier-other") as HTMLInputElement | null;
+                const tracking = document.getElementById("swal-tracking") as HTMLInputElement | null;
+                const carrier =
+                  select?.value === "__otro__" ? (other?.value.trim() ?? "") : (select?.value ?? "");
+                return { carrier, tracking: tracking?.value.trim() ?? "" };
+              },
             })
           : await Swal.fire({
               title,
@@ -412,12 +506,17 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
 
     setBusyId(order.id);
     try {
+      const shipped =
+        nextStatus === "enviado" && result.value && typeof result.value === "object"
+          ? (result.value as { carrier?: string; tracking?: string })
+          : null;
       await setOrderStatus(
         order.id,
         nextStatus,
         adminEmail,
         nextStatus === "rechazada" && typeof result.value === "string" ? result.value : "",
-        nextStatus === "enviado" && typeof result.value === "string" ? result.value : ""
+        shipped?.tracking ?? "",
+        shipped?.carrier ?? ""
       );
       const message = deducting
         ? `Orden ${order.code} marcada como ${statusLabel(nextStatus)} y stock descontado.`
@@ -481,6 +580,8 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
     setManualCustomer({ name: "", phone: "", email: "", address: "", city: "" });
     setManualCoupon("");
     setManualNotes("");
+    setManualCarrier("");
+    setManualTracking("");
     setManualItems([emptyManualItem()]);
     setSelectedCustomerKey("");
   };
@@ -566,6 +667,8 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
         coupon: manualCoupon.trim() || undefined,
         notes: manualNotes.trim() || undefined,
         status: manualStatus,
+        trackingNumber: manualStatus === "enviado" ? manualTracking.trim() || undefined : undefined,
+        carrier: manualStatus === "enviado" ? manualCarrier.trim() || undefined : undefined,
         adminEmail,
       });
       toast.success(
@@ -695,6 +798,24 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
                   {isSale(manualStatus) ? "Se descontará stock al guardar." : "No descuenta stock."}
                 </p>
               </div>
+              {manualStatus === "enviado" && (
+                <>
+                  <div>
+                    <Label htmlFor="m-carrier">Proveedor de envío</Label>
+                    <CarrierField id="m-carrier" value={manualCarrier} onChange={setManualCarrier} />
+                  </div>
+                  <div>
+                    <Label htmlFor="m-tracking">Número de seguimiento</Label>
+                    <Input
+                      id="m-tracking"
+                      value={manualTracking}
+                      onChange={(event) => setManualTracking(event.target.value)}
+                      className="mt-1 h-10"
+                      placeholder="Ej: 1234567890"
+                    />
+                  </div>
+                </>
+              )}
               <div>
                 <Label htmlFor="m-coupon">Cupón</Label>
                 <Input id="m-coupon" value={manualCoupon} onChange={(e) => setManualCoupon(e.target.value)} className="mt-1 h-10 uppercase placeholder:normal-case" />
@@ -1021,11 +1142,18 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
                             </>
                           )}
                           {order.status === "pendiente" && <p>Al confirmar la venta (pagado/enviado/aprobada) se descuenta el stock.</p>}
-                          {order.trackingNumber && (
+                          {(order.carrier || order.trackingNumber) && (
                             <p>
                               <Truck className="mr-1 inline h-3 w-3" />
-                              Seguimiento:{" "}
-                              <span className="font-mono text-foreground">{order.trackingNumber}</span>
+                              {order.carrier ? `Envío: ${order.carrier}` : "Seguimiento"}
+                              {order.trackingNumber ? (
+                                <>
+                                  {" · "}
+                                  <span className="font-mono text-foreground">
+                                    {order.trackingNumber}
+                                  </span>
+                                </>
+                              ) : null}
                             </p>
                           )}
                           <p>

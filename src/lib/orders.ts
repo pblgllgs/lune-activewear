@@ -105,6 +105,7 @@ export function normalizeOrder(id: string, data: Record<string, unknown>): Order
     rejectedBy: data.rejectedBy ? String(data.rejectedBy) : undefined,
     rejectionReason: data.rejectionReason ? String(data.rejectionReason) : undefined,
     trackingNumber: str(data.trackingNumber) || undefined,
+    carrier: str(data.carrier) || undefined,
     emails:
       data.emails && typeof data.emails === "object"
         ? (data.emails as Record<string, OrderEmailState>)
@@ -510,7 +511,8 @@ export async function setOrderStatus(
   nextStatus: OrderStatus,
   adminEmail: string,
   reason = "",
-  trackingNumber = ""
+  trackingNumber = "",
+  carrier = ""
 ): Promise<void> {
   const firestore = db;
   if (!firestore) throw new Error("Firebase no está configurado.");
@@ -566,6 +568,7 @@ export async function setOrderStatus(
         base.shippedAt = now;
         base.shippedBy = adminEmail;
         base.trackingNumber = trackingNumber.trim() || order.trackingNumber || "";
+        base.carrier = carrier.trim() || order.carrier || "";
       }
       transaction.update(orderRef, base);
       return;
@@ -612,6 +615,14 @@ export async function setOrderStatus(
               trackingNumber: {
                 before: previous.trackingNumber ?? null,
                 after: trackingNumber.trim(),
+              },
+            }
+          : {}),
+        ...(nextStatus === "enviado" && carrier.trim()
+          ? {
+              carrier: {
+                before: previous.carrier ?? null,
+                after: carrier.trim(),
               },
             }
           : {}),
@@ -715,6 +726,8 @@ export async function createManualOrder(input: CreateManualOrderInput): Promise<
       data.paidBy = input.adminEmail;
       data.shippedAt = now;
       data.shippedBy = input.adminEmail;
+      data.trackingNumber = input.trackingNumber?.trim() || "";
+      data.carrier = input.carrier?.trim() || "";
     } else if (status === "rechazada") {
       data.rejectedAt = now;
       data.rejectedBy = input.adminEmail;
@@ -755,7 +768,14 @@ export async function createManualOrder(input: CreateManualOrderInput): Promise<
     ...(status === "aprobada" ? { approvedAt: now, approvedBy: input.adminEmail } : {}),
     ...(status === "pagado" ? { paidAt: now, paidBy: input.adminEmail } : {}),
     ...(status === "enviado"
-      ? { paidAt: now, paidBy: input.adminEmail, shippedAt: now, shippedBy: input.adminEmail }
+      ? {
+          paidAt: now,
+          paidBy: input.adminEmail,
+          shippedAt: now,
+          shippedBy: input.adminEmail,
+          trackingNumber: input.trackingNumber?.trim() || undefined,
+          carrier: input.carrier?.trim() || undefined,
+        }
       : {}),
     ...(status === "rechazada" ? { rejectedAt: now, rejectedBy: input.adminEmail } : {}),
   };

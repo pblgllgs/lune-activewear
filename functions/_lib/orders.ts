@@ -46,6 +46,7 @@ export function normalizeOrderForEmail(data: Record<string, unknown>): OrderEmai
     coupon: str(data.coupon) || undefined,
     notes: str(data.notes) || undefined,
     trackingNumber: str(data.trackingNumber) || undefined,
+    carrier: str(data.carrier) || undefined,
     rejectionReason: str(data.rejectionReason) || undefined,
     createdAt: str(data.createdAt) || undefined,
   };
