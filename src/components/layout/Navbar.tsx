@@ -66,8 +66,8 @@ export function Navbar() {
     <>
       <header className="sticky top-0 z-50 border-b border-border/70 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <div className="container grid h-20 grid-cols-[1fr_auto_1fr] items-center">
-        {/* Navegación escritorio / hamburguesa móvil */}
-        <nav className="hidden items-center gap-7 md:flex">
+        {/* Navegación escritorio / hamburguesa móvil/tablet */}
+        <nav className="hidden items-center gap-7 lg:flex">
           {links.map((link) => (
             <Link
               key={link.label}
@@ -82,7 +82,7 @@ export function Navbar() {
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="inline-flex h-10 w-10 items-center justify-center justify-self-start rounded-md transition hover:bg-secondary md:hidden"
+          className="inline-flex h-10 w-10 items-center justify-center justify-self-start rounded-md transition hover:bg-secondary lg:hidden"
           aria-label={open ? "Cerrar menú" : "Abrir menú"}
           aria-expanded={open}
         >
@@ -199,7 +199,7 @@ export function Navbar() {
       </div>
 
       {open && (
-        <div className="border-t border-border bg-background md:hidden">
+        <div className="border-t border-border bg-background lg:hidden">
           <div className="container flex flex-col gap-1 py-5">
             {links.map((link) => (
               <Link
