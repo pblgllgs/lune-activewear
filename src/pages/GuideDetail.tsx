@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import { getGuideBySlug } from "@/lib/guides";
-import { richTextToDisplayHtml } from "@/lib/rich-text";
+import { richTextToDisplayHtml, richTextToPlainText } from "@/lib/rich-text";
 import { useSeo, SITE_URL } from "@/lib/seo";
 import type { Guide } from "@/types/guide";
 
@@ -29,7 +29,8 @@ export default function GuideDetail() {
 
   const path = slug ? `/guias/${slug}` : "/guias";
   const title = guide?.title ? `${guide.title} | LUNÉ Activewear` : "Guía | LUNÉ Activewear";
-  const description = guide?.excerpt || "Guías y consejos de activewear femenino de LUNÉ.";
+  const excerptPlain = richTextToPlainText(guide?.excerpt || "");
+  const description = excerptPlain || "Guías y consejos de activewear femenino de LUNÉ.";
 
   useSeo({
     title,
@@ -44,7 +45,7 @@ export default function GuideDetail() {
             "@context": "https://schema.org",
             "@type": "Article",
             headline: guide.title,
-            description: guide.excerpt,
+            description: excerptPlain,
             image: guide.coverImage ? [guide.coverImage] : undefined,
             datePublished: guide.publishedAt || guide.createdAt,
             dateModified: guide.updatedAt || guide.publishedAt || guide.createdAt,
@@ -75,6 +76,7 @@ export default function GuideDetail() {
   }
 
   const body = richTextToDisplayHtml(guide.content);
+  const excerptHtml = richTextToDisplayHtml(guide.excerpt);
   const date = formatDate(guide.publishedAt || guide.updatedAt || guide.createdAt);
 
   return (
@@ -86,7 +88,12 @@ export default function GuideDetail() {
       <header className="mt-6">
         {date && <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{date}</p>}
         <h1 className="mt-2 font-display text-4xl font-medium leading-tight tracking-tight">{guide.title}</h1>
-        {guide.excerpt && <p className="mt-4 text-base text-muted-foreground">{guide.excerpt}</p>}
+        {excerptHtml && (
+          <div
+            className="rich-text mt-4 text-base text-muted-foreground"
+            dangerouslySetInnerHTML={{ __html: excerptHtml }}
+          />
+        )}
       </header>
 
       {guide.coverImage && (

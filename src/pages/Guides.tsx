@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { BookOpen } from "lucide-react";
 import { getSiteContent } from "@/lib/site-content";
 import { listPublishedGuides } from "@/lib/guides";
+import { richTextToPlainText } from "@/lib/rich-text";
 import { useSeo } from "@/lib/seo";
 import type { Guide } from "@/types/guide";
 
@@ -92,8 +93,10 @@ export default function Guides() {
                 <h2 className="mt-1 font-display text-xl font-medium leading-snug group-hover:text-primary">
                   {guide.title}
                 </h2>
-                {guide.excerpt && (
-                  <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{guide.excerpt}</p>
+                {richTextToPlainText(guide.excerpt) && (
+                  <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">
+                    {richTextToPlainText(guide.excerpt)}
+                  </p>
                 )}
                 <span className="mt-3 inline-block text-[11px] uppercase tracking-wider2 text-primary">
                   Leer guía

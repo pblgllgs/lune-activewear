@@ -24,7 +24,21 @@ const ALLOWED_TAGS = [
   "span",
 ];
 
-const ALLOWED_ATTR = ["href", "title", "target", "rel"];
+const ALLOWED_ATTR = ["href", "title", "target", "rel", "style", "align"];
+
+/** Mantiene solo alineaciones de texto en `style`/`align` (para justificar, etc.). */
+DOMPurify.addHook("uponSanitizeAttribute", (_node, data) => {
+  if (data.attrName === "style") {
+    const match = /text-align\s*:\s*(left|right|center|justify)/i.exec(data.attrValue);
+    data.attrValue = match ? `text-align: ${match[1].toLowerCase()}` : "";
+    if (!data.attrValue) data.keepAttr = false;
+    return;
+  }
+  if (data.attrName === "align") {
+    const value = data.attrValue.toLowerCase();
+    data.keepAttr = ["left", "right", "center", "justify"].includes(value);
+  }
+});
 
 /** Limpia el HTML de la descripción y deja solo etiquetas seguras. */
 export function sanitizeRichText(value: string): string {

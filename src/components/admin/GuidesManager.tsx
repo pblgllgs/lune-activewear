@@ -10,10 +10,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { db } from "@/lib/firebase";
 import { logAudit } from "@/lib/audit";
 import { deleteGuide, saveGuide, slugifyGuide, subscribeGuides } from "@/lib/guides";
+import { richTextToPlainText } from "@/lib/rich-text";
 import { getSiteContent } from "@/lib/site-content";
 import { usePagination } from "@/lib/use-pagination";
 import { isUploadConfigured, uploadToR2 } from "@/lib/upload";
@@ -99,11 +99,11 @@ export function GuidesManager() {
       toast.error("Escribe un título para la guía.");
       return;
     }
-    if (form.excerpt.trim().length < 10) {
+    if (richTextToPlainText(form.excerpt).length < 10) {
       toast.error("Escribe un resumen/extracto breve.");
       return;
     }
-    if (form.content.replace(/<[^>]*>/g, "").trim().length < 20) {
+    if (richTextToPlainText(form.content).length < 20) {
       toast.error("Escribe el contenido de la guía.");
       return;
     }
@@ -249,8 +249,14 @@ export function GuidesManager() {
                 </label>
               </div>
               <div className="sm:col-span-2">
-                <Label htmlFor="g-excerpt">Resumen / extracto *</Label>
-                <Textarea id="g-excerpt" value={form.excerpt} onChange={(e) => setForm((f) => ({ ...f, excerpt: e.target.value }))} rows={2} className="mt-1" placeholder="Breve descripción para listado y SEO (meta description)." />
+                <Label>Resumen / extracto *</Label>
+                <div className="mt-1">
+                  <RichTextEditor
+                    value={form.excerpt}
+                    onChange={(excerpt) => setForm((f) => ({ ...f, excerpt }))}
+                    placeholder="Breve descripción para listado y SEO (se usará como texto plano en buscadores)."
+                  />
+                </div>
               </div>
               <div className="sm:col-span-2">
                 <Label>Contenido *</Label>
@@ -261,14 +267,30 @@ export function GuidesManager() {
               <div className="sm:col-span-2">
                 <Label>Imagen de portada</Label>
                 <div className="mt-2 flex flex-wrap items-start gap-3">
-                  {(coverPreview || form.coverImage) && (
+                  {coverPreview || form.coverImage ? (
                     <img src={coverPreview || form.coverImage} alt="" className="h-24 w-40 rounded-md border object-cover" />
+                  ) : (
+                    <div className="flex h-24 w-40 items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground">
+                      Sin imagen
+                    </div>
                   )}
                   <div className="space-y-2">
                     <Input type="file" accept="image/*" onChange={(e) => setCoverFile(e.target.files?.[0] ?? null)} />
-                    <Input value={form.coverImage} onChange={(e) => setForm((f) => ({ ...f, coverImage: e.target.value }))} placeholder="o URL de imagen" />
-                    {form.coverImage && !coverFile && (
-                      <Button type="button" variant="outline" size="sm" onClick={() => setForm((f) => ({ ...f, coverImage: "" }))}>Quitar imagen</Button>
+                    <p className="text-[11px] text-muted-foreground">
+                      Sube una imagen. Se guardará al guardar la guía.
+                    </p>
+                    {(form.coverImage || coverFile) && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setCoverFile(null);
+                          setForm((f) => ({ ...f, coverImage: "" }));
+                        }}
+                      >
+                        Quitar imagen
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -315,7 +337,11 @@ export function GuidesManager() {
                       )}
                     </div>
                     <p className="truncate text-xs text-muted-foreground">/guias/{guide.slug || guide.id}</p>
-                    {guide.excerpt && <p className="line-clamp-1 text-xs text-muted-foreground">{guide.excerpt}</p>}
+                    {richTextToPlainText(guide.excerpt) && (
+                      <p className="line-clamp-1 text-xs text-muted-foreground">
+                        {richTextToPlainText(guide.excerpt)}
+                      </p>
+                    )}
                   </div>
                   <div className="flex gap-1">
                     <Button variant="ghost" size="icon" title="Editar" onClick={() => startEdit(guide)}><Pencil className="h-4 w-4" /></Button>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  AlignJustify,
   Bold,
   Heading3,
   Italic,
@@ -120,6 +121,9 @@ export function RichTextEditor({
         </ToolbarButton>
         <ToolbarButton label="Lista numerada" onClick={() => exec("insertOrderedList")}>
           <ListOrdered className="h-4 w-4" />
+        </ToolbarButton>
+        <ToolbarButton label="Justificar texto" onClick={() => exec("justifyFull")}>
+          <AlignJustify className="h-4 w-4" />
         </ToolbarButton>
         <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
         <ToolbarButton label="Agregar enlace" onClick={addLink}>
