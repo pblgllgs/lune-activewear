@@ -822,7 +822,7 @@ export default function ProductDetail() {
 
           {/* Cantidad + agregar */}
           <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-            <div className="inline-flex h-12 items-center justify-between rounded-md border sm:w-32">
+            <div className="inline-flex h-12 w-full items-center justify-between rounded-md border sm:w-32">
               <button
                 type="button"
                 onClick={() => setQty((q) => Math.max(1, q - 1))}
@@ -844,7 +844,7 @@ export default function ProductDetail() {
             </div>
             <Button
               size="lg"
-              className="flex-1"
+              className="w-full sm:flex-1"
               onClick={handleAdd}
               disabled={currentStock === 0}
             >
@@ -853,7 +853,7 @@ export default function ProductDetail() {
             </Button>
           </div>
 
-          <Button size="lg" variant="whatsapp-outline" className="mt-3 w-full" onClick={handleWhatsApp}>
+          <Button size="lg" variant="whatsapp" className="mt-3 w-full" onClick={handleWhatsApp}>
             Comprar por WhatsApp
           </Button>
 
