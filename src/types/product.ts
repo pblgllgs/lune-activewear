@@ -47,6 +47,18 @@ export interface Product {
    * respaldo para cualquier color (compatibilidad con productos antiguos).
    */
   imageColors?: Record<string, string>;
+  /**
+   * Fotos del giro de 180° (frente y espalda) por color, con las mismas claves
+   * que `imageColors`. La ficha las muestra como última diapositiva del
+   * carrusel. La clave `"*"` aplica a cualquier color.
+   */
+  spinByColor?: Record<string, { front: string; back: string }>;
+  /**
+   * Si es `false`, el giro de 180° no se muestra aunque tenga sus dos fotos
+   * guardadas (permite ocultarlo sin volver a subirlas). Ausente o `true` =
+   * visible cuando `spinByColor` tiene frente y espalda.
+   */
+  spinEnabled?: boolean;
   featured?: boolean;
   isNew?: boolean;
   /**

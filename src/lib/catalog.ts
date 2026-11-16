@@ -232,6 +232,24 @@ function normalizeImageColors(value: unknown): Record<string, string> | undefine
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
+/** Giro de 180° por color: cada entrada necesita frente y espalda. */
+function normalizeSpinByColor(
+  value: unknown
+): Record<string, { front: string; back: string }> | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const entries: [string, { front: string; back: string }][] = [];
+  for (const [color, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (!raw || typeof raw !== "object") continue;
+    const entry = raw as { front?: unknown; back?: unknown };
+    const front = typeof entry.front === "string" ? entry.front.trim() : "";
+    const back = typeof entry.back === "string" ? entry.back.trim() : "";
+    const name = color.trim();
+    if (!name || !front || !back) continue;
+    entries.push([name, { front, back }]);
+  }
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
 function cleanQty(value: unknown): number | null {
   const number = Number(value);
   return Number.isFinite(number) ? Math.max(0, Math.floor(number)) : null;
@@ -320,6 +338,8 @@ export function normalizeProduct(id: string, data: Record<string, unknown>): Pro
     colors,
     images: Array.isArray(data.images) ? (data.images as string[]) : [],
     imageColors: normalizeImageColors(data.imageColors),
+    spinByColor: normalizeSpinByColor(data.spinByColor),
+    spinEnabled: typeof data.spinEnabled === "boolean" ? data.spinEnabled : undefined,
     featured: Boolean(data.featured),
     isNew: Boolean(data.isNew),
     // Sin el campo se considera publicado (catálogo anterior a los borradores).

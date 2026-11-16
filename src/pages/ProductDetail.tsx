@@ -12,6 +12,7 @@ import {
   Minus,
   Plus,
   RefreshCw,
+  RotateCw,
   ShoppingBag,
   Star,
   Truck,
@@ -54,6 +55,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ImageWithFallback } from "@/components/shop/ImageWithFallback";
 import { ProductCard } from "@/components/shop/ProductCard";
 import { SizeGuide } from "@/components/shop/SizeGuide";
+import { ProductSpin } from "@/components/product/ProductSpin";
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
@@ -78,6 +80,7 @@ export default function ProductDetail() {
   const [reviewPhotos, setReviewPhotos] = useState<{ file: File; preview: string }[]>([]);
   const [verifiedOrderId, setVerifiedOrderId] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
+  const [showSpin, setShowSpin] = useState(false);
   const touchX = useRef<number | null>(null);
   const reviewPhotosRef = useRef(reviewPhotos);
   const uploadsEnabled = isUploadConfigured();
@@ -115,10 +118,21 @@ export default function ProductDetail() {
     if (!id) return;
     setLoading(true);
     setIndex(0);
+    setShowSpin(false);
     setQty(1);
     getProduct(id)
       .then((found) => {
         setProduct(found);
+        // Sin fotos normales, el giro es la única vista: se abre directamente.
+        setShowSpin(
+          Boolean(
+            found &&
+              found.spinEnabled !== false &&
+              found.images.length === 0 &&
+              found.spinByColor &&
+              Object.keys(found.spinByColor).length > 0
+          )
+        );
         setSize(found ? firstAvailableSize(found) : "Único");
         // El color inicial sigue a la primera foto si tiene uno asignado; si está agotado, usa el primero disponible.
         const firstUrl = found?.images[0];
@@ -198,6 +212,23 @@ export default function ProductDetail() {
    */
   const images = useMemo(() => product?.images ?? [], [product]);
 
+  /**
+   * Giro de 180° disponible en el producto. Se usa el del color activo o, si
+   * ese color no tiene, el primero configurado; al abrirlo se activa su color,
+   * igual que al elegir una foto. Va como última diapositiva del carrusel.
+   */
+  const spin = useMemo(() => {
+    const map = product?.spinByColor;
+    if (!product || !map || product.spinEnabled === false) return null;
+    const names = new Set(product.colors.map((entry) => entry.name.trim()));
+    const usable = Object.entries(map).filter(
+      ([name]) => name === "*" || names.has(name.trim())
+    );
+    if (usable.length === 0) return null;
+    const [name, entry] = usable.find(([key]) => key === color) ?? usable[0];
+    return { front: entry.front, back: entry.back, color: name === "*" ? color : name };
+  }, [product, color]);
+
   if (loading) {
     return (
       <div className="container py-20">
@@ -239,6 +270,7 @@ export default function ProductDetail() {
 
   /** Selecciona una foto y, si tiene color asignado, lo activa. */
   const selectImage = (nextIndex: number) => {
+    setShowSpin(false);
     setIndex(nextIndex);
     const name = colorForImage(images[nextIndex]);
     if (name) {
@@ -251,6 +283,7 @@ export default function ProductDetail() {
   };
 
   const selectColor = (name: string) => {
+    setShowSpin(false);
     setColor(name);
     const first = images.findIndex(
       (url) => product.imageColors?.[url]?.trim() === name.trim()
@@ -265,8 +298,50 @@ export default function ProductDetail() {
     }
   };
 
-  const prev = () => selectImage((index - 1 + images.length) % images.length);
-  const next = () => selectImage((index + 1) % images.length);
+  /** Diapositivas del carrusel: fotos + el giro (si el producto lo tiene). */
+  const slideCount = images.length + (spin ? 1 : 0);
+  const position = showSpin ? images.length + 1 : index + 1;
+
+  /** Abre el giro y activa su color, como al elegir una foto. */
+  const showSpinSlide = () => {
+    if (!spin) return;
+    setShowSpin(true);
+    if (spin.color && spin.color !== color) {
+      setColor(spin.color);
+      const first = images.findIndex(
+        (url) => product.imageColors?.[url]?.trim() === spin.color.trim()
+      );
+      if (first >= 0) setIndex(first);
+      if (isSizeSoldOut(product, size, spin.color)) {
+        setSize(firstAvailableSize(product, spin.color));
+        setQty(1);
+      }
+    }
+  };
+
+  const prev = () => {
+    if (showSpin) {
+      setShowSpin(false);
+      return;
+    }
+    if (index === 0 && spin) {
+      showSpinSlide();
+      return;
+    }
+    selectImage((index - 1 + images.length) % images.length);
+  };
+
+  const next = () => {
+    if (showSpin) {
+      setShowSpin(false);
+      return;
+    }
+    if (spin && index === images.length - 1) {
+      showSpinSlide();
+      return;
+    }
+    selectImage((index + 1) % images.length);
+  };
 
   const handleAdd = () => {
     if (currentStock === 0) {
@@ -451,10 +526,11 @@ export default function ProductDetail() {
           <div
             className="relative aspect-[4/5] touch-pan-y overflow-hidden rounded-xl bg-secondary"
             onTouchStart={(event) => {
+              if (showSpin) return;
               touchX.current = event.touches[0]?.clientX ?? null;
             }}
             onTouchEnd={(event) => {
-              if (touchX.current === null || images.length < 2) return;
+              if (showSpin || touchX.current === null || slideCount < 2) return;
               const delta =
                 (event.changedTouches[0]?.clientX ?? touchX.current) - touchX.current;
               touchX.current = null;
@@ -464,12 +540,21 @@ export default function ProductDetail() {
               }
             }}
           >
-            <ImageWithFallback
-              src={currentImage}
-              alt={`${product.name} — ${categoryLabel(product.category)} LUNÉ Activewear`}
-              priority
-              className="h-full w-full object-cover"
-            />
+            {showSpin && spin ? (
+              <ProductSpin
+                front={spin.front}
+                back={spin.back}
+                alt={product.name}
+                className="h-full w-full"
+              />
+            ) : (
+              <ImageWithFallback
+                src={currentImage}
+                alt={`${product.name} — ${categoryLabel(product.category)} LUNÉ Activewear`}
+                priority
+                className="h-full w-full object-cover"
+              />
+            )}
 
             <div className="absolute left-4 top-4 flex flex-col gap-1.5">
               {product.isNew && <Badge variant="accent">Nuevo</Badge>}
@@ -477,7 +562,7 @@ export default function ProductDetail() {
               {soldOut && <Badge variant="secondary">Agotado</Badge>}
             </div>
 
-            {images.length > 1 && (
+            {slideCount > 1 && (
               <>
                 <button
                   type="button"
@@ -496,13 +581,13 @@ export default function ProductDetail() {
                   <ChevronRight className="h-5 w-5" />
                 </button>
                 <span className="absolute bottom-4 right-4 rounded-full bg-background/80 px-2.5 py-1 text-[10px] backdrop-blur">
-                  {index + 1} / {images.length}
+                  {position} / {slideCount}
                 </span>
               </>
             )}
           </div>
 
-          {images.length > 1 && (
+          {(slideCount > 1 || Boolean(spin)) && (
             <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
               {images.map((image, i) => (
                 <button
@@ -510,13 +595,35 @@ export default function ProductDetail() {
                   type="button"
                   onClick={() => selectImage(i)}
                   className={`h-20 w-16 shrink-0 overflow-hidden rounded-md border-2 transition ${
-                    i === index ? "border-primary" : "border-transparent opacity-70 hover:opacity-100"
+                    i === index && !showSpin
+                      ? "border-primary"
+                      : "border-transparent opacity-70 hover:opacity-100"
                   }`}
                   aria-label={`Ver imagen ${i + 1}`}
                 >
                   <ImageWithFallback src={image} alt="" className="h-full w-full object-cover" />
                 </button>
               ))}
+              {spin && (
+                <button
+                  type="button"
+                  onClick={showSpinSlide}
+                  className={`relative h-20 w-16 shrink-0 overflow-hidden rounded-md border-2 bg-secondary transition ${
+                    showSpin ? "border-primary" : "border-transparent opacity-70 hover:opacity-100"
+                  }`}
+                  aria-label="Ver el giro de 180°"
+                >
+                  <img
+                    src={spin.front}
+                    alt=""
+                    className="h-full w-full object-contain p-1"
+                    draggable={false}
+                  />
+                  <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-background/85 py-0.5 text-[8px] uppercase tracking-wider text-muted-foreground">
+                    <RotateCw className="h-2.5 w-2.5" /> Girar
+                  </span>
+                </button>
+              )}
             </div>
           )}
         </div>

@@ -77,6 +77,18 @@ export function buildPreviewIssues(product: Product): PreviewIssue[] {
       text: `${unassignedImages.length} foto(s) sin color: al seleccionarlas no se cambia el color de la ficha.`,
     });
   }
+  const spin = product.spinByColor?.["*"] ?? Object.values(product.spinByColor ?? {})[0];
+  if (spin && product.spinEnabled !== false) {
+    issues.push({
+      level: "info",
+      text: "Giro de 180° activo: se muestra como última diapositiva del carrusel.",
+    });
+  } else if (spin) {
+    issues.push({
+      level: "info",
+      text: "Giro de 180° oculto: las fotos están guardadas, pero no se muestran en la ficha.",
+    });
+  }
   if (descriptionText.length > 160) {
     issues.push({
       level: "info",

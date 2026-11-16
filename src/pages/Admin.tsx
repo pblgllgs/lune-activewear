@@ -11,6 +11,7 @@ import {
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   onSnapshot,
@@ -72,6 +73,7 @@ import { SuppliersManager } from "@/components/admin/SuppliersManager";
 import { Pagination } from "@/components/ui/pagination";
 import { usePagination } from "@/lib/use-pagination";
 import { deleteFromR2, isUploadConfigured, slugify, uploadToR2 } from "@/lib/upload";
+import { cutoutPhoto } from "@/lib/spin-photo";
 import { normalizeProduct, seedDemoProducts } from "@/lib/catalog";
 import { richTextToPlainText, sanitizeRichText } from "@/lib/rich-text";
 import { defaultSizeGuide, resolveSizeGuide } from "@/lib/size-guide";
@@ -369,6 +371,12 @@ interface DraftImage {
   color?: string;
 }
 
+/** Foto del giro de 180°: archivo pendiente de subir o URL ya guardada. */
+interface SpinDraft {
+  url: string;
+  file?: File;
+}
+
 function ProductForm({
   editing,
   takenSkus,
@@ -456,10 +464,29 @@ function ProductForm({
   const [sizeGuide, setSizeGuide] = useState<SizeGuideRow[]>(() =>
     editing ? resolveSizeGuide(editing) : defaultSizeGuide()
   );
+  /**
+   * Giro de 180° del producto: dos fotos (frente y espalda) guardadas bajo la
+   * clave `"*"` de `spinByColor`, así valen para cualquier color. Al editar se
+   * precargan las que ya tenga (también las de un color concreto, para migrar).
+   */
+  const initialSpin = editing?.spinByColor
+    ? editing.spinByColor["*"] ?? Object.values(editing.spinByColor)[0]
+    : undefined;
+  const [spinFront, setSpinFront] = useState<SpinDraft | null>(
+    initialSpin ? { url: initialSpin.front } : null
+  );
+  const [spinBack, setSpinBack] = useState<SpinDraft | null>(
+    initialSpin ? { url: initialSpin.back } : null
+  );
+  const [spinEnabled, setSpinEnabled] = useState(editing?.spinEnabled !== false);
+  const [spinCutout, setSpinCutout] = useState(true);
+  const [spinBusy, setSpinBusy] = useState<"front" | "back" | null>(null);
   const [status, setStatus] = useState("");
   const [restockBusy, setRestockBusy] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const spinFrontInputRef = useRef<HTMLInputElement>(null);
+  const spinBackInputRef = useRef<HTMLInputElement>(null);
 
   const set = (key: keyof typeof form) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -591,6 +618,30 @@ function ProductForm({
       return copy;
     });
 
+  /** Reemplaza una foto del giro y libera la vista previa anterior si era local. */
+  const setSpinPhoto = (side: "front" | "back", next: SpinDraft | null) => {
+    const current = side === "front" ? spinFront : spinBack;
+    if (current?.file) URL.revokeObjectURL(current.url);
+    if (side === "front") setSpinFront(next);
+    else setSpinBack(next);
+  };
+
+  /** Prepara (recorte opcional) y deja lista la foto; se sube al guardar. */
+  const pickSpinPhoto = async (side: "front" | "back", file?: File) => {
+    if (!file) return;
+    setSpinBusy(side);
+    try {
+      const prepared = spinCutout ? await cutoutPhoto(file) : file;
+      setSpinPhoto(side, { url: URL.createObjectURL(prepared), file: prepared });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "No se pudo preparar la foto del giro."
+      );
+    } finally {
+      setSpinBusy(null);
+    }
+  };
+
   /** Envía los avisos de reposición pendientes del producto que se está editando. */
   const notifyRestockNow = async () => {
     if (!editing) return;
@@ -635,6 +686,10 @@ function ProductForm({
       toast.error("Selecciona al menos una talla.");
       return;
     }
+    if (Boolean(spinFront) !== Boolean(spinBack)) {
+      toast.error("El giro de 180° necesita las dos fotos: frente y espalda.");
+      return;
+    }
     if (!db) {
       toast.error("Firebase no está configurado.");
       return;
@@ -657,6 +712,19 @@ function ProductForm({
           .filter((image) => image.color)
           .map((image) => [image.url, image.color as string])
       );
+
+      // Giro de 180°: solo existe con las dos fotos. Si ya estaban guardadas se
+      // reutilizan sus URLs; las nuevas se suben junto con las demás imágenes.
+      let spinEntry: { front: string; back: string } | null = null;
+      if (spinFront && spinBack) {
+        const front = spinFront.file
+          ? await uploadToR2(spinFront.file, `products/${slug}`)
+          : spinFront.url;
+        const back = spinBack.file
+          ? await uploadToR2(spinBack.file, `products/${slug}`)
+          : spinBack.url;
+        spinEntry = { front, back };
+      }
       // El SKU se fija al crear y no cambia al editar; si un producto antiguo
       // no lo tiene, se genera en su primer guardado.
       const sku = editing?.sku?.trim() || generateSku(form.category, takenSkus);
@@ -688,6 +756,13 @@ function ProductForm({
           .filter((c) => c.name),
         images: urls,
         imageColors,
+        // El giro se guarda bajo "*" (vale para todos los colores). Al quitar
+        // las fotos se borra el campo para que la ficha no lo muestre.
+        ...(spinEntry
+          ? { spinByColor: { "*": spinEntry }, spinEnabled }
+          : editing
+            ? { spinByColor: deleteField(), spinEnabled: false }
+            : { spinEnabled: false }),
         featured: form.featured,
         isNew: form.isNew,
         published: publish,
@@ -746,6 +821,7 @@ function ProductForm({
             images: urls.length,
             colors: payload.colors.map((color) => color.name),
             sizes,
+            spin: Boolean(spinEntry),
             stockTotal: Object.values(payload.stockByVariant).reduce(
               (sum, bySize) =>
                 sum + Object.values(bySize).reduce((inner, qty) => inner + qty, 0),
@@ -755,6 +831,20 @@ function ProductForm({
         });
         const removed = editing.images.filter((url) => !urls.includes(url));
         for (const url of removed) {
+          try {
+            await deleteFromR2(url);
+          } catch {
+            /* best effort */
+          }
+        }
+        // Fotos del giro que se reemplazaron o se quitaron: se borran de R2.
+        const keepSpin = new Set(spinEntry ? [spinEntry.front, spinEntry.back] : []);
+        const oldSpin = Object.values(editing.spinByColor ?? {}).flatMap((entry) => [
+          entry.front,
+          entry.back,
+        ]);
+        for (const url of oldSpin) {
+          if (keepSpin.has(url)) continue;
           try {
             await deleteFromR2(url);
           } catch {
@@ -823,6 +913,7 @@ function ProductForm({
             sizes,
             colors: payload.colors.map((color) => color.name),
             images: urls.length,
+            spin: Boolean(spinEntry),
           },
         });
         toast.success(
@@ -834,6 +925,10 @@ function ProductForm({
         );
         setImages([]);
         setColors([{ name: "Chocolate", hex: "#49372D" }]);
+        setSpinPhoto("front", null);
+        setSpinPhoto("back", null);
+        setSpinEnabled(true);
+        setSpinCutout(true);
         const resetSizes = ["S", "M", "L"];
         const resetColors = [{ name: "Chocolate", hex: "#49372D" }];
         setSizes(resetSizes);
@@ -865,6 +960,8 @@ function ProductForm({
   };
 
   const pendingFiles = images.filter((i) => i.file).length;
+  /** El giro solo existe con las dos fotos. */
+  const spinReady = Boolean(spinFront && spinBack);
 
   /** Borrador tal como quedará publicado: alimenta la vista previa. */
   const draft = useMemo<Product>(() => {
@@ -892,6 +989,12 @@ function ProductForm({
           .filter((image) => image.color?.trim())
           .map((image) => [image.url, image.color!.trim()])
       ),
+      ...(spinFront && spinBack
+        ? {
+            spinByColor: { "*": { front: spinFront.url, back: spinBack.url } },
+            spinEnabled,
+          }
+        : {}),
       featured: form.featured,
       isNew: form.isNew,
       published: form.active && form.published,
@@ -906,6 +1009,9 @@ function ProductForm({
     sizeGuide,
     colors,
     images,
+    spinFront,
+    spinBack,
+    spinEnabled,
   ]);
 
   const previewUrl = `/producto/${editing?.id ?? (slugify(form.name) || "slug-del-producto")}`;
@@ -1373,6 +1479,114 @@ function ProductForm({
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Giro de 180° */}
+          <div>
+            <div className="flex items-center justify-between">
+              <Label className="text-base">Giro de 180°</Label>
+              <span className="text-[11px] text-muted-foreground">Opcional</span>
+            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Dos fotos de la misma prenda (frente y espalda) para una diapositiva
+              interactiva al final del carrusel. Solo se muestra con las dos.
+            </p>
+
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {[
+                { side: "front" as const, label: "Frente", draft: spinFront, inputRef: spinFrontInputRef },
+                { side: "back" as const, label: "Espalda", draft: spinBack, inputRef: spinBackInputRef },
+              ].map(({ side, label, draft, inputRef }) => (
+                <div key={side} className="rounded-lg border p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">{label}</span>
+                    {draft && (
+                      <button
+                        type="button"
+                        onClick={() => setSpinPhoto(side, null)}
+                        className="text-muted-foreground transition hover:text-destructive"
+                        aria-label={`Quitar foto de ${label.toLowerCase()}`}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    ref={inputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(event) => {
+                      void pickSpinPhoto(side, event.target.files?.[0]);
+                      event.target.value = "";
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => inputRef.current?.click()}
+                    style={{
+                      backgroundColor: "#fff",
+                      backgroundImage:
+                        "linear-gradient(45deg, #f2f0ed 25%, transparent 25%, transparent 75%, #f2f0ed 75%), linear-gradient(45deg, #f2f0ed 25%, transparent 25%, transparent 75%, #f2f0ed 75%)",
+                      backgroundSize: "16px 16px",
+                      backgroundPosition: "0 0, 8px 8px",
+                    }}
+                    className="mt-2 flex h-40 w-full items-center justify-center overflow-hidden rounded-md border border-dashed"
+                  >
+                    {draft ? (
+                      <img src={draft.url} alt="" className="h-full w-full object-contain" />
+                    ) : (
+                      <span className="flex flex-col items-center gap-1 text-[11px] text-muted-foreground">
+                        <ImagePlus className="h-5 w-5" />
+                        {spinBusy === side ? "Preparando…" : "Elegir foto"}
+                      </span>
+                    )}
+                  </button>
+                  {draft?.file && (
+                    <p className="mt-1 text-[10px] text-muted-foreground">
+                      Se sube al guardar el producto.
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <label className="mt-3 flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={spinCutout}
+                onChange={(event) => setSpinCutout(event.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-input accent-primary"
+              />
+              <span>
+                Recortar el fondo claro al elegir la foto
+                <span className="block text-[11px] text-muted-foreground">
+                  Mismo criterio que <code>scripts/cutout-photos.py</code>. Sirve con fotos
+                  sobre fondo blanco o gris claro; si ya tienes PNG/WebP con transparencia,
+                  desmárcalo.
+                </span>
+              </span>
+            </label>
+
+            <label
+              className={`mt-2 flex items-start gap-2 text-sm ${spinReady ? "" : "opacity-60"}`}
+            >
+              <input
+                type="checkbox"
+                checked={spinEnabled}
+                disabled={!spinReady}
+                onChange={(event) => setSpinEnabled(event.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-input accent-primary disabled:cursor-not-allowed"
+              />
+              <span>
+                Mostrar el giro en la ficha
+                <span className="block text-[11px] text-muted-foreground">
+                  {spinReady
+                    ? "Aparece como última diapositiva del carrusel."
+                    : "Sube las dos fotos para poder activarlo."}
+                </span>
+              </span>
+            </label>
           </div>
 
           <div className="flex flex-wrap gap-6">
