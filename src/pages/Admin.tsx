@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   GoogleAuthProvider,
   onAuthStateChanged,
@@ -1744,9 +1744,14 @@ const MENU: { tab: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { tab: "ajustes", label: "Ajustes", icon: Settings },
 ];
 
+const TAB_IDS = new Set<Tab>(MENU.map((item) => item.tab));
+
 export default function Admin() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  const [tab, setTab] = useState<Tab>("dashboard");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawTab = searchParams.get("tab");
+  const tab: Tab = rawTab && TAB_IDS.has(rawTab as Tab) ? (rawTab as Tab) : "dashboard";
+  const setTab = (next: Tab) => setSearchParams({ tab: next }, { replace: true });
   const [menuOpen, setMenuOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [editing, setEditing] = useState<Product | null>(null);
