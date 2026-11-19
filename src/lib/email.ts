@@ -54,9 +54,10 @@ export type OrderEmailEvent =
   | "aprobada"
   | "pagado"
   | "enviado"
-  | "rechazada";
+  | "rechazada"
+  | "actualizada";
 
-/** Envía la confirmación o el aviso de cambio de estado de un pedido. */
+/** Envía la confirmación o el aviso de cambio/actualización de un pedido. */
 export function notifyOrderEmail(
   orderId: string,
   event: OrderEmailEvent,

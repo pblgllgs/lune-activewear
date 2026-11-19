@@ -105,6 +105,7 @@ const EMAIL_EVENT_LABELS: Record<string, string> = {
   pagado: "Pago recibido",
   enviado: "Pedido enviado",
   rechazada: "Pedido rechazado",
+  actualizada: "Pedido actualizado",
 };
 
 /** Último correo enviado del pedido, si hay alguno. */
@@ -361,28 +362,63 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
     );
   };
 
-  const validateEdit = (order: Order): string => {
+  const addEditItem = () => {
+    setEditForm((current) =>
+      current
+        ? {
+            ...current,
+            items: [
+              ...current.items,
+              { productId: "", name: "", image: "", size: "", color: "", qty: 1, price: 0 },
+            ],
+          }
+        : current
+    );
+  };
+
+  const selectEditProduct = (index: number, productId: string) => {
+    const product = products.find((p) => p.id === productId);
+    if (!product) {
+      updateItem(index, { productId: "", name: "", image: "", color: "", size: "", price: 0 });
+      return;
+    }
+    const colors = stockColors(product);
+    const color = colors[0] ?? "Único";
+    const size =
+      product.sizes.find((option) => variantStock(product, option, color) !== 0) ??
+      product.sizes[0] ??
+      "Único";
+    updateItem(index, {
+      productId: product.id,
+      name: product.name,
+      image: product.images[0] ?? "",
+      color,
+      size,
+      qty: 1,
+      price: product.price,
+    });
+  };
+
+  const validateEdit = (): string => {
     if (!editForm) return "No hay datos para guardar.";
     if (editForm.customer.name.trim().length < 2) return "Escribe el nombre de la clienta.";
     if (editForm.customer.phone.replace(/\D/g, "").length < 8) return "Escribe un teléfono válido.";
     if (editForm.customer.address.trim().length < 4) return "Escribe la dirección de envío.";
     if (editForm.customer.city.trim().length < 2) return "Indica la comuna o ciudad.";
-    if (order.status === "pendiente") {
-      if (editForm.items.length === 0) return "La orden debe tener al menos un producto.";
-      for (const item of editForm.items) {
-        if (!item.name.trim()) return "Cada producto necesita un nombre.";
-        if (!item.size.trim()) return "Cada producto necesita una talla.";
-        if (!item.color.trim()) return "Cada producto necesita un color.";
-        if (item.qty < 1) return "La cantidad debe ser al menos 1.";
-        if (item.price < 0) return "El precio no puede ser negativo.";
-      }
+    if (editForm.items.length === 0) return "La orden debe tener al menos un producto.";
+    for (const item of editForm.items) {
+      if (!item.name.trim()) return "Cada producto necesita un nombre.";
+      if (!item.size.trim()) return "Cada producto necesita una talla.";
+      if (!item.color.trim()) return "Cada producto necesita un color.";
+      if (item.qty < 1) return "La cantidad debe ser al menos 1.";
+      if (item.price < 0) return "El precio no puede ser negativo.";
     }
     return "";
   };
 
   const saveEdit = async (order: Order) => {
     if (!editForm) return;
-    const validation = validateEdit(order);
+    const validation = validateEdit();
     if (validation) {
       toast.error(validation);
       return;
@@ -400,9 +436,22 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
         },
         coupon: editForm.coupon,
         notes: editForm.notes,
-        items: order.status === "pendiente" ? editForm.items : undefined,
+        items: editForm.items.map((item) => ({
+          productId: item.productId.trim(),
+          name: item.name.trim(),
+          image: item.image?.trim() || undefined,
+          size: item.size.trim(),
+          color: item.color.trim(),
+          qty: Math.max(1, Math.floor(item.qty || 1)),
+          price: Math.max(0, Math.round(item.price || 0)),
+        })),
       });
-      toast.success(`Orden ${order.code} actualizada.`);
+      const email = editForm.customer.email?.trim() || order.customer.email?.trim();
+      toast.success(
+        email
+          ? `Orden ${order.code} actualizada y correo enviado al comprador.`
+          : `Orden ${order.code} actualizada.`
+      );
       cancelEdit();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo actualizar la orden.");
@@ -1175,9 +1224,9 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="font-display text-sm font-medium">Editar orden {order.code}</p>
                           <p className="text-[11px] text-muted-foreground">
-                            {order.status === "pendiente"
-                              ? "Puedes editar los datos y los productos."
-                              : "Solo datos de contacto, cupón y notas. Cambia el estado a pendiente para editar productos (se devolverá el stock si estaba aplicado)."}
+                            {order.stockApplied
+                              ? "Puedes editar datos y productos. Al guardar se ajustará el stock por los cambios y se enviará un correo al comprador con la nueva información."
+                              : "Puedes editar datos y productos. Al guardar se recalculará el total y se enviará un correo al comprador con la nueva información."}
                           </p>
                         </div>
 
@@ -1216,59 +1265,184 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
                         </div>
 
                         <div>
-                          <p className="text-[10px] uppercase tracking-wider2 text-muted-foreground">Productos</p>
-                          {order.status === "pendiente" ? (
-                            <div className="mt-2 space-y-2">
-                              {editForm.items.map((item, index) => (
-                                <div key={`${item.productId}-${index}`} className="rounded-md border bg-card p-3">
-                                  <div className="grid gap-2 sm:grid-cols-2">
-                                    <div>
-                                      <Label htmlFor={`edit-item-name-${order.id}-${index}`} className="text-[10px]">Producto</Label>
-                                      <Input id={`edit-item-name-${order.id}-${index}`} value={item.name} onChange={(event) => updateItem(index, { name: event.target.value })} className="mt-1 h-9" />
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-[10px] uppercase tracking-wider2 text-muted-foreground">Productos</p>
+                            <Button type="button" variant="outline" size="sm" onClick={addEditItem}>
+                              <Plus className="h-3.5 w-3.5" /> Agregar ítem
+                            </Button>
+                          </div>
+                          <div className="mt-2 space-y-3">
+                            {editForm.items.map((item, index) => {
+                              const product = products.find((p) => p.id === item.productId);
+                              const colors = product ? stockColors(product) : [];
+                              const sizes = product?.sizes ?? [];
+                              const stockInfo =
+                                product && item.color && item.size
+                                  ? variantStock(product, item.size, item.color)
+                                  : null;
+                              return (
+                                <div key={`${item.productId || "item"}-${index}`} className="rounded-md border bg-card p-3">
+                                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
+                                    <div className="lg:col-span-2">
+                                      <Label className="text-[10px]">Producto del catálogo</Label>
+                                      <Select
+                                        value={item.productId || "__none__"}
+                                        onValueChange={(v) =>
+                                          selectEditProduct(index, v === "__none__" ? "" : v)
+                                        }
+                                      >
+                                        <SelectTrigger className="mt-1 h-9">
+                                          <SelectValue placeholder="Selecciona un producto" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="__none__">Producto personalizado</SelectItem>
+                                          {catalog.map((p) => (
+                                            <SelectItem key={p.id} value={p.id}>
+                                              {p.name}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
                                     </div>
-                                    <div className="grid grid-cols-3 gap-2">
-                                      <div>
-                                        <Label htmlFor={`edit-item-size-${order.id}-${index}`} className="text-[10px]">Talla</Label>
-                                        <Input id={`edit-item-size-${order.id}-${index}`} value={item.size} onChange={(event) => updateItem(index, { size: event.target.value })} className="mt-1 h-9" />
-                                      </div>
-                                      <div>
-                                        <Label htmlFor={`edit-item-color-${order.id}-${index}`} className="text-[10px]">Color</Label>
-                                        <Input id={`edit-item-color-${order.id}-${index}`} value={item.color} onChange={(event) => updateItem(index, { color: event.target.value })} className="mt-1 h-9" />
-                                      </div>
-                                      <div>
-                                        <Label htmlFor={`edit-item-qty-${order.id}-${index}`} className="text-[10px]">Cant.</Label>
-                                        <Input id={`edit-item-qty-${order.id}-${index}`} type="number" min={1} value={item.qty} onChange={(event) => updateItem(index, { qty: Math.max(1, Math.floor(Number(event.target.value) || 1)) })} className="mt-1 h-9" />
-                                      </div>
+                                    <div className="lg:col-span-2">
+                                      <Label className="text-[10px]">Nombre</Label>
+                                      <Input
+                                        value={item.name}
+                                        onChange={(event) => updateItem(index, { name: event.target.value })}
+                                        className="mt-1 h-9"
+                                        placeholder="Nombre del producto"
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label className="text-[10px]">Color</Label>
+                                      {colors.length > 0 ? (
+                                        <Select
+                                          value={item.color || colors[0]}
+                                          onValueChange={(v) => {
+                                            const nextSize =
+                                              product?.sizes.find(
+                                                (size) => variantStock(product, size, v) !== 0
+                                              ) ??
+                                              product?.sizes[0] ??
+                                              (product && product.sizes.length === 0 ? "Único" : item.size);
+                                            updateItem(index, { color: v, size: nextSize || "Único" });
+                                          }}
+                                        >
+                                          <SelectTrigger className="mt-1 h-9">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {colors.map((c) => (
+                                              <SelectItem key={c} value={c}>
+                                                {c}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      ) : (
+                                        <Input
+                                          value={item.color}
+                                          onChange={(event) => updateItem(index, { color: event.target.value })}
+                                          className="mt-1 h-9"
+                                          placeholder="Color"
+                                        />
+                                      )}
+                                    </div>
+                                    <div>
+                                      <Label className="text-[10px]">Talla</Label>
+                                      {sizes.length > 0 ? (
+                                        <Select
+                                          value={item.size || sizes[0]}
+                                          onValueChange={(v) => updateItem(index, { size: v })}
+                                        >
+                                          <SelectTrigger className="mt-1 h-9">
+                                            <SelectValue placeholder="Talla" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {sizes.map((s) => (
+                                              <SelectItem key={s} value={s}>
+                                                {s}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      ) : (
+                                        <Input
+                                          value={item.size}
+                                          onChange={(event) => updateItem(index, { size: event.target.value })}
+                                          className="mt-1 h-9"
+                                          placeholder="Talla"
+                                        />
+                                      )}
                                     </div>
                                   </div>
                                   <div className="mt-2 flex flex-wrap items-end justify-between gap-2">
-                                    <div className="w-32">
-                                      <Label htmlFor={`edit-item-price-${order.id}-${index}`} className="text-[10px]">Precio unitario</Label>
-                                      <Input id={`edit-item-price-${order.id}-${index}`} type="number" min={0} value={item.price} onChange={(event) => updateItem(index, { price: Math.max(0, Math.round(Number(event.target.value) || 0)) })} className="mt-1 h-9" />
+                                    <div className="flex flex-wrap gap-2">
+                                      <div className="w-24">
+                                        <Label className="text-[10px]">Cantidad</Label>
+                                        <Input
+                                          type="number"
+                                          min={1}
+                                          value={item.qty}
+                                          onChange={(event) =>
+                                            updateItem(index, {
+                                              qty: Math.max(1, Math.floor(Number(event.target.value) || 1)),
+                                            })
+                                          }
+                                          className="mt-1 h-9"
+                                        />
+                                      </div>
+                                      <div className="w-32">
+                                        <Label className="text-[10px]">Precio unitario</Label>
+                                        <Input
+                                          type="number"
+                                          min={0}
+                                          value={item.price}
+                                          onChange={(event) =>
+                                            updateItem(index, {
+                                              price: Math.max(0, Math.round(Number(event.target.value) || 0)),
+                                            })
+                                          }
+                                          className="mt-1 h-9"
+                                        />
+                                      </div>
                                     </div>
-                                    <p className="text-xs text-muted-foreground">Subtotal: <span className="font-medium text-foreground">{formatCLP(item.price * item.qty)}</span></p>
-                                    <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={() => removeEditItem(index)} disabled={editForm.items.length <= 1}>
-                                      <Trash2 className="h-3.5 w-3.5" /> Quitar
-                                    </Button>
+                                    <div className="flex items-center gap-3">
+                                      {stockInfo !== null && (
+                                        <span
+                                          className={`text-[11px] ${
+                                            stockInfo === 0 ? "text-destructive" : "text-muted-foreground"
+                                          }`}
+                                        >
+                                          Stock variante: {stockInfo}
+                                        </span>
+                                      )}
+                                      <p className="text-xs text-muted-foreground">
+                                        Subtotal:{" "}
+                                        <span className="font-medium text-foreground">
+                                          {formatCLP(item.price * item.qty)}
+                                        </span>
+                                      </p>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-destructive"
+                                        onClick={() => removeEditItem(index)}
+                                        disabled={editForm.items.length <= 1}
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" /> Quitar
+                                      </Button>
+                                    </div>
                                   </div>
                                 </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <>
-                              <ul className="mt-2 divide-y rounded-md border bg-card">
-                                {editForm.items.map((item, index) => (
-                                  <li key={`${order.id}-${item.productId}-${index}`} className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
-                                    <div className="min-w-0">
-                                      <p className="truncate font-medium">{item.name}</p>
-                                      <p className="text-muted-foreground">Talla {item.size || "—"} · {item.color || "—"}</p>
-                                    </div>
-                                    <p className="shrink-0 font-medium">{item.qty} × {formatCLP(item.price)}</p>
-                                  </li>
-                                ))}
-                              </ul>
-                              <p className="mt-1 text-[11px] text-muted-foreground">Para modificar los productos, cambia el estado a pendiente. Si la orden tenía stock descontado, se devolverá al hacerlo.</p>
-                            </>
+                              );
+                            })}
+                          </div>
+                          {order.stockApplied && (
+                            <p className="mt-2 text-[11px] text-amber-700">
+                              Esta orden ya descontó stock: al guardar, los aumentos se descontarán (si hay stock disponible) y las reducciones o cambios se devolverán al inventario.
+                            </p>
                           )}
                         </div>
 

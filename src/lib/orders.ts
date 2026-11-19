@@ -249,10 +249,9 @@ export async function getMyOrders(email: string, userId?: string): Promise<Order
 }
 
 /**
- * Edita los datos de una orden. Los productos solo se pueden cambiar mientras la
- * orden está pendiente; en una orden ya procesada se editan los datos de contacto,
- * cupón y notas (para tocar productos primero hay que devolverla a pendiente, lo
- * que repone el stock si estaba aprobada).
+ * Edita una orden (solo admin). Permite modificar productos incluso si la orden ya
+ * tiene stock descontado: ajusta el inventario por diferencia (devuelve lo que se
+ * quita o cambia y descuenta lo que se agrega) y recalcula el subtotal.
  */
 export async function updateOrder(orderId: string, input: UpdateOrderInput): Promise<void> {
   const firestore = db;
@@ -279,9 +278,6 @@ export async function updateOrder(orderId: string, input: UpdateOrderInput): Pro
     let items = current.items;
 
     if (input.items) {
-      if (current.status !== "pendiente") {
-        throw new Error("Solo se pueden modificar los productos de una orden pendiente.");
-      }
       items = input.items.map(normalizeItem).filter((item): item is OrderItem => item !== null);
       if (items.length === 0) throw new Error("La orden debe tener al menos un producto.");
     }
@@ -294,6 +290,126 @@ export async function updateOrder(orderId: string, input: UpdateOrderInput): Pro
       notes: input.notes?.trim() || "",
     };
     snapshot.after = next;
+
+    // Si la orden ya descontó stock, ajusta el inventario por la diferencia entre
+    // los productos anteriores y los nuevos (por variante color/talla).
+    if (current.stockApplied && input.items) {
+      const oldRequested = groupRequested(current.items);
+      const newRequested = groupRequested(items);
+
+      const productIds = new Set<string>([...oldRequested.keys(), ...newRequested.keys()]);
+      const deltaRequested = new Map<string, Map<string, Map<string, number>>>();
+      const hasIncrease = new Set<string>();
+
+      for (const productId of productIds) {
+        const oldByColor = oldRequested.get(productId) ?? new Map<string, Map<string, number>>();
+        const newByColor = newRequested.get(productId) ?? new Map<string, Map<string, number>>();
+        const colors = new Set<string>([...oldByColor.keys(), ...newByColor.keys()]);
+        const deltaByColor = new Map<string, Map<string, number>>();
+
+        for (const color of colors) {
+          const oldBySize = oldByColor.get(color) ?? new Map<string, number>();
+          const newBySize = newByColor.get(color) ?? new Map<string, number>();
+          const sizes = new Set<string>([...oldBySize.keys(), ...newBySize.keys()]);
+          const deltaBySize = new Map<string, number>();
+
+          for (const size of sizes) {
+            const delta = (newBySize.get(size) ?? 0) - (oldBySize.get(size) ?? 0);
+            if (delta === 0) continue;
+            deltaBySize.set(size, delta);
+            if (delta > 0) hasIncrease.add(productId);
+          }
+
+          if (deltaBySize.size > 0) deltaByColor.set(color, deltaBySize);
+        }
+
+        if (deltaByColor.size > 0) deltaRequested.set(productId, deltaByColor);
+      }
+
+      if (deltaRequested.size > 0) {
+        // Lecturas antes de escrituras. Se exige que existan los productos a los que
+        // se les descontará más stock; los que solo devuelven se leen con tolerancia.
+        const increaseIds = new Set<string>(
+          [...deltaRequested.keys()].filter((id) => hasIncrease.has(id))
+        );
+        const products = await readProducts(firestore, transaction, deltaRequested, false);
+
+        for (const product of products) {
+          const byColor = deltaRequested.get(product.ref.id);
+          if (!byColor || (!product.stockByVariant && !product.stockBySize)) continue;
+          for (const [color, bySize] of byColor) {
+            for (const [size, delta] of bySize) {
+              if (delta <= 0) continue;
+              const currentStock = getCurrentStock(product, color, size);
+              if (currentStock === null || currentStock === undefined) continue;
+              if (currentStock < delta) {
+                throw new Error(
+                  `Stock insuficiente de ${product.name} (${color}, talla ${size}): quedan ${currentStock} y se necesitan ${delta} unidad(es) adicionales.`
+                );
+              }
+            }
+          }
+        }
+
+        // Verifica existencia de productos con aumento que no se pudieron leer.
+        for (const id of increaseIds) {
+          if (!products.some((p) => p.ref.id === id)) {
+            throw new Error(`El producto de la orden ya no existe (${id}).`);
+          }
+        }
+
+        const now = new Date().toISOString();
+        for (const product of products) {
+          const byColor = deltaRequested.get(product.ref.id);
+          if (!byColor) continue;
+
+          if (product.stockByVariant) {
+            const nextVariant: Record<string, Record<string, number>> = {};
+            for (const [c, sizes] of Object.entries(product.stockByVariant)) {
+              nextVariant[c] = { ...sizes };
+            }
+            let changed = false;
+            for (const [color, bySize] of byColor) {
+              if (!nextVariant[color]) nextVariant[color] = {};
+              for (const [size, delta] of bySize) {
+                const stock = nextVariant[color][size];
+                if (typeof stock === "number" && Number.isFinite(stock)) {
+                  nextVariant[color][size] =
+                    delta > 0
+                      ? Math.max(0, Math.floor(stock) - delta)
+                      : Math.min(9999, Math.floor(stock) + Math.abs(delta));
+                  changed = true;
+                }
+              }
+            }
+            if (changed) {
+              transaction.update(product.ref, { stockByVariant: nextVariant, updatedAt: now });
+            }
+            continue;
+          }
+
+          if (product.stockBySize) {
+            const nextStock = { ...product.stockBySize };
+            let changed = false;
+            for (const [, bySize] of byColor) {
+              for (const [size, delta] of bySize) {
+                const stock = nextStock[size];
+                if (typeof stock === "number" && Number.isFinite(stock)) {
+                  nextStock[size] =
+                    delta > 0
+                      ? Math.max(0, Math.floor(stock) - delta)
+                      : Math.min(9999, Math.floor(stock) + Math.abs(delta));
+                  changed = true;
+                }
+              }
+            }
+            if (changed) {
+              transaction.update(product.ref, { stockBySize: nextStock, updatedAt: now });
+            }
+          }
+        }
+      }
+    }
 
     transaction.update(ref, {
       ...next,
@@ -328,8 +444,17 @@ export async function updateOrder(orderId: string, input: UpdateOrderInput): Pro
         },
         ["customer", "items", "subtotal", "coupon", "notes"]
       ),
-      metadata: { status: before.status },
+      metadata: { status: before.status, stockApplied: before.stockApplied },
     });
+
+    // Envía al comprador el detalle actualizado del pedido (solo admin puede
+    // editar órdenes). Si no tiene correo, la notificación se omite.
+    const email = after.customer.email?.trim() || before.customer.email?.trim();
+    if (email) {
+      void notifyOrderEmail(orderId, "actualizada", { force: true }).catch((error) => {
+        console.warn("No se pudo enviar el correo de actualización del pedido.", error);
+      });
+    }
   }
 }
 

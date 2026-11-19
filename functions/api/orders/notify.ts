@@ -14,6 +14,7 @@ import { requireAdmin } from "../../_lib/auth";
 import { isEmailConfigured, sendEmail } from "../../_lib/email";
 import { orderConfirmationEmail } from "../../_lib/emails/order-confirmation";
 import { orderStatusEmail, type StatusEvent } from "../../_lib/emails/order-status";
+import { orderUpdatedEmail } from "../../_lib/emails/order-updated";
 import { getDocument, isFirestoreConfigured, patchDocument } from "../../_lib/firebase-admin";
 import { json, methodNotAllowed } from "../../_lib/http";
 import { normalizeOrderForEmail, orderEmails } from "../../_lib/orders";
@@ -22,10 +23,12 @@ import { siteUrl } from "../../_lib/seo";
 type Env = Record<string, string | undefined>;
 
 const STATUS_EVENTS: StatusEvent[] = ["aprobada", "pagado", "enviado", "rechazada"];
+type NotifyEvent = "confirmation" | StatusEvent | "actualizada";
 
-function normalizeEvent(value: unknown): "confirmation" | StatusEvent | null {
+function normalizeEvent(value: unknown): NotifyEvent | null {
   const event = typeof value === "string" ? value.trim() : "";
   if (event === "confirmation") return "confirmation";
+  if (event === "actualizada") return "actualizada";
   return (STATUS_EVENTS as string[]).includes(event) ? (event as StatusEvent) : null;
 }
 
@@ -57,8 +60,8 @@ export async function onRequestPost(context: {
   const event = normalizeEvent(body.event);
   if (!event) return json({ error: "Evento inválido." }, 400);
 
-  // El token solo es obligatorio para los estados; si una sesión de admin
-  // reenvía la confirmación, se valida igual y puede usar `force`.
+  // El token solo es obligatorio para eventos de administración; si una sesión
+  // de admin reenvía la confirmación, se valida igual y puede usar `force`.
   const admin = await requireAdmin(env, request);
   if (event !== "confirmation" && !admin) {
     return json({ error: "No autorizado." }, 401);
@@ -73,7 +76,7 @@ export async function onRequestPost(context: {
     if (!order.email) {
       return json({ error: "El pedido no tiene correo registrado." }, 422);
     }
-    if (event !== "confirmation" && order.status !== event) {
+    if (event !== "confirmation" && event !== "actualizada" && order.status !== event) {
       return json({ error: "El estado del pedido no coincide con el evento." }, 409);
     }
 
@@ -85,7 +88,9 @@ export async function onRequestPost(context: {
     const built =
       event === "confirmation"
         ? orderConfirmationEmail(order, siteUrl(env))
-        : orderStatusEmail(order, event, siteUrl(env));
+        : event === "actualizada"
+          ? orderUpdatedEmail(order, siteUrl(env))
+          : orderStatusEmail(order, event, siteUrl(env));
 
     const result = await sendEmail(env, {
       to: order.email,
