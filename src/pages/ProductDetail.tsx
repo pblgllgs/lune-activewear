@@ -860,6 +860,7 @@ export default function ProductDetail() {
             </div>
             <Button
               size="lg"
+              variant="celeste"
               className="hidden w-full sm:flex-1 lg:inline-flex"
               onClick={handleAdd}
               disabled={currentStock === 0}
@@ -1219,6 +1220,7 @@ export default function ProductDetail() {
           </div>
           <Button
             size="lg"
+            variant="celeste"
             className="w-full"
             onClick={handleAdd}
             disabled={currentStock === 0}

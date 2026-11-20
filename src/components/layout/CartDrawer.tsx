@@ -333,7 +333,7 @@ export function CartDrawer() {
                   El descuento se valida al confirmar el pedido por WhatsApp.
                 </p>
               </div>
-              <Button className="mt-4 w-full" onClick={() => setStep("checkout")}>
+              <Button className="mt-4 w-full" variant="celeste" onClick={() => setStep("checkout")}>
                 Continuar con el pedido
               </Button>
               <button

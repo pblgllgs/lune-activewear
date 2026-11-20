@@ -87,7 +87,7 @@ export default function Home() {
               
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Button asChild size="lg">
+              <Button asChild size="lg" variant="celeste">
                 <Link to="/tienda">
                   Explorar colección <ArrowRight className="h-4 w-4" />
                 </Link>
