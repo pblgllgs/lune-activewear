@@ -39,7 +39,8 @@ export function Navbar() {
   const { count, openCart } = useCart();
   const { count: wishlistCount } = useWishlist();
   const location = useLocation();
-  const firstName = displayName.trim().split(/\s+/)[0] ?? "";
+  const nameLabel = displayName.trim().split(/\s+/)[0] ?? "";
+  const accountLabel = nameLabel || user?.email?.trim() || "";
   const isAdmin = isAdminEmail(user?.email);
   const links = guidesEnabled || isAdmin ? baseLinks : baseLinks.filter((link) => link.to !== "/guias");
 
@@ -109,17 +110,19 @@ export function Navbar() {
               aria-label={
                 user
                   ? isAdmin
-                    ? "Panel de administración"
-                    : firstName
-                      ? `Mi cuenta — Bienvenida, ${firstName}`
+                    ? accountLabel
+                      ? `Panel de administración — Hola ${accountLabel}`
+                      : "Panel de administración"
+                    : accountLabel
+                      ? `Mi cuenta — Hola ${accountLabel}`
                       : "Mi cuenta"
                   : "Mi cuenta"
               }
             >
               <UserRound className="h-5 w-5 shrink-0" />
-              {firstName && (
+              {accountLabel && (
                 <span className="hidden whitespace-nowrap text-[11px] uppercase tracking-wider2 lg:inline">
-                  Bienvenida, {firstName}
+                  Hola {accountLabel}
                 </span>
               )}
             </Link>
@@ -235,10 +238,10 @@ export function Navbar() {
             >
               <UserRound className="h-4 w-4" />
               {user
-                ? isAdmin
-                  ? "Panel de administración"
-                  : firstName
-                    ? `Bienvenida, ${firstName}`
+                ? accountLabel
+                  ? `Hola ${accountLabel}`
+                  : isAdmin
+                    ? "Panel de administración"
                     : "Mi cuenta"
                 : "Mi cuenta"}
             </Link>
