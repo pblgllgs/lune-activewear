@@ -28,18 +28,42 @@ export function adminEmails(env: Env): string[] {
   return emails;
 }
 
-async function managedAdminEmails(env: Env): Promise<string[]> {
-  if (!isFirestoreConfigured(env)) return [];
+async function managedAccess(env: Env): Promise<{ active: string[]; disabled: string[] }> {
+  if (!isFirestoreConfigured(env)) return { active: [], disabled: [] };
   try {
     const doc = await getDocument(env, "settings/adminAccess");
+    const rawAdmins = doc?.admins;
+    if (Array.isArray(rawAdmins)) {
+      const active: string[] = [];
+      const disabled: string[] = [];
+      for (const value of rawAdmins) {
+        if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+        const record = value as Record<string, unknown>;
+        const email = typeof record.email === "string" ? record.email.trim().toLowerCase() : "";
+        if (!email) continue;
+        if (record.active === false) disabled.push(email);
+        else active.push(email);
+      }
+      return { active, disabled };
+    }
+
     const raw = doc?.emails;
-    if (!Array.isArray(raw)) return [];
-    return raw
-      .filter((value): value is string => typeof value === "string")
-      .map((email) => email.trim().toLowerCase())
-      .filter(Boolean);
+    const active = Array.isArray(raw)
+      ? raw
+          .filter((value): value is string => typeof value === "string")
+          .map((email) => email.trim().toLowerCase())
+          .filter(Boolean)
+      : [];
+    const rawDisabled = doc?.disabledEmails;
+    const disabled = Array.isArray(rawDisabled)
+      ? rawDisabled
+          .filter((value): value is string => typeof value === "string")
+          .map((email) => email.trim().toLowerCase())
+          .filter(Boolean)
+      : [];
+    return { active, disabled };
   } catch {
-    return [];
+    return { active: [], disabled: [] };
   }
 }
 
@@ -66,8 +90,10 @@ export async function requireAdmin(env: Env, request: Request): Promise<string |
   if (!email) return null;
 
   if (email === superAdminEmail(env)) return email;
-  if (adminEmails(env).includes(email)) return email;
 
-  const managed = await managedAdminEmails(env);
-  return managed.includes(email) ? email : null;
+  const managed = await managedAccess(env);
+  if (managed.disabled.includes(email)) return null;
+  if (managed.active.includes(email)) return email;
+  if (adminEmails(env).includes(email)) return email;
+  return null;
 }

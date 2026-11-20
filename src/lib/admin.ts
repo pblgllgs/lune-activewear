@@ -22,14 +22,26 @@ export function isSuperAdminEmail(email?: string | null): boolean {
   return Boolean(value) && value === SUPER_ADMIN_EMAIL;
 }
 
-/** `true` si el correo es super admin o está en la lista de admins indicada. */
-export function isAdminEmail(email?: string | null, managedEmails?: string[]): boolean {
+/** `true` si el correo tiene acceso admin (respeta desactivaciones del panel). */
+export function isAdminEmail(
+  email?: string | null,
+  managed?: string[] | { active?: string[]; disabled?: string[] }
+): boolean {
   const value = normalizeEmail(email);
   if (!value) return false;
   if (value === SUPER_ADMIN_EMAIL) return true;
-  if (managedEmails) {
-    return managedEmails.some((item) => normalizeEmail(item) === value);
+
+  if (Array.isArray(managed)) {
+    return managed.some((item) => normalizeEmail(item) === value);
   }
+
+  const disabled = new Set((managed?.disabled ?? []).map(normalizeEmail).filter(Boolean));
+  if (disabled.has(value)) return false;
+
+  const active = managed?.active;
+  if (active && active.some((item) => normalizeEmail(item) === value)) return true;
+
+  // Respaldo .env: acceso por defecto salvo desactivación explícita en panel.
   return LEGACY_ADMIN_EMAILS.includes(value);
 }
 

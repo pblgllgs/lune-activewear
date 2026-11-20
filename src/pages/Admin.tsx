@@ -1758,7 +1758,8 @@ const TAB_IDS = new Set<Tab>(MENU.map((item) => item.tab));
 export default function Admin() {
   const [authEmail, setAuthEmail] = useState<string | null>(null);
   const [authResolved, setAuthResolved] = useState(!isFirebaseConfigured || !auth);
-  const [managedAdminEmails, setManagedAdminEmails] = useState<string[]>([]);
+  const [managedActiveEmails, setManagedActiveEmails] = useState<string[]>([]);
+  const [managedDisabledEmails, setManagedDisabledEmails] = useState<string[]>([]);
   const [managedLoaded, setManagedLoaded] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1783,7 +1784,8 @@ export default function Admin() {
       return;
     }
     return subscribeAdminAccess((access) => {
-      setManagedAdminEmails(access.emails);
+      setManagedActiveEmails(access.emails);
+      setManagedDisabledEmails(access.disabledEmails);
       setManagedLoaded(true);
     });
   }, []);
@@ -1803,7 +1805,12 @@ export default function Admin() {
   const isSuperAdmin = isSuperAdminEmail(authEmail);
   const adminCheckReady = authResolved && (isSuperAdmin || managedLoaded || !authEmail);
   const isAdmin = adminCheckReady
-    ? isAdminEmail(authEmail, managedLoaded ? managedAdminEmails : LEGACY_ADMIN_EMAILS)
+    ? isAdminEmail(
+        authEmail,
+        managedLoaded
+          ? { active: managedActiveEmails, disabled: managedDisabledEmails }
+          : LEGACY_ADMIN_EMAILS
+      )
     : null;
 
   const visibleMenu = useMemo(

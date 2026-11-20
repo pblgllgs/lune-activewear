@@ -176,17 +176,42 @@ export async function logAudit(input: AuditLogInput): Promise<void> {
 
     const email = str(user.email).toLowerCase();
     let actorRole: AuditActorRole = isAdminEmail(email) ? "admin" : "client";
-    if (actorRole !== "admin") {
-      try {
-        // Admins administrados desde el panel (lectura directa para evitar ciclo con admin-access).
-        const snap = await getDoc(doc(db, "settings/adminAccess"));
-        const raw = snap.exists() ? snap.data().emails : undefined;
-        if (Array.isArray(raw) && raw.some((e) => typeof e === "string" && e.trim().toLowerCase() === email)) {
-          actorRole = "admin";
+    try {
+      // Estado administrado desde el panel (activos/desactivados), lectura directa para evitar ciclo.
+      const snap = await getDoc(doc(db, "settings/adminAccess"));
+      if (snap.exists()) {
+        const data = snap.data() as Record<string, unknown>;
+        const rawAdmins = data.admins;
+        const disabled = Array.isArray(data.disabledEmails)
+          ? data.disabledEmails
+          : Array.isArray(rawAdmins)
+            ? rawAdmins
+                .map((value) => (value && typeof value === "object" ? (value as Record<string, unknown>) : null))
+                .filter((value): value is Record<string, unknown> => Boolean(value && value.active === false))
+                .map((value) => value.email)
+            : [];
+        const isDisabled =
+          Array.isArray(disabled) &&
+          disabled.some((e) => typeof e === "string" && e.trim().toLowerCase() === email);
+
+        if (isDisabled) {
+          actorRole = "client";
+        } else {
+          const active = Array.isArray(data.emails) ? data.emails : [];
+          if (
+            Array.isArray(active) &&
+            active.some((e) => typeof e === "string" && e.trim().toLowerCase() === email)
+          ) {
+            actorRole = "admin";
+          } else if (isAdminEmail(email)) {
+            actorRole = "admin";
+          } else {
+            actorRole = "client";
+          }
         }
-      } catch {
-        /* sin acceso al documento: se mantiene el rol calculado */
       }
+    } catch {
+      /* sin acceso al documento: se mantiene el rol calculado */
     }
     const source: AuditSource = input.source ?? (actorRole === "admin" ? "admin" : "web");
 

@@ -12,11 +12,18 @@ service cloud.firestore {
       return ownerEmail() == 'pablogallegosgonzalez@gmail.com';
     }
 
-    // Admins administrados desde el panel (settings/adminAccess.emails).
+    // Admins activos administrados desde el panel (settings/adminAccess.emails).
     function managedAdmin() {
       return request.auth != null
         && exists(/databases/$(database)/documents/settings/adminAccess)
         && ownerEmail() in get(/databases/$(database)/documents/settings/adminAccess).data.get('emails', []);
+    }
+
+    // Admins desactivados explícitamente desde el panel (incluye respaldos .env).
+    function disabledManagedAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/settings/adminAccess)
+        && ownerEmail() in get(/databases/$(database)/documents/settings/adminAccess).data.get('disabledEmails', []);
     }
 
     // Admin de respaldo (.env) para compatibilidad operativa.
@@ -25,7 +32,7 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return superAdmin() || managedAdmin() || legacyAdmin();
+      return superAdmin() || (!disabledManagedAdmin() && (managedAdmin() || legacyAdmin()));
     }
 
     // La orden existe, está confirmada y pertenece a quien escribe la reseña.
