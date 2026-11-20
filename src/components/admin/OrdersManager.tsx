@@ -1141,20 +1141,22 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
                       <div className="space-y-4 border-t bg-secondary/20 p-4">
                         <div>
                           <p className="text-[10px] uppercase tracking-wider2 text-muted-foreground">Productos</p>
-                          <ul className="mt-2 divide-y rounded-md border bg-card">
+                          <ol className="mt-2 list-decimal divide-y rounded-md border bg-card pl-7 pr-3 marker:text-muted-foreground">
                             {order.items.map((item, index) => (
-                              <li key={`${order.id}-${item.productId}-${item.size}-${item.color}-${index}`} className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
-                                <div className="min-w-0">
-                                  <p className="truncate font-medium">{item.name}</p>
-                                  <p className="text-muted-foreground">Talla {item.size || "—"} · {item.color || "—"}</p>
-                                </div>
-                                <div className="shrink-0 text-right">
-                                  <p className="font-medium">{item.qty} × {formatCLP(item.price)}</p>
-                                  <p className="text-muted-foreground">{formatCLP(item.qty * item.price)}</p>
+                              <li key={`${order.id}-${item.productId}-${item.size}-${item.color}-${index}`} className="py-2 text-xs">
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <p className="truncate font-medium">{item.name}</p>
+                                    <p className="text-muted-foreground">Talla {item.size || "—"} · {item.color || "—"}</p>
+                                  </div>
+                                  <div className="shrink-0 text-right">
+                                    <p className="font-medium">{item.qty} × {formatCLP(item.price)}</p>
+                                    <p className="text-muted-foreground">{formatCLP(item.qty * item.price)}</p>
+                                  </div>
                                 </div>
                               </li>
                             ))}
-                          </ul>
+                          </ol>
                         </div>
 
                         <div className="grid gap-3 text-xs sm:grid-cols-2">
@@ -1282,6 +1284,9 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
                                   : null;
                               return (
                                 <div key={`${item.productId || "item"}-${index}`} className="rounded-md border bg-card p-3">
+                                  <p className="mb-2 text-[10px] font-medium uppercase tracking-wider2 text-muted-foreground">
+                                    Ítem {index + 1}
+                                  </p>
                                   <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
                                     <div className="lg:col-span-2">
                                       <Label className="text-[10px]">Producto del catálogo</Label>
