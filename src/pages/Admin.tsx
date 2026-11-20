@@ -48,6 +48,7 @@ import {
   RotateCcw,
   Save,
   Settings,
+  Shield,
   Star,
   TicketPercent,
   Trash2,
@@ -57,8 +58,10 @@ import {
   X,
 } from "lucide-react";
 import { auth, db, isFirebaseConfigured } from "@/lib/firebase";
-import { isAdminEmail } from "@/lib/admin";
+import { isAdminEmail, isSuperAdminEmail, LEGACY_ADMIN_EMAILS, normalizeEmail } from "@/lib/admin";
+import { subscribeAdminAccess } from "@/lib/admin-access";
 import { diffAuditFields, logAudit } from "@/lib/audit";
+import { AdminsManager } from "@/components/admin/AdminsManager";
 import { AuditLogPanel } from "@/components/admin/AuditLogPanel";
 import { AuthSettings } from "@/components/admin/AuthSettings";
 import { ContentManager } from "@/components/admin/ContentManager";
@@ -113,9 +116,10 @@ type Tab =
   | "ventas"
   | "cupones"
   | "guias"
-  | "contenido"
   | "comentarios"
+  | "contenido"
   | "auditoria"
+  | "administradores"
   | "ajustes";
 
 /** Columnas editables de la guía de tallas: cada medida es un rango desde/hasta. */const SIZE_GUIDE_FIELDS = [  { label: "Busto", min: "bustMin", max: "bustMax" },
@@ -1731,7 +1735,7 @@ function ProductForm({
 
 /* ------------------------------ Menú ------------------------------ */
 
-const MENU: { tab: Tab; label: string; icon: typeof LayoutDashboard }[] = [
+const MENU: { tab: Tab; label: string; icon: typeof LayoutDashboard; superOnly?: boolean }[] = [
   { tab: "dashboard", label: "Resumen", icon: LayoutDashboard },
   { tab: "nuevo", label: "Nuevo producto", icon: Plus },
   { tab: "productos", label: "Productos", icon: Package },
@@ -1745,17 +1749,18 @@ const MENU: { tab: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { tab: "comentarios", label: "Comentarios", icon: MessageSquare },
   { tab: "contenido", label: "Contenido", icon: ImagePlus },
   { tab: "auditoria", label: "Auditoría", icon: History },
+  { tab: "administradores", label: "Administradores", icon: Shield, superOnly: true },
   { tab: "ajustes", label: "Ajustes", icon: Settings },
 ];
 
 const TAB_IDS = new Set<Tab>(MENU.map((item) => item.tab));
 
 export default function Admin() {
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [authEmail, setAuthEmail] = useState<string | null>(null);
+  const [authResolved, setAuthResolved] = useState(!isFirebaseConfigured || !auth);
+  const [managedAdminEmails, setManagedAdminEmails] = useState<string[]>([]);
+  const [managedLoaded, setManagedLoaded] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
-  const rawTab = searchParams.get("tab");
-  const tab: Tab = rawTab && TAB_IDS.has(rawTab as Tab) ? (rawTab as Tab) : "dashboard";
-  const setTab = (next: Tab) => setSearchParams({ tab: next }, { replace: true });
   const [menuOpen, setMenuOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [editing, setEditing] = useState<Product | null>(null);
@@ -1773,16 +1778,61 @@ export default function Admin() {
   });
 
   useEffect(() => {
-    const currentAuth = auth;
-    if (!currentAuth) return;
-    return onAuthStateChanged(currentAuth, (user) => {
-      const allowed = isAdminEmail(user?.email);
-      setIsAdmin(allowed);
-      if (user?.email && !allowed) {
-        void signOut(currentAuth);
-      }
+    if (!isFirebaseConfigured || !db) {
+      setManagedLoaded(true);
+      return;
+    }
+    return subscribeAdminAccess((access) => {
+      setManagedAdminEmails(access.emails);
+      setManagedLoaded(true);
     });
   }, []);
+
+  useEffect(() => {
+    const currentAuth = auth;
+    if (!currentAuth) {
+      setAuthResolved(true);
+      return;
+    }
+    return onAuthStateChanged(currentAuth, (user) => {
+      setAuthEmail(normalizeEmail(user?.email) || null);
+      setAuthResolved(true);
+    });
+  }, []);
+
+  const isSuperAdmin = isSuperAdminEmail(authEmail);
+  const adminCheckReady = authResolved && (isSuperAdmin || managedLoaded || !authEmail);
+  const isAdmin = adminCheckReady
+    ? isAdminEmail(authEmail, managedLoaded ? managedAdminEmails : LEGACY_ADMIN_EMAILS)
+    : null;
+
+  const visibleMenu = useMemo(
+    () => MENU.filter((item) => !item.superOnly || isSuperAdmin),
+    [isSuperAdmin]
+  );
+  const rawTab = searchParams.get("tab");
+  const tab: Tab =
+    rawTab && TAB_IDS.has(rawTab as Tab) && visibleMenu.some((item) => item.tab === rawTab)
+      ? (rawTab as Tab)
+      : "dashboard";
+  const setTab = (next: Tab) => setSearchParams({ tab: next }, { replace: true });
+
+  useEffect(() => {
+    if (!auth || !authResolved) return;
+    if (!authEmail) return;
+    if (!adminCheckReady) return;
+    if (!isAdmin) {
+      void signOut(auth);
+    }
+  }, [adminCheckReady, authEmail, authResolved, isAdmin]);
+
+  useEffect(() => {
+    if (!rawTab) return;
+    if (!TAB_IDS.has(rawTab as Tab)) return;
+    if (!isSuperAdmin && rawTab === "administradores") {
+      setSearchParams({ tab: "dashboard" }, { replace: true });
+    }
+  }, [isSuperAdmin, rawTab, setSearchParams]);
 
   useEffect(() => {
     if (!isAdmin || !db) return;
@@ -2041,7 +2091,7 @@ export default function Admin() {
     }
   };
 
-  const activeItem = MENU.find((item) => item.tab === tab);
+  const activeItem = visibleMenu.find((item) => item.tab === tab) ?? MENU.find((item) => item.tab === tab);
 
   return (
     <div className="container flex min-h-[80vh] flex-col gap-6 py-8 md:flex-row md:py-10">
@@ -2086,7 +2136,7 @@ export default function Admin() {
             id="admin-menu"
             className={cn("flex-col gap-1 md:flex", menuOpen ? "mt-2 flex" : "hidden")}
           >
-            {MENU.map((item) => (
+            {visibleMenu.map((item) => (
               <Button
                 key={item.tab}
                 variant={tab === item.tab ? "secondary" : "ghost"}
@@ -2141,9 +2191,11 @@ export default function Admin() {
                               ? "Guías"
                               : tab === "auditoria"
                                 ? "Auditoría"
-                                : tab === "ajustes"
-                                  ? "Ajustes"
-                                  : "Catálogo"}
+                                : tab === "administradores"
+                                  ? "Administradores"
+                                  : tab === "ajustes"
+                                    ? "Ajustes"
+                                    : "Catálogo"}
             </h1>
           </div>
           {firebaseAuth.currentUser?.email && (
@@ -2491,6 +2543,9 @@ export default function Admin() {
         {tab === "comentarios" && <ReviewsModeration />}
         {tab === "contenido" && <ContentManager />}
         {tab === "auditoria" && <AuditLogPanel />}
+        {tab === "administradores" && isSuperAdmin && (
+          <AdminsManager actorEmail={authEmail ?? ""} />
+        )}
         {tab === "ajustes" && <AuthSettings />}
       </main>
     </div>

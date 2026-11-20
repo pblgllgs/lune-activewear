@@ -38,7 +38,8 @@ export type AuditAction =
   | "settings.magicLink"
   | "settings.whatsapp"
   | "settings.maintenance"
-  | "settings.content";
+  | "settings.content"
+  | "settings.admins";
 
 /** Diferencia de un campo entre el estado anterior y el nuevo. */
 export interface AuditChange {

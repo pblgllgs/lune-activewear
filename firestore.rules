@@ -2,15 +2,30 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isAdmin() {
-      return request.auth != null
-        && (request.auth.token.get('email', '') == 'pablogallegosgonzalez@gmail.com'
-            || request.auth.token.get('email', '') == 'admin@luneactivewear.cl');
-    }
-
-    // Correo de la sesión en minúsculas, sin errores si el token no lo trae.
     function ownerEmail() {
       return request.auth != null ? request.auth.token.get('email', '').lower() : '';
+    }
+
+    // Super admin: definido por variable de entorno en la app/servidor; en reglas
+    // se fija al correo configurado (por defecto pablogallegosgonzalez@gmail.com).
+    function superAdmin() {
+      return ownerEmail() == 'pablogallegosgonzalez@gmail.com';
+    }
+
+    // Admins administrados desde el panel (settings/adminAccess.emails).
+    function managedAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/settings/adminAccess)
+        && ownerEmail() in get(/databases/$(database)/documents/settings/adminAccess).data.get('emails', []);
+    }
+
+    // Admin de respaldo (.env) para compatibilidad operativa.
+    function legacyAdmin() {
+      return ownerEmail() == 'admin@luneactivewear.cl';
+    }
+
+    function isAdmin() {
+      return superAdmin() || managedAdmin() || legacyAdmin();
     }
 
     // La orden existe, está confirmada y pertenece a quien escribe la reseña.
@@ -83,10 +98,11 @@ service cloud.firestore {
       }
     }
 
-    // Contenido editable del sitio: hero del inicio e imágenes de Nosotros.
+    // Configuración/contenido editable del sitio. `adminAccess` (lista de
+    // administradores) solo puede escribirla el super admin.
     match /settings/{documentId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if documentId == 'adminAccess' ? superAdmin() : isAdmin();
     }
 
     // Cupones de descuento: lectura pública para validar en carrito y ficha,

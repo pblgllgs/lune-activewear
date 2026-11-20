@@ -1,6 +1,8 @@
 import {
   addDoc,
   collection,
+  doc,
+  getDoc,
   limit,
   onSnapshot,
   orderBy,
@@ -60,6 +62,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "settings.whatsapp": "WhatsApp actualizado",
   "settings.maintenance": "Modo mantenimiento",
   "settings.content": "Contenido actualizado",
+  "settings.admins": "Administradores actualizados",
 };
 
 /** Etiquetas legibles para las entidades afectadas. */
@@ -172,7 +175,19 @@ export async function logAudit(input: AuditLogInput): Promise<void> {
     if (!user) return;
 
     const email = str(user.email).toLowerCase();
-    const actorRole: AuditActorRole = isAdminEmail(email) ? "admin" : "client";
+    let actorRole: AuditActorRole = isAdminEmail(email) ? "admin" : "client";
+    if (actorRole !== "admin") {
+      try {
+        // Admins administrados desde el panel (lectura directa para evitar ciclo con admin-access).
+        const snap = await getDoc(doc(db, "settings/adminAccess"));
+        const raw = snap.exists() ? snap.data().emails : undefined;
+        if (Array.isArray(raw) && raw.some((e) => typeof e === "string" && e.trim().toLowerCase() === email)) {
+          actorRole = "admin";
+        }
+      } catch {
+        /* sin acceso al documento: se mantiene el rol calculado */
+      }
+    }
     const source: AuditSource = input.source ?? (actorRole === "admin" ? "admin" : "web");
 
     await addDoc(collection(db, "auditLogs"), {

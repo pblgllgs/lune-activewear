@@ -32,9 +32,16 @@ informativo hasta conectar Firebase.
    **Email link** para las clientas) y **Firestore**.
 3. Publica las reglas: `firebase deploy --only firestore:rules` (o pégalas desde
    `firestore.rules`).
-4. Agrega los emails administradores en `VITE_ADMIN_EMAILS` y en `firestore.rules`.
-5. Crea el usuario administrador en Firebase Authentication.
-6. Autoriza los dominios de la app en Authentication → Settings → Authorized domains
+4. Define el **super admin** en `VITE_SUPER_ADMIN_EMAIL` (y `SUPER_ADMIN_EMAIL` para el
+   servidor/Functions). Por defecto es `pablogallegosgonzalez@gmail.com`. El super admin
+   es el único que puede administrar a los demás administradores desde el panel
+   (Admin → Administradores). Si cambias el correo del super admin, actualiza también
+   `superAdmin()` en `firestore.rules`.
+5. (Opcional) Define admins de respaldo en `VITE_ADMIN_EMAILS`/`ADMIN_EMAILS`. Los
+   administradores habituales se gestionan desde Admin → Administradores y se guardan en
+   `settings/adminAccess`.
+6. Crea el usuario administrador en Firebase Authentication.
+7. Autoriza los dominios de la app en Authentication → Settings → Authorized domains
    (`localhost` y el dominio de Pages) para que funcione el enlace mágico.
 6. (Opcional) Despliega el worker de R2 para subir imágenes:
    ```bash
