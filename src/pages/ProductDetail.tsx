@@ -1187,6 +1187,35 @@ export default function ProductDetail() {
                 ))}
               </div>
             )}
+            {product.sizes.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {product.sizes
+                  .filter((s) => !isSizeSoldOut(product, s, color))
+                  .map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => {
+                        setSize(s);
+                        const max = sizeStock(product, s, color);
+                        setQty((q) =>
+                          typeof max === "number"
+                            ? Math.min(Math.max(1, q), max)
+                            : Math.max(1, q),
+                        );
+                      }}
+                      aria-label={`Talla ${s}`}
+                      className={`min-w-8 rounded-md border px-2 py-1 text-[11px] transition ${
+                        size === s
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-input hover:border-primary"
+                      }`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+              </div>
+            )}
           </div>
           <Button
             size="lg"
