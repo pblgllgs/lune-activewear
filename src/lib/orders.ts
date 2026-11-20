@@ -78,6 +78,8 @@ export function normalizeOrder(id: string, data: Record<string, unknown>): Order
   const customer = normalizeCustomer(data.customer);
   const customerEmail = str(data.customerEmail).toLowerCase() || customer.email?.toLowerCase();
   const sourceRaw = str(data.source);
+  const subtotal = Math.max(0, Math.round(Number(data.subtotal) || 0));
+  const discount = Math.min(subtotal, Math.max(0, Math.round(Number(data.discount) || 0)));
   return {
     id,
     code: str(data.code) || id.slice(0, 8).toUpperCase(),
@@ -88,7 +90,8 @@ export function normalizeOrder(id: string, data: Record<string, unknown>): Order
     items: Array.isArray(data.items)
       ? data.items.map(normalizeItem).filter((item): item is OrderItem => item !== null)
       : [],
-    subtotal: Math.max(0, Math.round(Number(data.subtotal) || 0)),
+    subtotal,
+    ...(discount > 0 ? { discount } : {}),
     coupon: str(data.coupon) || undefined,
     notes: str(data.notes) || undefined,
     stockApplied: data.stockApplied === true,
@@ -156,6 +159,8 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     .map(normalizeItem)
     .filter((item): item is OrderItem => item !== null);
   const subtotal = calculateSubtotal(items);
+  const discount = Math.min(subtotal, Math.max(0, Math.round(input.discount ?? 0)));
+  const coupon = input.coupon?.trim().toUpperCase() || "";
 
   const ref = await addDoc(collection(db, "orders"), {
     code,
@@ -165,7 +170,8 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     userId: input.userId ?? "",
     items,
     subtotal,
-    coupon: input.coupon?.trim() || "",
+    discount,
+    coupon,
     notes: input.notes?.trim() || "",
     stockApplied: false,
     source: "web",
@@ -182,6 +188,7 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     metadata: {
       items: items.length,
       subtotal,
+      ...(discount > 0 ? { discount, coupon } : {}),
       city: customer.city,
       source: "web",
     },
@@ -203,7 +210,8 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     ...(input.userId ? { userId: input.userId } : {}),
     items,
     subtotal,
-    coupon: input.coupon?.trim() || undefined,
+    ...(discount > 0 ? { discount } : {}),
+    coupon: coupon || undefined,
     notes: input.notes?.trim() || undefined,
     stockApplied: false,
     source: "web",
@@ -263,6 +271,7 @@ export async function updateOrder(orderId: string, input: UpdateOrderInput): Pro
       customer: OrderCustomer;
       items: OrderItem[];
       subtotal: number;
+      discount: number;
       coupon: string;
       notes: string;
     };
@@ -282,11 +291,20 @@ export async function updateOrder(orderId: string, input: UpdateOrderInput): Pro
       if (items.length === 0) throw new Error("La orden debe tener al menos un producto.");
     }
 
+    const subtotal = calculateSubtotal(items);
+    const coupon =
+      input.coupon !== undefined ? input.coupon.trim().toUpperCase() : (current.coupon ?? "");
+    let discount =
+      input.discount !== undefined ? Math.max(0, Math.round(input.discount)) : (current.discount ?? 0);
+    if (!coupon) discount = 0;
+    discount = Math.min(subtotal, discount);
+
     const next = {
       customer,
       items,
-      subtotal: calculateSubtotal(items),
-      coupon: input.coupon?.trim() || "",
+      subtotal,
+      discount,
+      coupon,
       notes: input.notes?.trim() || "",
     };
     snapshot.after = next;
@@ -432,6 +450,7 @@ export async function updateOrder(orderId: string, input: UpdateOrderInput): Pro
           customer: before.customer,
           items: before.items,
           subtotal: before.subtotal,
+          discount: before.discount ?? 0,
           coupon: before.coupon || null,
           notes: before.notes || null,
         },
@@ -439,10 +458,11 @@ export async function updateOrder(orderId: string, input: UpdateOrderInput): Pro
           customer: after.customer,
           items: after.items,
           subtotal: after.subtotal,
+          discount: after.discount,
           coupon: after.coupon || null,
           notes: after.notes || null,
         },
-        ["customer", "items", "subtotal", "coupon", "notes"]
+        ["customer", "items", "subtotal", "discount", "coupon", "notes"]
       ),
       metadata: { status: before.status, stockApplied: before.stockApplied },
     });
@@ -810,6 +830,13 @@ export async function createManualOrder(input: CreateManualOrderInput): Promise<
     typeof input.subtotal === "number" && Number.isFinite(input.subtotal)
       ? Math.max(0, Math.round(input.subtotal))
       : calculateSubtotal(items);
+  const coupon = input.coupon?.trim().toUpperCase() || "";
+  let discount =
+    typeof input.discount === "number" && Number.isFinite(input.discount)
+      ? Math.max(0, Math.round(input.discount))
+      : 0;
+  if (!coupon) discount = 0;
+  discount = Math.min(subtotal, discount);
   const code = makeCode();
   const now = new Date().toISOString();
   const orderRef = doc(collection(firestore, "orders"));
@@ -832,7 +859,8 @@ export async function createManualOrder(input: CreateManualOrderInput): Promise<
       userId: "",
       items,
       subtotal,
-      coupon: input.coupon?.trim() || "",
+      discount,
+      coupon,
       notes: input.notes?.trim() || "",
       stockApplied: applied,
       source: "manual",
@@ -872,6 +900,7 @@ export async function createManualOrder(input: CreateManualOrderInput): Promise<
       status,
       items: items.length,
       subtotal,
+      ...(discount > 0 ? { discount, coupon } : {}),
       source: "manual",
     },
   });
@@ -884,7 +913,8 @@ export async function createManualOrder(input: CreateManualOrderInput): Promise<
     ...(customer.email ? { customerEmail: customer.email.toLowerCase() } : {}),
     items,
     subtotal,
-    coupon: input.coupon?.trim() || undefined,
+    ...(discount > 0 ? { discount } : {}),
+    coupon: coupon || undefined,
     notes: input.notes?.trim() || undefined,
     stockApplied: applied,
     source: "manual",

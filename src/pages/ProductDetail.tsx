@@ -9,12 +9,14 @@ import {
   ChevronRight,
   Heart,
   ImagePlus,
+  Loader2,
   Minus,
   Plus,
   RefreshCw,
   RotateCw,
   ShoppingBag,
   Star,
+  Tag,
   Truck,
   X,
 } from "lucide-react";
@@ -32,6 +34,12 @@ import {
   sizeStock,
 } from "@/lib/stock";
 import { discountPercent, formatCLP } from "@/lib/utils";
+import {
+  couponDiscount,
+  couponValidity,
+  normalizeCouponCode,
+  validateCouponCode,
+} from "@/lib/coupons";
 import { useContact } from "@/lib/use-contact";
 import { richTextToDisplayHtml, richTextToPlainText } from "@/lib/rich-text";
 import { usePagination } from "@/lib/use-pagination";
@@ -59,7 +67,13 @@ import { ProductSpin } from "@/components/product/ProductSpin";
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
-  const { addItem, openCart } = useCart();
+  const {
+    addItem,
+    openCart,
+    appliedCoupon,
+    applyCoupon,
+    clearCoupon,
+  } = useCart();
   const { has: isFavorite, toggle: toggleFavorite } = useWishlist();
   const { whatsappLink } = useContact();
   const { user, displayName } = useAuth();
@@ -84,6 +98,14 @@ export default function ProductDetail() {
   const touchX = useRef<number | null>(null);
   const reviewPhotosRef = useRef(reviewPhotos);
   const uploadsEnabled = isUploadConfigured();
+
+  const [couponInput, setCouponInput] = useState("");
+  const [couponBusy, setCouponBusy] = useState(false);
+  const [couponError, setCouponError] = useState("");
+
+  useEffect(() => {
+    if (appliedCoupon) setCouponInput(appliedCoupon.code);
+  }, [appliedCoupon]);
 
   // Publica la altura de la barra fija para que el botón flotante de WhatsApp quede justo encima.
   const mobileCtaRef = useRef<HTMLDivElement | null>(null);
@@ -275,6 +297,49 @@ export default function ProductDetail() {
   const currentStock = sizeStock(product, size, color);
   const soldOutSizes = product.sizes.filter((s) => isSizeSoldOut(product, s, color));
   const favorite = isFavorite(product.id);
+
+  const selectionAmount = product.price * qty;
+  const appliedIssue = appliedCoupon ? couponValidity(appliedCoupon, selectionAmount) : "";
+  const appliedDiscount =
+    appliedCoupon && !appliedIssue ? couponDiscount(appliedCoupon, selectionAmount) : 0;
+  const selectionTotal = Math.max(0, selectionAmount - appliedDiscount);
+
+  const handleApplyCoupon = async () => {
+    const code = normalizeCouponCode(couponInput);
+    if (code.length < 3) {
+      setCouponError("Escribe un código válido.");
+      return;
+    }
+    setCouponBusy(true);
+    setCouponError("");
+    try {
+      const result = await validateCouponCode(code, selectionAmount);
+      if (!result.coupon || result.discount <= 0) {
+        setCouponError(result.error || "El cupón no es válido.");
+        return;
+      }
+      const { coupon } = result;
+      applyCoupon({
+        code: coupon.code,
+        type: coupon.type,
+        value: coupon.value,
+        active: coupon.active,
+        ...(coupon.minPurchase ? { minPurchase: coupon.minPurchase } : {}),
+        ...(coupon.expiresAt ? { expiresAt: coupon.expiresAt } : {}),
+        ...(coupon.description ? { description: coupon.description } : {}),
+      });
+      setCouponInput(coupon.code);
+      toast.success(`Cupón ${coupon.code} aplicado al carrito.`);
+    } finally {
+      setCouponBusy(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    clearCoupon();
+    setCouponInput("");
+    setCouponError("");
+  };
 
   /** Color asociado a una foto, solo si existe en los colores del producto. */
   const colorForImage = (url: string | undefined) => {
@@ -695,17 +760,44 @@ export default function ProductDetail() {
             </button>
           </div>
 
-          <div className="mt-4 hidden items-center gap-3 lg:flex">
-            <span className="font-display text-2xl">{formatCLP(product.price)}</span>
-            {discount > 0 && product.compareAtPrice && (
-              <>
-                <span className="text-sm text-muted-foreground line-through">
-                  {formatCLP(product.compareAtPrice)}
-                </span>
-                <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] uppercase tracking-wider2">
-                  -{discount}%
-                </span>
-              </>
+          <div className="mt-4 hidden lg:block">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="font-display text-2xl">
+                {formatCLP(appliedDiscount > 0 ? selectionTotal : product.price * (appliedDiscount > 0 ? qty : 1))}
+              </span>
+              {appliedDiscount > 0 ? (
+                <>
+                  <span className="text-sm text-muted-foreground line-through">
+                    {formatCLP(selectionAmount)}
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider2 text-primary">
+                    <Tag className="h-3 w-3" /> -{formatCLP(appliedDiscount)} cupón
+                  </span>
+                </>
+              ) : (
+                discount > 0 &&
+                product.compareAtPrice && (
+                  <>
+                    <span className="text-sm text-muted-foreground line-through">
+                      {formatCLP(product.compareAtPrice)}
+                    </span>
+                    <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] uppercase tracking-wider2">
+                      -{discount}%
+                    </span>
+                  </>
+                )
+              )}
+            </div>
+            {appliedDiscount > 0 && appliedCoupon && (
+              <p className="mt-1 text-xs text-primary">
+                Cupón <span className="font-medium">{appliedCoupon.code}</span> aplicado
+                {qty > 1 ? ` por ${qty} unidades` : ""}.
+              </p>
+            )}
+            {appliedCoupon && appliedIssue && (
+              <p className="mt-1 text-xs text-amber-700">
+                Cupón {appliedCoupon.code}: {appliedIssue}
+              </p>
             )}
           </div>
 
@@ -834,6 +926,73 @@ export default function ProductDetail() {
                 </p>
               </div>
             )}
+          </div>
+
+          {/* Cupón de descuento */}
+          <div className="mt-7 rounded-lg border bg-secondary/30 p-4">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[10px] uppercase tracking-wider2">Cupón de descuento</p>
+              {appliedCoupon && !appliedIssue && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider2 text-primary">
+                  <Tag className="h-3 w-3" /> Aplicado
+                </span>
+              )}
+            </div>
+            {appliedCoupon ? (
+              <div className="mt-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-background px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{appliedCoupon.code}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {appliedCoupon.type === "percent"
+                        ? `${appliedCoupon.value}% de descuento`
+                        : `${formatCLP(appliedCoupon.value)} de descuento`}
+                      {appliedDiscount > 0 ? ` · Ahorras ${formatCLP(appliedDiscount)}` : ""}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2 normal-case tracking-normal"
+                    onClick={handleRemoveCoupon}
+                  >
+                    Quitar
+                  </Button>
+                </div>
+                {appliedIssue ? (
+                  <p className="mt-2 text-xs text-amber-700">{appliedIssue}</p>
+                ) : (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    El descuento se aplicará al total del carrito.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="mt-2 flex gap-2">
+                <Input
+                  id="product-coupon"
+                  value={couponInput}
+                  onChange={(event) => {
+                    setCouponInput(normalizeCouponCode(event.target.value));
+                    if (couponError) setCouponError("");
+                  }}
+                  placeholder="Ingresa tu código"
+                  autoComplete="off"
+                  className="h-10 uppercase placeholder:normal-case"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-10 shrink-0 px-4 normal-case tracking-normal"
+                  onClick={() => void handleApplyCoupon()}
+                  disabled={couponBusy || !couponInput.trim()}
+                >
+                  {couponBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Aplicar"}
+                </Button>
+              </div>
+            )}
+            {couponError && <p className="mt-2 text-xs text-destructive">{couponError}</p>}
           </div>
 
           {/* Cantidad + agregar */}
@@ -1157,8 +1316,17 @@ export default function ProductDetail() {
               <span className="truncate">
                 {color} · Talla {size}
               </span>
-              <span className="font-medium text-foreground">{formatCLP(product.price * qty)}</span>
-              {discount > 0 && product.compareAtPrice ? (
+              <span className="font-medium text-foreground">
+                {formatCLP(appliedDiscount > 0 ? selectionTotal : product.price * qty)}
+              </span>
+              {appliedDiscount > 0 && appliedCoupon ? (
+                <>
+                  <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider2 text-primary">
+                    -{formatCLP(appliedDiscount)}
+                  </span>
+                  <span className="line-through">{formatCLP(selectionAmount)}</span>
+                </>
+              ) : discount > 0 && product.compareAtPrice ? (
                 <>
                   <span className="rounded-full bg-accent px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider2 text-accent-foreground">
                     -{discount}%

@@ -49,6 +49,7 @@ import {
   Save,
   Settings,
   Star,
+  TicketPercent,
   Trash2,
   Truck,
   UploadCloud,
@@ -65,6 +66,7 @@ import { CustomersManager } from "@/components/admin/CustomersManager";
 import { GuidesManager } from "@/components/admin/GuidesManager";
 import { InventoryPanel } from "@/components/admin/InventoryPanel";
 import { OrdersManager } from "@/components/admin/OrdersManager";
+import { CouponsManager } from "@/components/admin/CouponsManager";
 import { SalesManager } from "@/components/admin/SalesManager";
 import { ProductPreview } from "@/components/admin/ProductPreview";
 import { ReviewsModeration } from "@/components/admin/ReviewsModeration";
@@ -109,6 +111,7 @@ type Tab =
   | "clientes"
   | "ordenes"
   | "ventas"
+  | "cupones"
   | "guias"
   | "contenido"
   | "comentarios"
@@ -1737,6 +1740,7 @@ const MENU: { tab: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { tab: "clientes", label: "Clientes", icon: Users },
   { tab: "ordenes", label: "Órdenes de compra", icon: ClipboardList },
   { tab: "ventas", label: "Ventas", icon: BarChart3 },
+  { tab: "cupones", label: "Cupones", icon: TicketPercent },
   { tab: "guias", label: "Guías", icon: BookOpen },
   { tab: "comentarios", label: "Comentarios", icon: MessageSquare },
   { tab: "contenido", label: "Contenido", icon: ImagePlus },
@@ -2131,7 +2135,9 @@ export default function Admin() {
                           ? "Órdenes de compra"
                           : tab === "ventas"
                             ? "Ventas"
-                            : tab === "guias"
+                            : tab === "cupones"
+                              ? "Cupones"
+                              : tab === "guias"
                               ? "Guías"
                               : tab === "auditoria"
                                 ? "Auditoría"
@@ -2252,6 +2258,7 @@ export default function Admin() {
         {tab === "clientes" && <CustomersManager />}
         {tab === "ordenes" && <OrdersManager products={products} />}
         {tab === "ventas" && <SalesManager />}
+        {tab === "cupones" && <CouponsManager />}
         {tab === "guias" && <GuidesManager />}
 
         {tab === "productos" && (

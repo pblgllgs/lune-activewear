@@ -33,7 +33,7 @@ export function orderUpdatedEmail(order: OrderEmailData, siteUrl: string): Built
       )}</strong>. A continuación verás el detalle vigente de tu compra.
     </p>
     ${renderItems(order.items)}
-    ${renderTotals({ subtotal: order.subtotal, coupon: order.coupon })}
+    ${renderTotals({ subtotal: order.subtotal, discount: order.discount, coupon: order.coupon })}
     <div style="margin-top:26px;">
       ${renderInfoBlock([
         ["Estado", escapeHtml(statusLabel)],
@@ -73,8 +73,8 @@ export function orderUpdatedEmail(order: OrderEmailData, siteUrl: string): Built
     ),
     "",
     `Subtotal: ${formatCLP(order.subtotal)}`,
-    ...(order.coupon ? [`Cupón: ${order.coupon}`] : []),
-    `Total: ${formatCLP(order.subtotal)}`,
+    ...((order.discount ?? 0) > 0 ? [`Descuento${order.coupon ? ` (${order.coupon})` : ""}: -${formatCLP(order.discount ?? 0)}`] : []),
+    `Total: ${formatCLP(Math.max(0, order.subtotal - (order.discount ?? 0)))}`,
     "",
     `Estado: ${statusLabel}`,
     `Entrega: ${order.address}, ${order.city}`,

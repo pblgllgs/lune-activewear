@@ -114,7 +114,7 @@ export function orderStatusEmail(
     ${reasonBlock}
     ${trackingBlock}
     ${renderItems(order.items)}
-    ${renderTotals({ subtotal: order.subtotal, coupon: order.coupon })}
+    ${renderTotals({ subtotal: order.subtotal, discount: order.discount, coupon: order.coupon })}
     <div style="margin-top:26px;">
       ${renderInfoBlock([
         ["Estado", escapeHtml(copy.title)],
@@ -149,7 +149,8 @@ export function orderStatusEmail(
       (item) => `- ${item.name} (${item.color}, talla ${item.size}) x${item.qty}`
     ),
     "",
-    `Total: ${formatCLP(order.subtotal)}`,
+    ...((order.discount ?? 0) > 0 ? [`Descuento${order.coupon ? ` (${order.coupon})` : ""}: -${formatCLP(order.discount ?? 0)}`] : []),
+    `Total: ${formatCLP(Math.max(0, order.subtotal - (order.discount ?? 0)))}`,
     "",
     `Entrega: ${order.address}, ${order.city}`,
     "",

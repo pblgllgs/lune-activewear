@@ -136,7 +136,17 @@ export function renderItems(items: OrderEmailItem[]): string {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 0;">${rows}</table>`;
 }
 
-export function renderTotals(input: { subtotal: number; coupon?: string; shipping?: number }): string {
+export function renderTotals(input: {
+  subtotal: number;
+  discount?: number;
+  coupon?: string;
+  shipping?: number;
+}): string {
+  const discount = Math.min(
+    input.subtotal,
+    Math.max(0, Math.round(Number(input.discount) || 0))
+  );
+  const shipping = typeof input.shipping === "number" ? input.shipping : 0;
   const rows: string[] = [
     `<tr>
       <td style="padding:4px 0;font-family:${BODY};font-size:12px;color:${BRAND.muted};">Subtotal</td>
@@ -146,11 +156,12 @@ export function renderTotals(input: { subtotal: number; coupon?: string; shippin
     </tr>`,
   ];
 
-  if (input.coupon) {
+  if (discount > 0 || input.coupon) {
+    const label = input.coupon ? `Descuento (${escapeHtml(input.coupon)})` : "Descuento";
     rows.push(`<tr>
-      <td style="padding:4px 0;font-family:${BODY};font-size:12px;color:${BRAND.muted};">Cupón</td>
-      <td style="padding:4px 0;font-family:${BODY};font-size:12px;color:${BRAND.text};text-align:right;">${escapeHtml(
-        input.coupon
+      <td style="padding:4px 0;font-family:${BODY};font-size:12px;color:${BRAND.muted};">${label}</td>
+      <td style="padding:4px 0;font-family:${BODY};font-size:12px;color:${BRAND.text};text-align:right;">-${formatCLP(
+        discount
       )}</td>
     </tr>`);
   }
@@ -167,7 +178,7 @@ export function renderTotals(input: { subtotal: number; coupon?: string; shippin
   rows.push(`<tr>
     <td style="padding:12px 0 0;border-top:1px solid ${BRAND.border};font-family:${DISPLAY};font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:${BRAND.text};">Total</td>
     <td style="padding:12px 0 0;border-top:1px solid ${BRAND.border};font-family:${DISPLAY};font-size:16px;color:${BRAND.text};text-align:right;">${formatCLP(
-      input.subtotal + (input.shipping ?? 0)
+      Math.max(0, input.subtotal - discount + shipping)
     )}</td>
   </tr>`);
 

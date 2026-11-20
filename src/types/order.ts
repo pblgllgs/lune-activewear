@@ -31,7 +31,10 @@ export interface Order {
   /** UID de Firebase si la compra se hizo con sesión iniciada. */
   userId?: string;
   items: OrderItem[];
+  /** Suma de los productos antes de descuentos. */
   subtotal: number;
+  /** Monto descontado por el cupón (pesos). */
+  discount?: number;
   coupon?: string;
   notes?: string;
   /** `true` cuando la venta se confirmó y se descontó el stock. */
@@ -68,6 +71,7 @@ export interface CreateOrderInput {
   customer: OrderCustomer;
   items: OrderItem[];
   subtotal: number;
+  discount?: number;
   coupon?: string;
   notes?: string;
   /** UID de la clienta si tiene sesión; ausente en compras de invitada. */
@@ -78,6 +82,7 @@ export interface CreateManualOrderInput {
   customer: OrderCustomer;
   items: OrderItem[];
   subtotal?: number;
+  discount?: number;
   coupon?: string;
   notes?: string;
   status: OrderStatus;
@@ -93,6 +98,8 @@ export interface UpdateOrderInput {
   customer: OrderCustomer;
   /** Solo se aplica cuando la orden está pendiente. */
   items?: OrderItem[];
+  subtotal?: number;
+  discount?: number;
   coupon?: string;
   notes?: string;
 }

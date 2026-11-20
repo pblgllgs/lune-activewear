@@ -56,6 +56,7 @@ type Filter = "todas" | OrderStatus;
 type EditForm = {
   customer: OrderCustomer;
   coupon: string;
+  discount: number;
   notes: string;
   items: OrderItem[];
 };
@@ -229,6 +230,7 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
     city: "",
   });
   const [manualCoupon, setManualCoupon] = useState("");
+  const [manualDiscount, setManualDiscount] = useState(0);
   const [manualNotes, setManualNotes] = useState("");
   const [manualCarrier, setManualCarrier] = useState("");
   const [manualTracking, setManualTracking] = useState("");
@@ -291,7 +293,10 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
       pending: pending.length,
       pendingUnits: pending.reduce((sum, order) => sum + itemCount(order), 0),
       sales: sales.length,
-      salesTotal: sales.reduce((sum, order) => sum + order.subtotal, 0),
+      salesTotal: sales.reduce(
+        (sum, order) => sum + Math.max(0, order.subtotal - (order.discount ?? 0)),
+        0
+      ),
       rejected: rejected.length,
     };
   }, [orders]);
@@ -327,6 +332,7 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
     setEditForm({
       customer: { ...order.customer },
       coupon: order.coupon ?? "",
+      discount: order.discount ?? 0,
       notes: order.notes ?? "",
       items: order.items.map((item) => ({ ...item })),
     });
@@ -435,6 +441,7 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
           city: editForm.customer.city.trim(),
         },
         coupon: editForm.coupon,
+        discount: editForm.discount,
         notes: editForm.notes,
         items: editForm.items.map((item) => ({
           productId: item.productId.trim(),
@@ -628,6 +635,7 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
     setManualStatus("pagado");
     setManualCustomer({ name: "", phone: "", email: "", address: "", city: "" });
     setManualCoupon("");
+    setManualDiscount(0);
     setManualNotes("");
     setManualCarrier("");
     setManualTracking("");
@@ -713,6 +721,7 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
         },
         items,
         subtotal: formSubtotal(items),
+        discount: manualDiscount,
         coupon: manualCoupon.trim() || undefined,
         notes: manualNotes.trim() || undefined,
         status: manualStatus,
@@ -867,7 +876,32 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
               )}
               <div>
                 <Label htmlFor="m-coupon">Cupón</Label>
-                <Input id="m-coupon" value={manualCoupon} onChange={(e) => setManualCoupon(e.target.value)} className="mt-1 h-10 uppercase placeholder:normal-case" />
+                <Input
+                  id="m-coupon"
+                  value={manualCoupon}
+                  onChange={(e) => {
+                    const code = e.target.value.toUpperCase().replace(/[^A-Z0-9-_]/g, "").slice(0, 24);
+                    setManualCoupon(code);
+                    if (!code) setManualDiscount(0);
+                  }}
+                  className="mt-1 h-10 uppercase placeholder:normal-case"
+                  placeholder="Código"
+                />
+              </div>
+              <div>
+                <Label htmlFor="m-discount">Descuento (CLP)</Label>
+                <Input
+                  id="m-discount"
+                  type="number"
+                  min={0}
+                  value={manualDiscount}
+                  onChange={(e) =>
+                    setManualDiscount(Math.max(0, Math.round(Number(e.target.value) || 0)))
+                  }
+                  className="mt-1 h-10"
+                  placeholder="0"
+                  disabled={!manualCoupon.trim()}
+                />
               </div>
               <div className="sm:col-span-2 lg:col-span-1">
                 <Label htmlFor="m-notes">Notas (canal, referencia, etc.)</Label>
@@ -992,9 +1026,28 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3">
-              <p className="text-sm">
-                Subtotal: <span className="font-display text-lg">{formatCLP(formSubtotal(manualItems))}</span>
-              </p>
+              <div className="text-sm space-y-0.5">
+                <p>Subtotal: <span className="font-medium">{formatCLP(formSubtotal(manualItems))}</span></p>
+                {manualDiscount > 0 && manualCoupon.trim() && (
+                  <p className="text-primary">
+                    Descuento ({manualCoupon.trim()}): -{formatCLP(Math.min(formSubtotal(manualItems), manualDiscount))}
+                  </p>
+                )}
+                <p>
+                  Total:{" "}
+                  <span className="font-display text-lg">
+                    {formatCLP(
+                      Math.max(
+                        0,
+                        formSubtotal(manualItems) -
+                          (manualCoupon.trim()
+                            ? Math.min(formSubtotal(manualItems), manualDiscount)
+                            : 0)
+                      )
+                    )}
+                  </span>
+                </p>
+              </div>
               <div className="flex flex-wrap gap-2">
                 <Button variant="ghost" onClick={() => { resetManual(); setManualOpen(false); }} disabled={manualSaving}>Cancelar</Button>
                 <Button onClick={() => void saveManual()} disabled={manualSaving}>
@@ -1082,7 +1135,14 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-display text-lg">{formatCLP(order.subtotal)}</p>
+                        <p className="font-display text-lg">
+                          {formatCLP(Math.max(0, order.subtotal - (order.discount ?? 0)))}
+                        </p>
+                        {(order.discount ?? 0) > 0 && (
+                          <p className="text-[11px] text-muted-foreground line-through">
+                            {formatCLP(order.subtotal)}
+                          </p>
+                        )}
                         <p className="text-[11px] text-muted-foreground">
                           {units} {units === 1 ? "unidad" : "unidades"} · {order.items.length} {order.items.length === 1 ? "ítem" : "ítems"}
                         </p>
@@ -1173,7 +1233,7 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
                           </div>
                         </div>
 
-                        {(order.coupon || order.notes) && (
+                        {(order.coupon || order.notes || (order.discount ?? 0) > 0) && (
                           <div className="space-y-1 text-xs">
                             {order.coupon && <p><span className="text-muted-foreground">Cupón: </span>{order.coupon}</p>}
                             {order.notes && <p><span className="text-muted-foreground">Notas: </span>{order.notes}</p>}
@@ -1182,6 +1242,12 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
 
                         <div className="space-y-1 border-t pt-3 text-[11px] text-muted-foreground">
                           <p>Subtotal: {formatCLP(order.subtotal)}</p>
+                          {(order.discount ?? 0) > 0 && (
+                            <p>Descuento{order.coupon ? ` (${order.coupon})` : ""}: -{formatCLP(order.discount ?? 0)}</p>
+                          )}
+                          <p className="font-medium text-foreground">
+                            Total: {formatCLP(Math.max(0, order.subtotal - (order.discount ?? 0)))}
+                          </p>
                           <p>Origen: {order.source === "manual" ? "Manual (registrada en admin)" : "Web (carrito)"}</p>
                           {order.status === "aprobada" && <p>Aprobada {formatDateTime(order.approvedAt)}{order.approvedBy ? ` por ${order.approvedBy}` : ""} · Stock descontado: {order.stockApplied ? "sí" : "no"}</p>}
                           {order.status === "pagado" && <p>Pagada {formatDateTime(order.paidAt)}{order.paidBy ? ` por ${order.paidBy}` : ""} · Stock descontado: {order.stockApplied ? "sí" : "no"}</p>}
@@ -1258,9 +1324,47 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
                         <div className="grid gap-3 sm:grid-cols-2">
                           <div>
                             <Label htmlFor={`edit-coupon-${order.id}`}>Cupón</Label>
-                            <Input id={`edit-coupon-${order.id}`} value={editForm.coupon} onChange={(event) => setEditForm((c) => c ? { ...c, coupon: event.target.value } : c)} className="mt-1 h-10 uppercase placeholder:normal-case" placeholder="Sin cupón" />
+                            <Input
+                              id={`edit-coupon-${order.id}`}
+                              value={editForm.coupon}
+                              onChange={(event) => {
+                                const code = event.target.value
+                                  .toUpperCase()
+                                  .replace(/[^A-Z0-9-_]/g, "")
+                                  .slice(0, 24);
+                                setEditForm((c) =>
+                                  c ? { ...c, coupon: code, discount: code ? c.discount : 0 } : c
+                                );
+                              }}
+                              className="mt-1 h-10 uppercase placeholder:normal-case"
+                              placeholder="Sin cupón"
+                            />
                           </div>
                           <div>
+                            <Label htmlFor={`edit-discount-${order.id}`}>Descuento (CLP)</Label>
+                            <Input
+                              id={`edit-discount-${order.id}`}
+                              type="number"
+                              min={0}
+                              value={editForm.discount}
+                              onChange={(event) =>
+                                setEditForm((c) =>
+                                  c
+                                    ? {
+                                        ...c,
+                                        discount: Math.max(
+                                          0,
+                                          Math.round(Number(event.target.value) || 0)
+                                        ),
+                                      }
+                                    : c
+                                )
+                              }
+                              className="mt-1 h-10"
+                              disabled={!editForm.coupon.trim()}
+                            />
+                          </div>
+                          <div className="sm:col-span-2">
                             <Label htmlFor={`edit-notes-${order.id}`}>Notas</Label>
                             <Textarea id={`edit-notes-${order.id}`} value={editForm.notes} onChange={(event) => setEditForm((c) => c ? { ...c, notes: event.target.value } : c)} rows={2} className="mt-1" />
                           </div>
@@ -1452,7 +1556,32 @@ export function OrdersManager({ products = [] }: { products?: Product[] }) {
                         </div>
 
                         <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3">
-                          <p className="text-sm">Subtotal: <span className="font-display text-lg">{formatCLP(formSubtotal(editForm.items))}</span></p>
+                          <div className="text-sm space-y-0.5">
+                            <p>
+                              Subtotal:{" "}
+                              <span className="font-medium">{formatCLP(formSubtotal(editForm.items))}</span>
+                            </p>
+                            {editForm.discount > 0 && editForm.coupon.trim() && (
+                              <p className="text-primary">
+                                Descuento ({editForm.coupon.trim()}): -
+                                {formatCLP(Math.min(formSubtotal(editForm.items), editForm.discount))}
+                              </p>
+                            )}
+                            <p>
+                              Total:{" "}
+                              <span className="font-display text-lg">
+                                {formatCLP(
+                                  Math.max(
+                                    0,
+                                    formSubtotal(editForm.items) -
+                                      (editForm.coupon.trim()
+                                        ? Math.min(formSubtotal(editForm.items), editForm.discount)
+                                        : 0)
+                                  )
+                                )}
+                              </span>
+                            </p>
+                          </div>
                           <div className="flex flex-wrap gap-2">
                             <Button type="button" variant="ghost" onClick={cancelEdit} disabled={saving}>Cancelar</Button>
                             <Button type="button" onClick={() => void saveEdit(order)} disabled={saving}>

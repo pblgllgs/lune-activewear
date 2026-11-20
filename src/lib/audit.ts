@@ -42,6 +42,9 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "supplier.create": "Proveedor creado",
   "supplier.update": "Proveedor actualizado",
   "supplier.delete": "Proveedor eliminado",
+  "coupon.create": "Cupón creado",
+  "coupon.update": "Cupón actualizado",
+  "coupon.delete": "Cupón eliminado",
   "purchase.create": "Compra registrada",
   "purchase.update": "Compra actualizada",
   "purchase.delete": "Compra eliminada",
@@ -68,6 +71,7 @@ export const AUDIT_ENTITY_LABELS: Record<string, string> = {
   supplier: "Proveedor",
   purchase: "Compra",
   guide: "Guía",
+  coupon: "Cupón",
   review: "Comentario",
   settings: "Ajustes",
 };

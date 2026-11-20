@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Loader2, Minus, Plus, ShoppingBag, Trash2, X } from "lucide-react";
+import { ArrowLeft, Loader2, Minus, Plus, ShoppingBag, Tag, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { FREE_SHIPPING_THRESHOLD } from "@/lib/constants";
+import { normalizeCouponCode, validateCouponCode } from "@/lib/coupons";
 import { useContact } from "@/lib/use-contact";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import { createOrder } from "@/lib/orders";
@@ -29,10 +30,27 @@ function emptyCustomer(): CustomerForm {
 }
 
 export function CartDrawer() {
-  const { items, count, subtotal, isOpen, closeCart, removeItem, setQty, clear } = useCart();
+  const {
+    items,
+    count,
+    subtotal,
+    total,
+    appliedCoupon,
+    couponDiscountAmount,
+    couponIssue,
+    isOpen,
+    closeCart,
+    removeItem,
+    setQty,
+    clear,
+    applyCoupon,
+    clearCoupon,
+  } = useCart();
   const { user } = useAuth();
   const { whatsappLink } = useContact();
-  const [coupon, setCoupon] = useState("");
+  const [couponInput, setCouponInput] = useState("");
+  const [couponBusy, setCouponBusy] = useState(false);
+  const [couponError, setCouponError] = useState("");
   const [step, setStep] = useState<"cart" | "checkout">("cart");
   const [customer, setCustomer] = useState<CustomerForm>(emptyCustomer);
   const [submitting, setSubmitting] = useState(false);
@@ -68,14 +86,58 @@ export function CartDrawer() {
     if (items.length === 0) setStep("cart");
   }, [items.length]);
 
+  useEffect(() => {
+    if (appliedCoupon) setCouponInput(appliedCoupon.code);
+  }, [appliedCoupon]);
+
   if (!isOpen) return null;
 
   const remaining = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal);
   const progress = Math.min(100, (subtotal / FREE_SHIPPING_THRESHOLD) * 100);
+  const effectiveDiscount = couponDiscountAmount;
+  const payable = total;
+  const hasValidCoupon = Boolean(appliedCoupon && !couponIssue && effectiveDiscount > 0);
 
   const update = (field: keyof CustomerForm, value: string) => {
     setCustomer((current) => ({ ...current, [field]: value }));
     if (error) setError("");
+  };
+
+  const handleApplyCoupon = async () => {
+    const code = normalizeCouponCode(couponInput);
+    if (code.length < 3) {
+      setCouponError("Escribe un código válido.");
+      return;
+    }
+    setCouponBusy(true);
+    setCouponError("");
+    try {
+      const result = await validateCouponCode(code, subtotal);
+      if (!result.coupon || result.discount <= 0) {
+        setCouponError(result.error || "El cupón no es válido.");
+        return;
+      }
+      const { coupon } = result;
+      applyCoupon({
+        code: coupon.code,
+        type: coupon.type,
+        value: coupon.value,
+        active: coupon.active,
+        ...(coupon.minPurchase ? { minPurchase: coupon.minPurchase } : {}),
+        ...(coupon.expiresAt ? { expiresAt: coupon.expiresAt } : {}),
+        ...(coupon.description ? { description: coupon.description } : {}),
+      });
+      setCouponInput(coupon.code);
+      toast.success(`Cupón ${coupon.code} aplicado.`);
+    } finally {
+      setCouponBusy(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    clearCoupon();
+    setCouponInput("");
+    setCouponError("");
   };
 
   const validate = (): string => {
@@ -89,6 +151,7 @@ export function CartDrawer() {
   };
 
   const buildMessage = (code?: string): string => {
+    const couponCode = hasValidCoupon ? appliedCoupon?.code : "";
     const lines = [
       code ? `🛍️ Nueva orden ${code}` : "Hola LUNÉ! Quiero hacer un pedido:",
       "",
@@ -98,7 +161,12 @@ export function CartDrawer() {
       ),
       "",
       `Subtotal: ${formatCLP(subtotal)}`,
-      ...(coupon.trim() ? [`Cupón: ${coupon.trim()}`, "(validar descuento, por favor)"] : []),
+      ...(couponCode
+        ? [`Cupón: ${couponCode}`, `Descuento: -${formatCLP(effectiveDiscount)}`]
+        : appliedCoupon
+          ? [`Cupón: ${appliedCoupon.code} (no aplica: ${couponIssue || "revisar"})`]
+          : []),
+      `Total: ${formatCLP(payable)}`,
       "",
       `Clienta: ${customer.name.trim()}`,
       `Teléfono: ${customer.phone.trim()}`,
@@ -149,7 +217,8 @@ export function CartDrawer() {
             price: item.price,
           })),
           subtotal,
-          coupon: coupon.trim() || undefined,
+          discount: hasValidCoupon ? effectiveDiscount : 0,
+          coupon: hasValidCoupon ? appliedCoupon?.code : undefined,
           notes: customer.notes.trim() || undefined,
           userId: user?.uid,
         });
@@ -167,7 +236,8 @@ export function CartDrawer() {
 
       clear();
       setCustomer(emptyCustomer());
-      setCoupon("");
+      setCouponInput("");
+      setCouponError("");
       setStep("cart");
       closeCart();
       toast.success(
@@ -300,39 +370,84 @@ export function CartDrawer() {
             </div>
 
             <div className="border-t bg-card px-5 py-4">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span className="font-display text-xl">{formatCLP(subtotal)}</span>
+              <div className="space-y-1 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span>{formatCLP(subtotal)}</span>
+                </div>
+                {hasValidCoupon && appliedCoupon && (
+                  <div className="flex items-center justify-between text-primary">
+                    <span className="flex items-center gap-1.5">
+                      <Tag className="h-3.5 w-3.5" /> Cupón {appliedCoupon.code}
+                    </span>
+                    <span>-{formatCLP(effectiveDiscount)}</span>
+                  </div>
+                )}
+                {appliedCoupon && couponIssue && (
+                  <p className="text-xs text-amber-700">
+                    Cupón {appliedCoupon.code}: {couponIssue}
+                  </p>
+                )}
+                <div className="flex items-center justify-between border-t pt-2">
+                  <span className="font-medium">Total</span>
+                  <span className="font-display text-xl">{formatCLP(payable)}</span>
+                </div>
               </div>
               <p className="mt-1 text-[11px] text-muted-foreground">
                 Envío calculado al confirmar el pedido por WhatsApp.
               </p>
+
               <div className="mt-4">
                 <label
                   htmlFor="coupon"
                   className="text-[10px] uppercase tracking-wider2 text-muted-foreground"
                 >
-                  Código de descuento (opcional)
+                  Código de descuento
                 </label>
-                <Input
-                  id="coupon"
-                  value={coupon}
-                  onChange={(event) =>
-                    setCoupon(
-                      event.target.value
-                        .toUpperCase()
-                        .replace(/[^A-Z0-9-]/g, "")
-                        .slice(0, 20)
-                    )
-                  }
-                  placeholder="Ej: LUNE10"
-                  autoComplete="off"
-                  className="mt-1 h-10 uppercase placeholder:normal-case"
-                />
-                <p className="mt-1 text-[10px] text-muted-foreground">
-                  El descuento se valida al confirmar el pedido por WhatsApp.
-                </p>
+                {hasValidCoupon && appliedCoupon ? (
+                  <div className="mt-1 flex items-center justify-between rounded-md border bg-secondary/40 px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-foreground">{appliedCoupon.code}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {appliedCoupon.type === "percent"
+                          ? `${appliedCoupon.value}% de descuento`
+                          : `${formatCLP(appliedCoupon.value)} de descuento`}
+                      </p>
+                    </div>
+                    <Button type="button" variant="ghost" size="sm" className="h-8 px-2" onClick={handleRemoveCoupon}>
+                      Quitar
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="mt-1 flex gap-2">
+                    <Input
+                      id="coupon"
+                      value={couponInput}
+                      onChange={(event) => {
+                        setCouponInput(normalizeCouponCode(event.target.value));
+                        if (couponError) setCouponError("");
+                      }}
+                      placeholder="Ej: LUNE10"
+                      autoComplete="off"
+                      className="h-10 uppercase placeholder:normal-case"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-10 shrink-0 px-4 normal-case tracking-normal"
+                      onClick={() => void handleApplyCoupon()}
+                      disabled={couponBusy || !couponInput.trim()}
+                    >
+                      {couponBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Aplicar"}
+                    </Button>
+                  </div>
+                )}
+                {couponError && <p className="mt-1 text-[11px] text-destructive">{couponError}</p>}
+                {appliedCoupon && couponIssue && !couponError && (
+                  <p className="mt-1 text-[11px] text-amber-700">{couponIssue}</p>
+                )}
               </div>
+
               <Button className="mt-4 w-full" variant="celeste" onClick={() => setStep("checkout")}>
                 Continuar con el pedido
               </Button>
@@ -362,16 +477,27 @@ export function CartDrawer() {
                     </li>
                   ))}
                 </ul>
-                <div className="mt-3 flex justify-between border-t pt-2 text-sm">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-display text-base">{formatCLP(subtotal)}</span>
+                <div className="mt-3 space-y-1 border-t pt-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span>{formatCLP(subtotal)}</span>
+                  </div>
+                  {hasValidCoupon && appliedCoupon && (
+                    <div className="flex justify-between text-primary">
+                      <span>Descuento ({appliedCoupon.code})</span>
+                      <span>-{formatCLP(effectiveDiscount)}</span>
+                    </div>
+                  )}
+                  {appliedCoupon && couponIssue && (
+                    <p className="text-[11px] text-amber-700">
+                      Cupón {appliedCoupon.code}: {couponIssue}
+                    </p>
+                  )}
+                  <div className="flex justify-between pt-1 font-medium">
+                    <span>Total</span>
+                    <span className="font-display text-base">{formatCLP(payable)}</span>
+                  </div>
                 </div>
-                {coupon.trim() && (
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    Cupón <span className="font-medium text-foreground">{coupon.trim()}</span> (se valida
-                    por WhatsApp).
-                  </p>
-                )}
               </div>
 
               <div className="mt-5 grid gap-3">
@@ -464,7 +590,7 @@ export function CartDrawer() {
             <div className="border-t bg-card px-5 py-4">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Total del pedido</span>
-                <span className="font-display text-xl">{formatCLP(subtotal)}</span>
+                <span className="font-display text-xl">{formatCLP(payable)}</span>
               </div>
               <Button
                 variant="whatsapp"

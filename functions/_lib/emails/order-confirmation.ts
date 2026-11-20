@@ -22,6 +22,7 @@ export interface OrderEmailData {
   city: string;
   items: OrderEmailItem[];
   subtotal: number;
+  discount?: number;
   coupon?: string;
   notes?: string;
   trackingNumber?: string;
@@ -48,7 +49,7 @@ export function orderConfirmationEmail(order: OrderEmailData, siteUrl: string): 
       )}</strong> y ya lo estamos preparando.
     </p>
     ${renderItems(order.items)}
-    ${renderTotals({ subtotal: order.subtotal, coupon: order.coupon })}
+    ${renderTotals({ subtotal: order.subtotal, discount: order.discount, coupon: order.coupon })}
     <div style="margin-top:26px;">
       ${renderInfoBlock([
         ["Entrega", `${escapeHtml(order.address)}<br />${escapeHtml(order.city)}`],
@@ -88,8 +89,8 @@ export function orderConfirmationEmail(order: OrderEmailData, siteUrl: string): 
     ),
     "",
     `Subtotal: ${formatCLP(order.subtotal)}`,
-    ...(order.coupon ? [`Cupón: ${order.coupon}`] : []),
-    `Total: ${formatCLP(order.subtotal)}`,
+    ...((order.discount ?? 0) > 0 ? [`Descuento${order.coupon ? ` (${order.coupon})` : ""}: -${formatCLP(order.discount ?? 0)}`] : []),
+    `Total: ${formatCLP(Math.max(0, order.subtotal - (order.discount ?? 0)))}`,
     "",
     `Entrega: ${order.address}, ${order.city}`,
     `Contacto: ${order.phone}`,

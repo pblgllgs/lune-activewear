@@ -7,6 +7,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { couponDiscount, couponValidity } from "@/lib/coupons";
+import type { Coupon } from "@/types/coupon";
 
 export interface CartItem {
   key: string;
@@ -21,10 +23,24 @@ export interface CartItem {
   stock?: number;
 }
 
+/** Cupón aplicado al carrito (datos mínimos para recalcular el descuento). */
+export type AppliedCoupon = Pick<
+  Coupon,
+  "code" | "type" | "value" | "active" | "minPurchase" | "expiresAt" | "description"
+>;
+
 interface CartContextValue {
   items: CartItem[];
   count: number;
   subtotal: number;
+  /** Cupón aplicado actualmente (si es válido para el subtotal). */
+  appliedCoupon: AppliedCoupon | null;
+  /** Descuento calculado sobre el subtotal según el cupón aplicado. */
+  couponDiscountAmount: number;
+  /** Motivo por el que el cupón no aplica al subtotal actual (vacío si aplica). */
+  couponIssue: string;
+  /** Total a pagar (subtotal menos descuento válido). */
+  total: number;
   isOpen: boolean;
   openCart: () => void;
   closeCart: () => void;
@@ -32,9 +48,12 @@ interface CartContextValue {
   removeItem: (key: string) => void;
   setQty: (key: string, qty: number) => void;
   clear: () => void;
+  applyCoupon: (coupon: AppliedCoupon) => void;
+  clearCoupon: () => void;
 }
 
 const STORAGE_KEY = "lune-cart";
+const COUPON_KEY = "lune-coupon";
 
 const CartContext = createContext<CartContextValue | null>(null);
 
@@ -53,6 +72,29 @@ export function CartProvider({ children }: { children: ReactNode }) {
       return [];
     }
   });
+  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(() => {
+    try {
+      const raw = localStorage.getItem(COUPON_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as Partial<AppliedCoupon>;
+      if (!parsed || typeof parsed.code !== "string" || !parsed.code) return null;
+      return {
+        code: parsed.code,
+        type: parsed.type === "fixed" ? "fixed" : "percent",
+        value: Math.max(0, Math.round(Number(parsed.value) || 0)),
+        active: parsed.active !== false,
+        ...(typeof parsed.minPurchase === "number" ? { minPurchase: parsed.minPurchase } : {}),
+        ...(typeof parsed.expiresAt === "string" && parsed.expiresAt
+          ? { expiresAt: parsed.expiresAt }
+          : {}),
+        ...(typeof parsed.description === "string" && parsed.description
+          ? { description: parsed.description }
+          : {}),
+      };
+    } catch {
+      return null;
+    }
+  });
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
@@ -62,6 +104,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
       /* almacenamiento no disponible */
     }
   }, [items]);
+
+  useEffect(() => {
+    try {
+      if (appliedCoupon) localStorage.setItem(COUPON_KEY, JSON.stringify(appliedCoupon));
+      else localStorage.removeItem(COUPON_KEY);
+    } catch {
+      /* almacenamiento no disponible */
+    }
+  }, [appliedCoupon]);
 
   const openCart = useCallback(() => setIsOpen(true), []);
   const closeCart = useCallback(() => setIsOpen(false), []);
@@ -98,16 +149,44 @@ export function CartProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
-  const clear = useCallback(() => setItems([]), []);
+  const clear = useCallback(() => {
+    setItems([]);
+    setAppliedCoupon(null);
+  }, []);
+
+  const applyCoupon = useCallback((coupon: AppliedCoupon) => {
+    setAppliedCoupon(coupon);
+  }, []);
+
+  const clearCoupon = useCallback(() => {
+    setAppliedCoupon(null);
+  }, []);
 
   const count = useMemo(() => items.reduce((sum, i) => sum + i.qty, 0), [items]);
   const subtotal = useMemo(() => items.reduce((sum, i) => sum + i.price * i.qty, 0), [items]);
+
+  const couponIssue = useMemo(
+    () => (appliedCoupon ? couponValidity(appliedCoupon, subtotal) : ""),
+    [appliedCoupon, subtotal]
+  );
+  const couponDiscountAmount = useMemo(
+    () => (appliedCoupon && !couponIssue ? couponDiscount(appliedCoupon, subtotal) : 0),
+    [appliedCoupon, couponIssue, subtotal]
+  );
+  const total = useMemo(
+    () => Math.max(0, subtotal - couponDiscountAmount),
+    [subtotal, couponDiscountAmount]
+  );
 
   const value = useMemo(
     () => ({
       items,
       count,
       subtotal,
+      appliedCoupon: couponIssue ? appliedCoupon : appliedCoupon,
+      couponDiscountAmount,
+      couponIssue,
+      total,
       isOpen,
       openCart,
       closeCart,
@@ -115,8 +194,27 @@ export function CartProvider({ children }: { children: ReactNode }) {
       removeItem,
       setQty,
       clear,
+      applyCoupon,
+      clearCoupon,
     }),
-    [items, count, subtotal, isOpen, openCart, closeCart, addItem, removeItem, setQty, clear]
+    [
+      items,
+      count,
+      subtotal,
+      appliedCoupon,
+      couponDiscountAmount,
+      couponIssue,
+      total,
+      isOpen,
+      openCart,
+      closeCart,
+      addItem,
+      removeItem,
+      setQty,
+      clear,
+      applyCoupon,
+      clearCoupon,
+    ]
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

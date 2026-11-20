@@ -31,6 +31,8 @@ export function normalizeOrderForEmail(data: Record<string, unknown>): OrderEmai
       : {};
   const email = (str(data.customerEmail) || str(customer.email)).toLowerCase();
 
+  const subtotal = num(data.subtotal);
+  const discount = Math.min(subtotal, Math.max(0, Math.round(Number(data.discount) || 0)));
   return {
     code: str(data.code) || "LUNÉ",
     status: str(data.status) || "pendiente",
@@ -42,7 +44,8 @@ export function normalizeOrderForEmail(data: Record<string, unknown>): OrderEmai
     items: Array.isArray(data.items)
       ? data.items.map(normalizeItem).filter((item): item is OrderEmailItem => item !== null)
       : [],
-    subtotal: num(data.subtotal),
+    subtotal,
+    ...(discount > 0 ? { discount } : {}),
     coupon: str(data.coupon) || undefined,
     notes: str(data.notes) || undefined,
     trackingNumber: str(data.trackingNumber) || undefined,
