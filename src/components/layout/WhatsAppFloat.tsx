@@ -4,9 +4,8 @@ import { useContact } from "@/lib/use-contact";
 export function WhatsAppFloat() {
   const { whatsappLink } = useContact();
   const { pathname } = useLocation();
-
-  // En la ficha de producto ya hay botón de compra por WhatsApp visible.
-  if (pathname.startsWith("/producto/")) return null;
+  // En la ficha de producto la barra de compra es fija: el botón flotante se apoya sobre ella.
+  const aboveBar = pathname.startsWith("/producto/");
 
   return (
     <a
@@ -14,7 +13,11 @@ export function WhatsAppFloat() {
       target="_blank"
       rel="noreferrer"
       aria-label="Escríbenos por WhatsApp"
-      className="fixed bottom-5 left-5 z-40 flex items-center justify-center rounded-full bg-whatsapp text-whatsapp-foreground shadow-lg shadow-whatsapp/30 ring-1 ring-black/5 transition hover:scale-105 hover:bg-whatsapp-dark"
+      className={`fixed right-5 z-40 flex items-center justify-center rounded-full bg-whatsapp text-whatsapp-foreground shadow-lg shadow-whatsapp/30 ring-1 ring-black/5 transition hover:scale-105 hover:bg-whatsapp-dark ${
+        aboveBar
+          ? "bottom-[calc(var(--product-bar-h,0px)+0.75rem)] lg:bottom-5"
+          : "bottom-5"
+      }`}
       style={{ height: "3.25rem", width: "3.25rem" }}
     >
       <svg viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6">

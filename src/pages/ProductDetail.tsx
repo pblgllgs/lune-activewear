@@ -85,6 +85,22 @@ export default function ProductDetail() {
   const reviewPhotosRef = useRef(reviewPhotos);
   const uploadsEnabled = isUploadConfigured();
 
+  // Publica la altura de la barra fija para que el botón flotante de WhatsApp quede justo encima.
+  const mobileCtaRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const element = mobileCtaRef.current;
+    if (!element) return;
+    const sync = () =>
+      document.documentElement.style.setProperty("--product-bar-h", `${element.offsetHeight}px`);
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.removeProperty("--product-bar-h");
+    };
+  }, [product]);
+
   const reviewPagination = usePagination(reviews, { pageSize: 6, resetKey: id });
 
   useSeo({
@@ -507,7 +523,7 @@ export default function ProductDetail() {
   };
 
   return (
-    <div className="container py-8 pb-80 md:py-12 lg:pb-12">
+    <div className="container py-8 pb-60 md:py-12 lg:pb-12">
       <nav aria-label="Migas de pan" className="mb-6 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
         <Link to="/" className="hover:text-foreground">
           Inicio
@@ -853,6 +869,7 @@ export default function ProductDetail() {
             </Button>
           </div>
 
+          {/* En escritorio se mantiene la compra por WhatsApp; en móvil solo en el carrito. */}
           <Button
             size="lg"
             variant="whatsapp"
@@ -1128,10 +1145,13 @@ export default function ProductDetail() {
       )}
 
       {/* CTA fija en móvil/tablet: botones de compra siempre visibles. */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:hidden">
+      <div
+        ref={mobileCtaRef}
+        className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:hidden"
+      >
         <div className="container flex flex-col gap-2 px-0 sm:px-2">
           <div className="min-w-0">
-            <p className="truncate text-[28px] font-bold leading-tight text-foreground">{product.name}</p>
+            <p className="truncate text-[21px] font-bold leading-tight text-foreground">{product.name}</p>
             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
               <span className="truncate">
                 {color} · Talla {size}
@@ -1176,14 +1196,6 @@ export default function ProductDetail() {
           >
             <ShoppingBag className="h-4 w-4" />
             {currentStock === 0 ? "Agotado en este color" : "Agregar al carrito"}
-          </Button>
-          <Button
-            size="lg"
-            variant="whatsapp"
-            className="w-full"
-            onClick={handleWhatsApp}
-          >
-            Comprar por WhatsApp
           </Button>
         </div>
       </div>
