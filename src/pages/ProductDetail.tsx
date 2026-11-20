@@ -507,7 +507,7 @@ export default function ProductDetail() {
   };
 
   return (
-    <div className="container py-8 md:py-12">
+    <div className="container py-8 pb-80 md:py-12 lg:pb-12">
       <nav aria-label="Migas de pan" className="mb-6 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
         <Link to="/" className="hover:text-foreground">
           Inicio
@@ -635,7 +635,7 @@ export default function ProductDetail() {
           </p>
           <div className="mt-2 flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <h1 className="font-display text-3xl font-medium tracking-tight md:text-4xl">
+              <h1 className="hidden font-display text-3xl font-medium tracking-tight md:text-4xl lg:block">
                 {product.name}
               </h1>
               {product.sku && (
@@ -679,7 +679,7 @@ export default function ProductDetail() {
             </button>
           </div>
 
-          <div className="mt-4 flex items-center gap-3">
+          <div className="mt-4 hidden items-center gap-3 lg:flex">
             <span className="font-display text-2xl">{formatCLP(product.price)}</span>
             {discount > 0 && product.compareAtPrice && (
               <>
@@ -844,7 +844,7 @@ export default function ProductDetail() {
             </div>
             <Button
               size="lg"
-              className="w-full sm:flex-1"
+              className="hidden w-full sm:flex-1 lg:inline-flex"
               onClick={handleAdd}
               disabled={currentStock === 0}
             >
@@ -853,7 +853,12 @@ export default function ProductDetail() {
             </Button>
           </div>
 
-          <Button size="lg" variant="whatsapp" className="mt-3 w-full" onClick={handleWhatsApp}>
+          <Button
+            size="lg"
+            variant="whatsapp"
+            className="mt-3 hidden w-full lg:inline-flex"
+            onClick={handleWhatsApp}
+          >
             Comprar por WhatsApp
           </Button>
 
@@ -1121,6 +1126,67 @@ export default function ProductDetail() {
           </div>
         </section>
       )}
+
+      {/* CTA fija en móvil/tablet: botones de compra siempre visibles. */}
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:hidden">
+        <div className="container flex flex-col gap-2 px-0 sm:px-2">
+          <div className="min-w-0">
+            <p className="truncate text-[28px] font-bold leading-tight text-foreground">{product.name}</p>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
+              <span className="truncate">
+                {color} · Talla {size}
+              </span>
+              <span className="font-medium text-foreground">{formatCLP(product.price * qty)}</span>
+              {discount > 0 && product.compareAtPrice ? (
+                <>
+                  <span className="rounded-full bg-accent px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider2 text-accent-foreground">
+                    -{discount}%
+                  </span>
+                  <span className="line-through">{formatCLP(product.compareAtPrice * qty)}</span>
+                </>
+              ) : null}
+            </div>
+            {product.colors.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {product.colors.map((c) => (
+                  <button
+                    key={c.name}
+                    type="button"
+                    onClick={() => selectColor(c.name)}
+                    className={`flex h-7 w-7 items-center justify-center rounded-full border-2 transition ${
+                      color === c.name ? "border-primary" : "border-transparent"
+                    } ${isColorSoldOut(product, c.name) ? "opacity-40" : ""}`}
+                    aria-label={`Color ${c.name}${isColorSoldOut(product, c.name) ? " (agotado)" : ""}`}
+                    title={isColorSoldOut(product, c.name) ? `${c.name} (agotado)` : c.name}
+                  >
+                    <span
+                      className="h-5 w-5 rounded-full border border-primary/15"
+                      style={{ backgroundColor: c.hex }}
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <Button
+            size="lg"
+            className="w-full"
+            onClick={handleAdd}
+            disabled={currentStock === 0}
+          >
+            <ShoppingBag className="h-4 w-4" />
+            {currentStock === 0 ? "Agotado en este color" : "Agregar al carrito"}
+          </Button>
+          <Button
+            size="lg"
+            variant="whatsapp"
+            className="w-full"
+            onClick={handleWhatsApp}
+          >
+            Comprar por WhatsApp
+          </Button>
+        </div>
+      </div>
 
       {lightbox && (
         <div

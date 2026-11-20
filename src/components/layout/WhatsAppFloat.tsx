@@ -1,7 +1,13 @@
+import { useLocation } from "react-router-dom";
 import { useContact } from "@/lib/use-contact";
 
 export function WhatsAppFloat() {
   const { whatsappLink } = useContact();
+  const { pathname } = useLocation();
+
+  // En la ficha de producto ya hay botón de compra por WhatsApp visible.
+  if (pathname.startsWith("/producto/")) return null;
+
   return (
     <a
       href={whatsappLink("Hola Luné! Quiero información sobre sus prendas.")}
